@@ -80,3 +80,4 @@ docker-compose.override.yml
 *.swo
 *.bak
 *~
+.env
