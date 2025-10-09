@@ -24,10 +24,11 @@ const CapturePanel: React.FC<CapturePanelProps> = ({ onSessionComplete }) => {
     pauseRecording,
     setProfession,
     pendingSessionData,
-    startSession,
+    createSessionWithProfession,
     stopRecording: stopRecordingFromStore,
     stopSession: stopSessionFromStore,
-    uploadVideo
+    uploadVideo,
+    resetSession
   } = useSessionStore();
 
   const { settings } = useBrandingStore();
@@ -51,17 +52,12 @@ const CapturePanel: React.FC<CapturePanelProps> = ({ onSessionComplete }) => {
     setProfession(selectedProfession);
     setRecordingStep('generating');
     try {
-      await startSession(
+      await createSessionWithProfession(
         pendingSessionData.studentName,
         pendingSessionData.studentClass,
         selectedProfession,
         pendingSessionData.studentImageId
       );
-
-      setTimeout(() => {
-        setShowAIImage(true);
-        setRecordingStep('confirmed');
-      }, 1000);
     } catch (error) {
       console.error('Error confirming profession:', error);
       setRecordingStep('selecting');
@@ -132,6 +128,17 @@ const CapturePanel: React.FC<CapturePanelProps> = ({ onSessionComplete }) => {
       videoElement.play().catch(console.error);
     }
   }, [stream]);
+
+  React.useEffect(() => {
+    if (currentSession?.status === 'ready' && currentSession?.futureImageId && recordingStep === 'generating') {
+      setShowAIImage(true);
+      setRecordingStep('confirmed');
+    } else if (currentSession?.status === 'idle' && recordingStep === 'generating') {
+      alert('Failed to generate image. Please try again.');
+      setRecordingStep('selecting');
+      resetSession();
+    }
+  }, [currentSession?.status, currentSession?.futureImageId, recordingStep, resetSession]);
 
   const handleStopSession = () => {
     if (captureState.isRecording) {

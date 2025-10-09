@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { createSession, getSessionStatus, getSessionOutputs, startFinalVideo, getAllSessions } from '../services/sessionService';
+import { createJob, getJobStatus } from '../services/jobService';
 import { Session, CaptureState, UploadProgress } from '../types';
 import { useBrandingStore } from './useBrandingStore';
 import { uploadFile } from '../services/brandingService';
-import { backendFormatToDate } from '../utils/dateUtils'; // Import necessary date utils
+import { backendFormatToDate } from '../utils/dateUtils';
 
 interface SessionStore {
   currentSession: Session | null;
@@ -15,18 +16,18 @@ interface SessionStore {
     studentClass: string;
     studentImageId: string;
   } | null;
+  currentJobId: string | null;
 
   allSessions: Session[];
   latestSession: Session | null;
   isLoadingSessions: boolean;
   sessionsError: string | null;
 
-  startSession: (
+  createSessionWithProfession: (
     studentName: string,
     studentClass: string,
     profession: string,
-    studentImageId: string,
-    studentPhoto?: string | null
+    studentImageId: string
   ) => Promise<void>;
   stopSession: () => Promise<void>;
   uploadVideo: (videoBlob: Blob) => Promise<string | null>;
@@ -57,13 +58,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   captureState: { isRecording: false, hasPhoto: false, recordingDuration: 0 },
   uploadProgress: { percentage: 0, isUploading: false },
   pendingSessionData: null,
+  currentJobId: null,
 
   allSessions: [],
   latestSession: null,
   isLoadingSessions: false,
   sessionsError: null,
 
-  startSession: async (studentName, studentClass, profession, studentImageId) => {
+  createSessionWithProfession: async (studentName, studentClass, profession, studentImageId) => {
     try {
       const schoolId = useBrandingStore.getState().settings?.id;
       if (!schoolId) {
@@ -71,16 +73,26 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         return;
       }
 
-      const response = await createSession(studentName, studentClass, profession, schoolId, studentImageId);
-      if ((response.code === 200 || response.code === 3034) && response.result) {
-        const session = response.result;
+      const sessionResponse = await createSession(studentName, studentClass, schoolId);
+      if ((sessionResponse.code === 200 || sessionResponse.code === 3034) && sessionResponse.result) {
+        const session = sessionResponse.result;
         set({
           currentSession: {
             ...session,
+            profession,
+            studentImageId
           },
         });
+
+        const jobResponse = await createJob(session.id, studentImageId, profession);
+        if ((jobResponse.code === 3057 || jobResponse.code === 200) && jobResponse.result) {
+          set({ currentJobId: jobResponse.result.id });
+          get().pollJobStatus(jobResponse.result.id);
+        } else {
+          console.error('Failed to create job:', jobResponse.message);
+        }
       } else {
-        console.error('Failed to create session:', response.message);
+        console.error('Failed to create session:', sessionResponse.message);
       }
     } catch (error) {
       console.error('Error creating session:', error);
@@ -192,6 +204,39 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
 
+  pollJobStatus: async (jobId: string) => {
+    try {
+      const response = await getJobStatus(jobId);
+      if (!response?.result) return;
+
+      const { currentSession } = get();
+      if (!currentSession) return;
+
+      const job = response.result;
+
+      if (job.status === 'success') {
+        set({
+          currentSession: {
+            ...currentSession,
+            futureImageId: job.imageUrl,
+            status: 'ready'
+          },
+        });
+      } else if (job.status === 'failed') {
+        set({
+          currentSession: {
+            ...currentSession,
+            status: 'idle'
+          },
+        });
+      } else if (['processing', 'queued'].includes(job.status)) {
+        setTimeout(() => get().pollJobStatus(jobId), 3000);
+      }
+    } catch (error) {
+      console.error('⚠️ Error polling job status:', error);
+    }
+  },
+
   pollSessionStatus: async (sessionId) => {
     try {
       const response = await getSessionStatus(sessionId);
@@ -200,7 +245,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const { currentSession } = get();
       if (!currentSession) return;
 
-      const result = response.result as Partial<Session>; 
+      const result = response.result as Partial<Session>;
       set({
         currentSession: {
           ...currentSession,
@@ -311,6 +356,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       captureState: { isRecording: false, hasPhoto: false, recordingDuration: 0 },
       uploadProgress: { percentage: 0, isUploading: false },
       pendingSessionData: null,
+      currentJobId: null,
     });
   },
 

@@ -132,7 +132,8 @@ const StartSessionForm: React.FC<StartSessionFormProps> = ({ onSessionStart }) =
       setPendingSessionData(studentName.trim(), studentClass, studentImageId);
       onSessionStart();
     } catch (error) {
-      console.error('Error uploading photo or starting session:', error);
+      console.error('Error uploading photo:', error);
+      alert('Failed to upload photo. Please try again.');
     } finally {
       setIsUploading(false);
     }

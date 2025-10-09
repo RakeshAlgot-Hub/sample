@@ -5,17 +5,13 @@ import { apiClient } from "./authService";
 export const createSession = async (
   studentName: string,
   studentClass: string,
-  profession: string,
-  schoolId: string,
-  studentImageId: string,
+  schoolId: string
 ): Promise<ApiResponse<Session>> => {
   try {
     const response = await apiClient.post('/sessions', {
       studentName,
       studentClass,
-      profession,
-      schoolId,
-      studentImageId
+      schoolId
     });
     return response.data;
   } catch (error: any) {

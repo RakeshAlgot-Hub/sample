@@ -11,9 +11,7 @@ export type SessionStatus =
 export interface SessionBase {
   studentName: string;
   studentClass: string;
-  profession: string;
   schoolId: string;
-  studentImageId: string;
 }
 
 // Session creation request
@@ -21,9 +19,11 @@ export interface SessionCreate extends SessionBase {}
 
 // Session object returned from backend
 export interface Session extends SessionBase {
-  id: string;                        // always included for UI
-  createdAt: Date;                  // ISO string from backend
+  id: string;
+  createdAt: Date;
   status: SessionStatus;
+  profession?: string;
+  studentImageId?: string;
   futureImageId?: string;
   videoId?: string;
   outputs?: Record<string, any>;
