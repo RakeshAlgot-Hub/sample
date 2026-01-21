@@ -1,21 +1,10 @@
+// ui/src/types/auth.ts
+
 export interface User {
   id: string;
+  username: string;
   email: string;
-  createdDate: string;
-  keycloakId: string;
-  username: string;
-  role?: string;
-  isEmailVerified?: boolean;
-  profilePicture?: string | null;
-  provider?: string;
+  fullName: string;
+  phoneNumber: string;
+  isActive: boolean;
 }
-
-export interface LoginData {
-  username: string;
-  password: string;
-}
-
-export type LoginCredentials = LoginData;
-
-
-

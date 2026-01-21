@@ -1,134 +1,73 @@
+# Welcome to your Lovable project
 
+## Project info
 
+**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
-# 🚀 Frontend Project Template (Vite + React + TS + Tailwind)
+## How can I edit this code?
 
-This is a dynamic **frontend project template** built with **Vite**, **React**, **TypeScript**, **Tailwind CSS**, **Stripe**, and **Razorpay**.  
-It includes a custom **bootstrap script** (`setupUiTemplate.sh`) to quickly create new projects with pre-configured environment variables.
+There are several ways of editing your application.
 
----
+**Use Lovable**
 
-## 📦 Features
+Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
 
-- ⚡ **Vite + React + TypeScript** – Modern, fast development
-- 🎨 **Tailwind CSS** – Utility-first styling
-- 💳 **Stripe + Razorpay** – Payment gateway integrations
-- ⚙️ **Bootstrap Script** – Create new projects with one command
-- 🌐 **Dynamic Config** – Project name & description auto-injected from `.env`
-- 🧹 **Clean Setup** – Skips `node_modules` and `.git` when copying
+Changes made via Lovable will be committed automatically to this repo.
 
----
+**Use your preferred IDE**
 
-## 🚀 Getting Started
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-### 1. Run Setup Script
-Create a new project with:
-```bash
-./setupUiTemplate.sh <path-to-create> <project-name>
-````
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Example:
+Follow these steps:
 
-```bash
-./setupUiTemplate.sh /d/ProjectName ui
-```
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
 
-If arguments are omitted, the script will ask you interactively.
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
 
----
+# Step 3: Install the necessary dependencies.
+npm i
 
-## ⚙️ Environment Variables
-
-The setup script generates a `.env` file with required values.
-
-Example `.env`:
-
-```env
-# Project Info
-VITE_PROJECT_NAME=MyApp
-VITE_PROJECT_DESCRIPTION=My amazing Vite project
-
-# API Config
-VITE_API_BASE_URL=http://localhost:8000
-VITE_API_KEY=admin123
-
-# Payment Config
-VITE_RAZORPAY_KEY_ID=rzp_test_xxxxx
-VITE_RAZORPAY_KEY_SECRET=xxxxxx
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_xxxxx
-
-# Theme Colors (edit anytime)
-VITE_PRIMARY_500=#38bdf8
-VITE_PRIMARY_600=#0ea5e9
-VITE_SECONDARY_500=#4ade80
-VITE_SECONDARY_600=#22c55e
-VITE_ACCENT_500=#fbbf24
-VITE_ACCENT_600=#f59e0b
-```
-
----
-
-## 🎨 Dynamic Title & Description
-
-The `index.html` template updates **title** and **description** dynamically from `.env`:
-
-```html
-<title id="dynamic-title">Dynamic App</title>
-<meta name="description" id="dynamic-description" content="A dynamic application template" />
-```
-
-Injected at runtime:
-
-```js
-const projectName = import.meta.env.VITE_PROJECT_NAME || 'Dynamic App';
-const projectDescription = import.meta.env.VITE_PROJECT_DESCRIPTION || 'A dynamic application template';
-```
-
----
-
-## 🛠️ Development
-
-Start the dev server:
-
-```bash
+# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-Build for production:
+**Edit a file directly in GitHub**
 
-```bash
-npm run build
-```
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
 
-Preview production build:
+**Use GitHub Codespaces**
 
-```bash
-npm run preview
-```
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
 
----
+## What technologies are used for this project?
 
-## 📁 Folder Structure
+This project is built with:
 
-```
-project-root/
-├── public/             # Static assets
-├── src/                # React + TS source code
-│   ├── components/     # Shared components
-│   ├── pages/          # Page-level views
-│   ├── stores/         # Zustand stores
-│   ├── services/       # API services
-│   └── main.tsx        # App entry
-├── index.html          # Template with dynamic title & description
-├── setupUiTemplate.sh  # Bootstrap script
-└── .env                # Environment variables
-```
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
 
----
+## How can I deploy this project?
 
-## 🎉 Notes
+Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
-* The setup script automatically installs dependencies and updates project name.
-* You can edit colors, project name, and description anytime in `.env`.
-* Every new project is clean and independent.
+## Can I connect a custom domain to my Lovable project?
 
+Yes, you can!
+
+To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+
+Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)

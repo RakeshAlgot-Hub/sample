@@ -2,27 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title id="dynamic-title">Dynamic App</title>
-    <meta name="description" content="A dynamic application template" id="dynamic-description" />
+    <!-- TODO: Set the document title to the name of your application -->
+    <title>Lovable App</title>
+    <meta name="description" content="Lovable Generated Project" />
+    <meta name="author" content="Lovable" />
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@300;400;700&family=Fredoka+One:wght@400&family=Bubblegum+Sans:wght@400&family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <!-- TODO: Update og:title to match your application name -->
+    <meta property="og:title" content="Lovable App" />
+    <meta property="og:description" content="Lovable Generated Project" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@Lovable" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
   </head>
+
   <body>
     <div id="root"></div>
-    <script type="module">
-      // Import Vite environment variables
-      const projectName = import.meta.env.VITE_PROJECT_NAME || 'Dynamic App';
-      const projectDescription = import.meta.env.VITE_PROJECT_DESCRIPTION || 'A dynamic application template';
-      
-      // Set title and meta description
-      document.getElementById('dynamic-title').textContent = projectName;
-      document.getElementById('dynamic-description').setAttribute('content', projectDescription);
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
