@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building2, ArrowRight, CheckCircle, Smartphone, Shield, Zap } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { useAuth } from '../contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
   const { user, isLoading } = useAuth();

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Building, BedDouble, Users, MapPin, ChevronRight } from 'lucide-react';
-import { Property } from '../types/property'; // Import the Property type
+import { Property } from '@/types/property'; // Import the Property type
 
 interface PropertyCardProps {
   property: Property; // Use the imported Property type

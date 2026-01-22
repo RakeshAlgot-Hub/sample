@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BedDouble, ArrowRight } from 'lucide-react';
-import { Button } from '../ui/button';
-import { usePropertyWizardStore } from '../../stores/propertyWizardStore';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
-import { Input } from '../ui/input';
-import { FloorConfig, RoomConfig } from '../../types/propertyWizard';
+import { Button } from '@/components/ui/button';
+import { usePropertyWizardStore } from '@/stores/propertyWizardStore';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Input } from '@/components/ui/input';
+import { FloorConfig, RoomConfig } from '@/types/propertyWizard';
 
 const shareTypes = [
   { value: 1, label: '1 Share' },

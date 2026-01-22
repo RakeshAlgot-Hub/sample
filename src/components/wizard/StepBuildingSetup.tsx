@@ -1,10 +1,10 @@
 import { motion } from 'framer-motion';
 import { Layers, ArrowRight, Minus, Plus } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { usePropertyWizardStore } from '../../stores/propertyWizardStore';
-
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { usePropertyWizardStore } from '@/stores/propertyWizardStore';
+import { BuildingConfig } from '@/types/propertyWizard';
 
 const StepBuildingSetup = () => {
   const { 

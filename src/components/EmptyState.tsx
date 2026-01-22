@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Building2, Plus, ArrowRight } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 
 interface EmptyStateProps {
   onCreateProperty: () => void;

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BedDouble, ArrowRight, Check } from 'lucide-react';
-import { Button } from '../ui/button';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Label } from '../ui/label';
-import { Input } from '../ui/input';
-import { usePropertyWizardStore } from '../../stores/propertyWizardStore';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
-import { FloorConfig, FloorShareDecision } from '../../types/propertyWizard';
+import { Button } from '@/components/ui/button';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { usePropertyWizardStore } from '@/stores/propertyWizardStore';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { FloorConfig, FloorShareDecision } from '@/types/propertyWizard';
 
 const shareTypes = [
   { label: '1 Bed', value: 1 },
