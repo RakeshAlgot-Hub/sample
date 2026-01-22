@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building2, Plus, Users, BedDouble, Home, LogOut, LayoutGrid } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { propertiesApi } from '@/services/api'; // propertiesApi still imported from services/api
-import { Property } from '@/types/property'; // Import Property from types
-import { useToast } from '@/hooks/use-toast';
-import PropertyCard from '@/components/PropertyCard';
-import EmptyState from '@/components/EmptyState';
+import { Button } from '../components/ui/button';
+import { useAuth } from '../contexts/AuthContext';
+import { propertiesApi } from '../services/api'; // propertiesApi still imported from services/api
+import { Property } from '../types/property'; // Import Property from types
+import { useToast } from '../hooks/use-toast';
+import PropertyCard from '../components/PropertyCard';
+import EmptyState from '../components/EmptyState';
 
 const Dashboard = () => {
   const { user, isLoading: authIsLoading, signOut } = useAuth();

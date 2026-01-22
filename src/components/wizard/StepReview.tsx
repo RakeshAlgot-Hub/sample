@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Building, Layers, Grid3X3, BedDouble, MapPin, Phone, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { usePropertyWizardStore } from '@/stores/propertyWizardStore';
-import { useAuth } from '@/contexts/AuthContext';
-import { wizardApi } from '@/services/api';
-import { CreateFullPropertyRequest, CreateFullPropertyResponse } from '@/types/api';
-import { Property } from '@/types/property';
-import { useToast } from '@/hooks/use-toast';
+import { Button } from '../ui/button';
+import { usePropertyWizardStore } from '../../stores/propertyWizardStore';
+import { useAuth } from '../../contexts/AuthContext';
+import { wizardApi } from '../../services/api';
+import { CreateFullPropertyRequest, CreateFullPropertyResponse } from '../../types/api';
+import { Property } from '../../types/property';
+import { useToast } from '../../hooks/use-toast';
 
 const StepReview = () => {
   const navigate = useNavigate();

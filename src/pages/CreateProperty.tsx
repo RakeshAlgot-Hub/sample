@@ -2,16 +2,16 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building2, ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { usePropertyWizardStore } from '@/stores/propertyWizardStore';
-import WizardProgress from '@/components/wizard/WizardProgress';
-import StepPropertyDetails from '@/components/wizard/StepPropertyDetails';
-import StepBuildingSetup from '@/components/wizard/StepBuildingSetup';
-import StepFloorConfig from '@/components/wizard/StepFloorConfig';
-import StepShareTypeDecision from '@/components/wizard/StepShareTypeDecision';
-import StepRoomConfig from '@/components/wizard/StepRoomConfig';
-import StepReview from '@/components/wizard/StepReview';
+import { Button } from '../components/ui/button';
+import { useAuth } from '../contexts/AuthContext';
+import { usePropertyWizardStore } from '../stores/propertyWizardStore';
+import WizardProgress from '../components/wizard/WizardProgress';
+import StepPropertyDetails from '../components/wizard/StepPropertyDetails';
+import StepBuildingSetup from '../components/wizard/StepBuildingSetup';
+import StepFloorConfig from '../components/wizard/StepFloorConfig';
+import StepShareTypeDecision from '../components/wizard/StepShareTypeDecision';
+import StepRoomConfig from '../components/wizard/StepRoomConfig';
+import StepReview from '../components/wizard/StepReview';
 
 const CreateProperty = () => {
   const { user, isLoading: loading } = useAuth();

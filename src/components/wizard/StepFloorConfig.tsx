@@ -1,10 +1,9 @@
 import { motion } from 'framer-motion';
 import { Grid3X3, ArrowRight, Minus, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { usePropertyWizardStore } from '@/stores/propertyWizardStore';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Button } from '../ui/button';
+import { usePropertyWizardStore } from '../../stores/propertyWizardStore';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { useState } from 'react';
-import { FloorConfig } from '@/types/propertyWizard';
 
 const StepFloorConfig = () => {
   const { buildings, floors, setFloor, initializeFloorShareDecisions, nextStep } = usePropertyWizardStore();

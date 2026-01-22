@@ -2,13 +2,13 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Building2, Mail, Lock, User, ArrowRight, Eye, EyeOff, Phone } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../hooks/use-toast";
 import { z } from "zod";
-import { loginSchema, signupSchema } from "@/types/authSchemas";
+import { loginSchema, signupSchema } from "../types/authSchemas";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);

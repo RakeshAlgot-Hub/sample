@@ -5,11 +5,11 @@
  * Replace API_BASE_URL with your actual backend URL when ready.
  */
 
-import { LoginRequest, RegisterRequest, WizardPropertyRequest, WizardBuildingInput, WizardFloorInput, WizardRoomInput, CreateFullPropertyRequest, CreateFullPropertyResponse, CreatePropertyRequest, UpdatePropertyRequest, CreateBuildingRequest, CreateFloorRequest, CreateRoomRequest, CreateMemberRequest, UpdateMemberRequest, PropertyDetailBuilding, PropertyDetailFloor, PropertyDetailRoom, PropertyDetails } from "@/types/api";
-import { User } from "@/types/auth";
-import { Property } from "@/types/property";
-import { Building, Floor, Room, Bed } from "@/types/hierarchy";
-import { Member } from "@/types/member";
+import { LoginRequest, RegisterRequest, WizardPropertyRequest, WizardBuildingInput, WizardFloorInput, WizardRoomInput, CreateFullPropertyRequest, CreateFullPropertyResponse, CreatePropertyRequest, UpdatePropertyRequest, CreateBuildingRequest, CreateFloorRequest, CreateRoomRequest, CreateMemberRequest, UpdateMemberRequest, PropertyDetailBuilding, PropertyDetailFloor, PropertyDetailRoom, PropertyDetails } from "../types/api";
+import { User } from "../types/auth";
+import { Property } from "../types/property";
+import { Building, Floor, Room, Bed } from "../types/hierarchy";
+import { Member } from "../types/member";
 
 const API_BASE_URL = "/api";
 console.log(API_BASE_URL)

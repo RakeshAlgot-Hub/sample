@@ -5,18 +5,18 @@ import {
   Building2, ArrowLeft, MapPin, Phone, Building, 
   Grid3X3, BedDouble, Users, Search, UserPlus, Pencil, Trash2
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useAuth } from '@/contexts/AuthContext';
-import { propertyDetailsApi, membersApi, propertiesApi } from '@/services/api';
-import { PropertyDetails, UpdatePropertyRequest } from '@/types/api';
-import { Member } from '@/types/member';
-import { useToast } from '@/hooks/use-toast';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { useAuth } from '../contexts/AuthContext';
+import { propertyDetailsApi, membersApi, propertiesApi } from '../services/api';
+import { PropertyDetails, UpdatePropertyRequest } from '../types/api';
+import { Member } from '../types/member';
+import { useToast } from '../hooks/use-toast';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '../components/ui/dialog';
+import { Label } from '../components/ui/label';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 const PropertyDetail = () => {
   const { id } = useParams();

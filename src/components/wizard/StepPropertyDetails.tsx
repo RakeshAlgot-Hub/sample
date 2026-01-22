@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Building, MapPin, Phone, ArrowRight, Minus, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { usePropertyWizardStore } from '@/stores/propertyWizardStore';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { usePropertyWizardStore } from '../../stores/propertyWizardStore';
 import { z } from 'zod';
-import { propertyDetailsSchema as schema } from '@/types/propertyWizardSchemas';
+import { propertyDetailsSchema as schema } from '../../types/propertyWizardSchemas';
 
 const StepPropertyDetails = () => {
   const { 
