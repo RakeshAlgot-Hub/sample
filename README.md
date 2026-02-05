@@ -1,73 +1,325 @@
-# Welcome to your Lovable project
+# PropertyPal
 
-## Project info
+A mobile-first Expo React Native application for smart property management.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+### Part 1 - Authentication & Core UI
+- Full Light and Dark theme support
+- Mock authentication system with persistent login
+- Animated splash screen
+- Bottom tab navigation
+- Profile management with theme toggle
+- Modern, clean UI design
 
-There are several ways of editing your application.
+### Part 2A - Property Creation Wizard
+- 5-step wizard for creating properties
+  - Step 1: Property Details (name, type, city)
+  - Step 2: Buildings (add/edit/remove buildings)
+  - Step 3: Floors (add/edit/remove floors per building)
+  - Step 4: Rooms (add/remove rooms with share types)
+  - Step 5: Review (review complete property hierarchy before submission)
+- Multi-building support with floor management
+- Room management with share type selection (Single, Double, Triple)
+- Visual bed preview based on share type
+- Real-time validation with inline feedback
+- Persistent wizard state across steps
+- Smooth animations and transitions
+- Card-based layouts with touch-friendly UI
 
-**Use Lovable**
+### Part 2B-2B - Review Screen
+- Comprehensive review screen showing complete property hierarchy
+- Collapsible cards for Buildings, Floors, and Rooms
+- Beds displayed as simple list with availability status
+- Summary statistics showing:
+  - Total Buildings
+  - Total Floors
+  - Total Rooms
+  - Total Beds
+- Property details summary at top
+- Navigation back to edit previous steps
+- Read-only display with no editing capabilities
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Part 2B-2C - Final Validation & Save
+- Complete validation before saving:
+  - Every building must have at least 1 floor
+  - Every floor must have at least 1 room
+  - Every room must have at least 1 bed
+- Inline validation messages for any errors
+- "Confirm & Save" button disabled when validation fails
+- Success feedback with animated check icon
+- Automatic navigation to Properties list after save
+- Full wizard state reset after successful save
+- Properties persisted in AsyncStorage via propertiesStore
+- Properties list displays saved properties with complete stats
 
-Changes made via Lovable will be committed automatically to this repo.
+### Part 3A - Dashboard Analytics
+- Real-time analytics computed from local properties store
+- Key metrics displayed:
+  - Total Properties
+  - Total Buildings
+  - Total Floors
+  - Total Rooms
+  - Total Beds
+  - Available Beds
+- Occupancy Rate indicator with animated progress bar
+- Color-coded occupancy status (green/yellow/red based on percentage)
+- Empty state with CTA to create first property
+- Smooth entrance animations for all dashboard cards
+- Reusable StatCard and OccupancyIndicator components
+- Mobile-optimized grid layout
+- Dashboard is the default screen after login
 
-**Use your preferred IDE**
+### Part 3B - Property Details & Bed Status
+- Property Details screen accessible from Properties list
+- Shows property name, type, and city at the top
+- Read-only property hierarchy view:
+  - Expandable buildings
+  - Expandable floors within buildings
+  - Expandable rooms within floors
+  - Bed status display within rooms
+- Bed status color coding:
+  - Green = Available
+  - Red = Occupied
+- Room-level summary showing:
+  - Room number and share type
+  - Total bed count
+  - Available vs Occupied beds count
+- Summary statistics at property level:
+  - Total buildings
+  - Available beds (green)
+  - Occupied beds (red)
+- Clean nested card layout with subtle animations
+- Touch-friendly expandable/collapsible hierarchy
+- Back navigation to Properties list
+- Reusable components: BuildingAccordion, FloorAccordion, RoomDetailCard, BedStatusBadge
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Part 4 - Members Management (Foundation)
+- Members tab in bottom navigation
+- Members list screen displaying all members
+- Each member card shows:
+  - Name
+  - Phone number
+  - Active status
+- Add member functionality:
+  - Name field (required)
+  - Phone number field (required)
+  - Success feedback on save
+- Remove member functionality:
+  - Confirmation dialog before removal
+  - Smooth removal animation
+- Empty state with CTA to add first member
+- Members persisted in AsyncStorage via membersStore
+- Reusable components: MemberCard, MemberForm
+- No bed assignments yet (foundation for future features)
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Tech Stack
 
-Follow these steps:
+- Expo + React Native
+- TypeScript
+- expo-router for navigation
+- Zustand for state management
+- react-native-reanimated for animations
+- AsyncStorage for persistence
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Project Structure
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+```
+app/
+├── (auth)/
+│   ├── _layout.tsx
+│   ├── login.tsx
+│   └── signup.tsx
+├── (tabs)/
+│   ├── _layout.tsx
+│   ├── index.tsx (Dashboard)
+│   ├── properties.tsx
+│   ├── members.tsx
+│   └── profile.tsx
+├── property/
+│   ├── _layout.tsx
+│   └── [id].tsx (Property Details)
+├── member/
+│   ├── _layout.tsx
+│   └── add.tsx (Add Member)
+├── wizard/
+│   ├── _layout.tsx
+│   ├── property-details.tsx
+│   ├── buildings.tsx
+│   ├── floors.tsx
+│   ├── rooms.tsx
+│   └── review.tsx
+├── _layout.tsx
+└── index.tsx (Splash)
 
-# Step 3: Install the necessary dependencies.
-npm i
+components/
+├── AnimatedButton.tsx
+├── PropertyCard.tsx
+├── FloorCard.tsx
+├── RoomCard.tsx
+├── RoomDetailCard.tsx
+├── ShareTypeSelector.tsx
+├── WizardHeader.tsx
+├── WizardFooter.tsx
+├── ReviewSummary.tsx
+├── TotalStatsCard.tsx
+├── HierarchyCard.tsx
+├── BuildingAccordion.tsx
+├── FloorAccordion.tsx
+├── BedStatusBadge.tsx
+├── StatCard.tsx
+├── OccupancyIndicator.tsx
+├── MemberCard.tsx
+└── MemberForm.tsx
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+store/
+├── useStore.ts
+├── useWizardStore.ts
+├── usePropertiesStore.ts
+└── useMembersStore.ts
+
+theme/
+├── colors.ts
+└── useTheme.ts
+
+types/
+├── property.ts
+└── member.ts
+
+mockData/
+└── users.ts
 ```
 
-**Edit a file directly in GitHub**
+## Demo Credentials
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Email: demo@propertypal.com
+- Password: demo123
 
-**Use GitHub Codespaces**
+## Getting Started
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-## What technologies are used for this project?
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-This project is built with:
+3. Build for web:
+   ```bash
+   npm run build:web
+   ```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Theme System
 
-## How can I deploy this project?
+The app supports Light and Dark themes with the following colors:
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### Light Theme
+- Primary: hsl(173, 58%, 39%)
+- Secondary: hsl(220, 14%, 96%)
+- Accent: hsl(12, 76%, 61%)
+- Background: #ffffff
+- Text: #111827
 
-## Can I connect a custom domain to my Lovable project?
+### Dark Theme
+- Primary: hsl(173, 58%, 45%)
+- Secondary: hsl(220, 20%, 18%)
+- Accent: hsl(12, 76%, 55%)
+- Background: #0f172a
+- Text: #f8fafc
 
-Yes, you can!
+Theme preference is persisted in AsyncStorage and can be toggled from the Profile screen.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Authentication
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Mock authentication is implemented using Zustand and AsyncStorage:
+- Login with demo credentials or create a new account
+- Auth state persists across app restarts
+- Logout clears auth state and redirects to login
+
+## Property Creation Wizard
+
+The app includes a comprehensive 5-step wizard for creating properties:
+
+### Step 1: Property Details
+- Enter property name (required)
+- Select property type (Hostel, PG, Apartment)
+- Enter city location
+
+### Step 2: Buildings
+- Add multiple buildings to the property
+- Edit or remove existing buildings
+- At least one building required to proceed
+- Buildings are initialized with empty floors array
+
+### Step 3: Floors
+- Building selector tabs with floor counts
+- Add floors to each building with custom labels (e.g., G, 1, 2)
+- Edit or remove floors per building
+- Validation ensures all buildings have at least one floor
+- Visual indicators for buildings missing floors
+
+### Step 4: Rooms
+- Building and floor selector tabs
+- Add rooms with room number and share type
+- Share type options: Single (1 bed), Double (2 beds), Triple (3 beds)
+- Visual bed icon preview based on selected share type
+- Remove rooms per floor
+- Validation ensures all floors have at least one room
+- Room count indicators per floor
+
+### Step 5: Review & Save
+- Comprehensive review of complete property hierarchy
+- Collapsible cards for buildings, floors, and rooms
+- Total statistics summary (buildings, floors, rooms, beds)
+- Final validation ensures all requirements are met
+- "Confirm & Save" button with accent color
+- Success feedback upon save
+- Automatic navigation to Properties list
+
+All wizard data is persisted in AsyncStorage and survives app restarts.
+
+## Data Model
+
+```typescript
+type ShareType = 'single' | 'double' | 'triple';
+
+interface Room {
+  id: string;
+  roomNumber: string;
+  shareType: ShareType;
+}
+
+interface Floor {
+  id: string;
+  label: string;
+  rooms: Room[];
+}
+
+interface Building {
+  id: string;
+  name: string;
+  floors: Floor[];
+}
+
+interface Property {
+  id: string;
+  name: string;
+  type: 'Hostel' | 'PG' | 'Apartment';
+  city: string;
+  buildings: Building[];
+  totalRooms: number;
+  totalBeds: number;
+  createdAt: string;
+}
+```
+
+## Coming Soon
+
+- Bed assignment functionality
+- Member assignment to beds
+- Payment tracking
+- Maintenance requests
+- And more...
