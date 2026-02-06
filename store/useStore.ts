@@ -49,8 +49,18 @@ export const useStore = create<AppState>((set) => ({
 
   logout: async () => {
     try {
-      await AsyncStorage.removeItem('isAuthenticated');
-      await AsyncStorage.removeItem('user');
+      // Clear all AsyncStorage data (properties, members, wizard data, etc.)
+      await AsyncStorage.clear();
+
+      // Reset all store states to initial values
+      const { usePropertiesStore } = await import('./usePropertiesStore');
+      const { useMembersStore } = await import('./useMembersStore');
+      const { useWizardStore } = await import('./useWizardStore');
+
+      usePropertiesStore.getState().reset();
+      useMembersStore.getState().reset();
+      useWizardStore.getState().resetWizard();
+
       set({ isAuthenticated: false, user: null });
     } catch (error) {
       console.error('Failed to clear auth state:', error);

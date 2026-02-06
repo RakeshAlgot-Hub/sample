@@ -10,6 +10,7 @@ interface MembersStore {
   updateMember: (id: string, updates: Partial<Member>) => Promise<void>;
   loadMembers: () => Promise<void>;
   saveMembers: () => Promise<void>;
+  reset: () => void;
 }
 
 export const useMembersStore = create<MembersStore>((set, get) => ({
@@ -96,5 +97,9 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to save members:', error);
     }
+  },
+
+  reset: () => {
+    set({ members: [] });
   },
 }));

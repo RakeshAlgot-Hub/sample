@@ -18,6 +18,7 @@ interface PropertiesStore {
   syncBedOccupancyWithMembers: (members: any[]) => Promise<void>;
   loadProperties: () => Promise<void>;
   saveProperties: () => Promise<void>;
+  reset: () => void;
 }
 
 export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
@@ -58,34 +59,34 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
       properties: state.properties.map((property) =>
         property.id === propertyId
           ? {
-              ...property,
-              buildings: property.buildings.map((building) =>
-                building.id === buildingId
-                  ? {
-                      ...building,
-                      floors: building.floors.map((floor) =>
-                        floor.id === floorId
-                          ? {
-                              ...floor,
-                              rooms: floor.rooms.map((room) =>
-                                room.id === roomId
-                                  ? {
-                                      ...room,
-                                      beds: room.beds.map((bed) =>
-                                        bed.id === bedId
-                                          ? { ...bed, occupied }
-                                          : bed
-                                      ),
-                                    }
-                                  : room
+            ...property,
+            buildings: property.buildings.map((building) =>
+              building.id === buildingId
+                ? {
+                  ...building,
+                  floors: building.floors.map((floor) =>
+                    floor.id === floorId
+                      ? {
+                        ...floor,
+                        rooms: floor.rooms.map((room) =>
+                          room.id === roomId
+                            ? {
+                              ...room,
+                              beds: room.beds.map((bed) =>
+                                bed.id === bedId
+                                  ? { ...bed, occupied }
+                                  : bed
                               ),
                             }
-                          : floor
-                      ),
-                    }
-                  : building
-              ),
-            }
+                            : room
+                        ),
+                      }
+                      : floor
+                  ),
+                }
+                : building
+            ),
+          }
           : property
       ),
     }));
@@ -151,5 +152,9 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to save properties:', error);
     }
+  },
+
+  reset: () => {
+    set({ properties: [] });
   },
 }));
