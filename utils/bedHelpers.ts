@@ -2,19 +2,10 @@ import { Bed, ShareType } from '@/types/property';
 
 export function generateBedsByShareType(shareType: ShareType): Bed[] {
   const bedCount = getBedCountByShareType(shareType);
-  const beds: Bed[] = [];
-
-  for (let i = 1; i <= bedCount; i++) {
-    beds.push({
-      id: `B${i}`,
-      occupied: false,
-    });
-  }
-
-  return beds;
+  return generateBedsByCount(bedCount);
 }
 
-function getBedCountByShareType(shareType: ShareType): number {
+export function getBedCountByShareType(shareType: ShareType): number {
   switch (shareType) {
     case 'single':
       return 1;
@@ -25,4 +16,17 @@ function getBedCountByShareType(shareType: ShareType): number {
     default:
       return 0;
   }
+}
+
+export function generateBedsByCount(bedCount: number): Bed[] {
+  const beds: Bed[] = [];
+
+  for (let i = 1; i <= bedCount; i++) {
+    beds.push({
+      id: `B${i}`,
+      occupied: false,
+    });
+  }
+
+  return beds;
 }

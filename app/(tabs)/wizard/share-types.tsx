@@ -15,17 +15,28 @@ import WizardHeader from '@/components/WizardHeader';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
 import { Bed } from 'lucide-react-native';
+import { BillingPeriod } from '@/types/property';
 
-const AVAILABLE_BED_COUNTS = [1, 2, 3, 4, 5, 6];
+const AVAILABLE_BED_COUNTS = [2, 3, 4, 5];
+const PERIODS: BillingPeriod[] = ['monthly', 'weekly', 'hourly', 'yearly'];
 
 export default function ShareTypesScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { allowedBedCounts, updateAllowedBedCounts, nextStep, previousStep, resetWizard } = useWizardStore();
+  const {
+    allowedBedCounts,
+    bedPricing,
+    updateAllowedBedCounts,
+    updateBedPricing,
+    nextStep,
+    previousStep,
+    resetWizard,
+  } = useWizardStore();
 
   const [selectedCounts, setSelectedCounts] = useState<number[]>(allowedBedCounts);
   const [customCount, setCustomCount] = useState('');
   const [customCounts, setCustomCounts] = useState<number[]>([]);
+  const [pricingByCount, setPricingByCount] = useState<Record<number, { price: string; period: BillingPeriod }>>({});
 
   const mergedCounts = useMemo(() => {
     const merged = [...AVAILABLE_BED_COUNTS, ...customCounts];
@@ -36,7 +47,17 @@ export default function ShareTypesScreen() {
     setSelectedCounts(allowedBedCounts);
     const custom = allowedBedCounts.filter((count) => count > 6);
     setCustomCounts(custom);
-  }, [allowedBedCounts]);
+    const mapped: Record<number, { price: string; period: BillingPeriod }> = {};
+
+    bedPricing.forEach((pricing) => {
+      mapped[pricing.bedCount] = {
+        price: pricing.price.toString(),
+        period: pricing.period,
+      };
+    });
+
+    setPricingByCount(mapped);
+  }, [allowedBedCounts, bedPricing]);
 
   const handleClose = () => {
     resetWizard();
@@ -51,8 +72,17 @@ export default function ShareTypesScreen() {
   const handleToggleBedCount = (count: number) => {
     setSelectedCounts((prev) => {
       if (prev.includes(count)) {
+        setPricingByCount((current) => {
+          const next = { ...current };
+          delete next[count];
+          return next;
+        });
         return prev.filter((c) => c !== count);
       } else {
+        setPricingByCount((current) => ({
+          ...current,
+          [count]: current[count] ?? { price: '', period: 'monthly' },
+        }));
         return [...prev, count].sort((a, b) => a - b);
       }
     });
@@ -60,17 +90,31 @@ export default function ShareTypesScreen() {
 
   const handleAddCustom = () => {
     const parsed = Number(customCount.trim());
-    if (!Number.isInteger(parsed) || parsed < 7) {
+    if (!Number.isInteger(parsed) || parsed < 6) {
       return;
     }
 
     setCustomCounts((prev) => Array.from(new Set([...prev, parsed])).sort((a, b) => a - b));
     setSelectedCounts((prev) => Array.from(new Set([...prev, parsed])).sort((a, b) => a - b));
+    setPricingByCount((current) => ({
+      ...current,
+      [parsed]: current[parsed] ?? { price: '', period: 'monthly' },
+    }));
     setCustomCount('');
   };
 
   const handleNext = () => {
     updateAllowedBedCounts(selectedCounts);
+    const pricing = selectedCounts.map((count) => {
+      const entry = pricingByCount[count] ?? { price: '', period: 'monthly' as BillingPeriod };
+      const parsed = Number(entry.price);
+      return {
+        bedCount: count,
+        price: Number.isFinite(parsed) ? parsed : 0,
+        period: entry.period,
+      };
+    });
+    updateBedPricing(pricing);
     nextStep();
     router.push('/wizard/rooms');
   };
@@ -106,39 +150,113 @@ export default function ShareTypesScreen() {
           <View style={styles.bedCountContainer}>
             {mergedCounts.map((count) => {
               const isSelected = selectedCounts.includes(count);
+              const pricing = pricingByCount[count];
               return (
-                <TouchableOpacity
-                  key={count}
-                  style={[
-                    styles.bedCountButton,
-                    {
-                      backgroundColor: isSelected
-                        ? theme.primary + '15'
-                        : theme.inputBackground,
-                      borderColor: isSelected ? theme.primary : theme.inputBorder,
-                    },
-                  ]}
-                  onPress={() => handleToggleBedCount(count)}
-                  activeOpacity={0.7}
-                >
-                  <Text
+                <View key={count} style={styles.bedCountCard}>
+                  <View
                     style={[
-                      styles.bedCountText,
+                      styles.cardHeader,
                       {
-                        color: isSelected ? theme.primary : theme.text,
-                        fontWeight: isSelected ? '600' : '500',
+                        backgroundColor: theme.card,
+                        borderColor: theme.cardBorder,
                       },
                     ]}
                   >
-                    {count} {count === 1 ? 'Bed' : 'Beds'}
-                  </Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.bedCountButton,
+                        {
+                          backgroundColor: isSelected
+                            ? theme.primary
+                            : theme.inputBackground,
+                          borderColor: isSelected ? theme.primary : theme.inputBorder,
+                        },
+                      ]}
+                      onPress={() => handleToggleBedCount(count)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.bedCountText,
+                          { color: isSelected ? '#ffffff' : theme.text },
+                        ]}
+                      >
+                        {count} {count === 1 ? 'Bed' : 'Beds'}
+                      </Text>
+                    </TouchableOpacity>
+                    {isSelected && (
+                      <View style={styles.inlinePricing}>
+                        <TextInput
+                          style={[
+                            styles.inlinePriceInput,
+                            { color: theme.text, backgroundColor: theme.inputBackground, borderColor: theme.inputBorder },
+                          ]}
+                          placeholder="e.g. 4500"
+                          placeholderTextColor={theme.textSecondary}
+                          keyboardType="decimal-pad"
+                          value={pricing?.price ?? ''}
+                          onChangeText={(value) =>
+                            setPricingByCount((current) => ({
+                              ...current,
+                              [count]: {
+                                price: value,
+                                period: current[count]?.period ?? 'monthly',
+                              },
+                            }))
+                          }
+                        />
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.periodRow}
+                        >
+                          {PERIODS.map((period) => {
+                            const isSelected = (pricing?.period ?? 'monthly') === period;
+                            return (
+                              <TouchableOpacity
+                                key={period}
+                                style={[
+                                  styles.periodOption,
+                                  {
+                                    backgroundColor: isSelected
+                                      ? theme.primary
+                                      : theme.inputBackground,
+                                    borderColor: isSelected ? theme.primary : theme.inputBorder,
+                                  },
+                                ]}
+                                onPress={() =>
+                                  setPricingByCount((current) => ({
+                                    ...current,
+                                    [count]: {
+                                      price: current[count]?.price ?? '',
+                                      period,
+                                    },
+                                  }))
+                                }
+                                activeOpacity={0.8}
+                              >
+                                <Text
+                                  style={[
+                                    styles.periodOptionText,
+                                    { color: isSelected ? '#ffffff' : theme.text },
+                                  ]}
+                                >
+                                  {period}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+                </View>
               );
             })}
           </View>
 
           <View style={styles.customSection}>
-            <Text style={[styles.customLabel, { color: theme.textSecondary }]}>Custom beds (7+)</Text>
+            <Text style={[styles.customLabel, { color: theme.textSecondary }]}>Custom beds (6+)</Text>
             <View style={styles.customRow}>
               <TextInput
                 style={[
@@ -183,7 +301,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
     gap: 24,
   },
   section: {
@@ -203,20 +321,62 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   bedCountContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    gap: 12,
+  },
+  bedCountCard: {
     gap: 10,
   },
-  bedCountButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 12,
-    borderWidth: 2,
-    justifyContent: 'center',
+  cardHeader: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 10,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  bedCountButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   bedCountText: {
     fontSize: 16,
+    fontWeight: '700',
+  },
+  inlinePricing: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  inlinePriceInput: {
+    height: 36,
+    minWidth: 80,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    fontSize: 14,
+    textAlign: 'right',
+  },
+  periodRow: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  periodOption: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  periodOptionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'capitalize',
   },
   customSection: {
     gap: 8,

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PropertyDetails, Building, Floor, Room, WizardState, Property } from '@/types/property';
-import { generateBedsByShareType } from '@/utils/bedHelpers';
+import { generateBedsByShareType, generateBedsByCount, getBedCountByShareType } from '@/utils/bedHelpers';
 
 interface WizardStore extends WizardState {
   setCurrentStep: (step: number) => void;
@@ -17,6 +17,7 @@ interface WizardStore extends WizardState {
   addRoom: (buildingId: string, floorId: string, room: Room) => void;
   removeRoom: (buildingId: string, floorId: string, roomId: string) => void;
   updateAllowedBedCounts: (bedCounts: number[]) => void;
+  updateBedPricing: (pricing: WizardState['bedPricing']) => void;
   setWizardFromProperty: (property: Property) => void;
   resetWizard: () => void;
   loadWizardState: () => Promise<void>;
@@ -34,6 +35,7 @@ const initialState: WizardState = {
   propertyDetails: initialPropertyDetails,
   buildings: [],
   allowedBedCounts: [],
+  bedPricing: [],
   editingPropertyId: null,
 };
 
@@ -124,9 +126,11 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
   },
 
   addRoom: (buildingId: string, floorId: string, room: Room) => {
+    const bedCount = room.bedCount ?? getBedCountByShareType(room.shareType);
     const roomWithBeds = {
       ...room,
-      beds: generateBedsByShareType(room.shareType),
+      bedCount,
+      beds: bedCount > 0 ? generateBedsByCount(bedCount) : generateBedsByShareType(room.shareType),
     };
 
     set((state) => ({
@@ -169,6 +173,11 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
     get().saveWizardState();
   },
 
+  updateBedPricing: (pricing) => {
+    set({ bedPricing: pricing });
+    get().saveWizardState();
+  },
+
   setWizardFromProperty: (property: Property) => {
     const bedCounts = new Set<number>();
 
@@ -191,6 +200,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       },
       buildings: property.buildings,
       allowedBedCounts: Array.from(bedCounts).sort((a, b) => a - b),
+      bedPricing: property.bedPricing ?? [],
       editingPropertyId: property.id,
     });
     get().saveWizardState();
@@ -206,7 +216,10 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       const savedState = await AsyncStorage.getItem('wizardState');
       if (savedState) {
         const parsedState: WizardState = JSON.parse(savedState);
-        set(parsedState);
+        set({
+          ...parsedState,
+          bedPricing: parsedState.bedPricing ?? [],
+        });
       }
     } catch (error) {
       console.error('Failed to load wizard state:', error);
@@ -221,6 +234,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
         propertyDetails: state.propertyDetails,
         buildings: state.buildings,
         allowedBedCounts: state.allowedBedCounts,
+        bedPricing: state.bedPricing,
         editingPropertyId: state.editingPropertyId ?? null,
       };
       await AsyncStorage.setItem('wizardState', JSON.stringify(stateToSave));

@@ -279,6 +279,15 @@ export default function MemberAssignmentForm({
     setSelectedBedId(null);
   };
 
+  const selectedProperty = properties.find((p) => p.id === selectedPropertyId);
+  const selectedBuilding = selectedProperty?.buildings.find((b) => b.id === selectedBuildingId);
+  const selectedFloor = selectedBuilding?.floors.find((f) => f.id === selectedFloorId);
+  const selectedRoom = selectedFloor?.rooms.find((r) => r.id === selectedRoomId);
+  const selectedBedCount = selectedRoom?.bedCount ?? selectedRoom?.beds.length;
+  const selectedPricing = selectedProperty?.bedPricing?.find(
+    (pricing) => pricing.bedCount === selectedBedCount
+  );
+
   const canSubmit =
     name.trim().length > 0 &&
     phone.trim().length > 0 &&
@@ -547,6 +556,21 @@ export default function MemberAssignmentForm({
           onBedChange={setSelectedBedId}
         />
 
+        {selectedPricing && selectedBedCount ? (
+          <View
+            style={[
+              styles.pricingSummary,
+              { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder },
+            ]}
+          >
+            <CreditCard size={16} color={theme.textSecondary} strokeWidth={2} />
+            <Text style={[styles.pricingText, { color: theme.text }]}
+            >
+              {selectedPricing.price} / {selectedPricing.period} per bed ({selectedBedCount} beds)
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[
@@ -605,6 +629,18 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: 12,
+  },
+  pricingSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  pricingText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   labelContainer: {
     flexDirection: 'row',

@@ -14,6 +14,15 @@ const getShareTypeLabel = (shareType: string): string => {
   return shareType.charAt(0).toUpperCase() + shareType.slice(1);
 };
 
+const getRoomLabel = (room: Room): string => {
+  const count = room.bedCount ?? room.beds.length;
+  if (count > 3) {
+    return `${count} Beds`;
+  }
+
+  return getShareTypeLabel(room.shareType);
+};
+
 export default function RoomDetailCard({ room }: RoomDetailCardProps) {
   const theme = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -45,7 +54,7 @@ export default function RoomDetailCard({ room }: RoomDetailCardProps) {
               Room {room.roomNumber}
             </Text>
             <Text style={[styles.shareType, { color: theme.textSecondary }]}>
-              {getShareTypeLabel(room.shareType)} • {totalBeds} {totalBeds === 1 ? 'Bed' : 'Beds'}
+              {getRoomLabel(room)} • {totalBeds} {totalBeds === 1 ? 'Bed' : 'Beds'}
             </Text>
           </View>
         </View>

@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -15,6 +14,7 @@ import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
+import ConfirmModal from '@/components/ConfirmModal';
 import { Building } from '@/types/property';
 import { Building2, Plus, Pencil, Trash2 } from 'lucide-react-native';
 import Animated, {
@@ -39,6 +39,7 @@ export default function BuildingsScreen() {
   const [newBuildingName, setNewBuildingName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const handleClose = () => {
     resetWizard();
@@ -53,7 +54,7 @@ export default function BuildingsScreen() {
   const handleAddBuilding = () => {
     if (newBuildingName.trim()) {
       const building: Building = {
-        id: Date.now().toString(),
+        id: Date.now().toString() + Math.random(),
         name: newBuildingName.trim(),
         floors: [],
       };
@@ -81,18 +82,7 @@ export default function BuildingsScreen() {
   };
 
   const handleRemoveBuilding = (id: string) => {
-    Alert.alert(
-      'Delete Building',
-      'Delete this building and all its floors, rooms, and beds?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Yes',
-          style: 'destructive',
-          onPress: () => removeBuilding(id),
-        },
-      ]
-    );
+    setPendingDeleteId(id);
   };
 
   const handleNext = () => {
@@ -116,7 +106,10 @@ export default function BuildingsScreen() {
         showSteps
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.section}>
           <View style={styles.labelContainer}>
             <Building2 size={18} color={theme.textSecondary} strokeWidth={2} />
@@ -301,6 +294,18 @@ export default function BuildingsScreen() {
         nextLabel="Next"
         nextDisabled={!canProceed}
         showBack={true}
+      />
+      <ConfirmModal
+        visible={pendingDeleteId !== null}
+        title="Delete Building"
+        message="Delete this building and all its floors, rooms, and beds?"
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => {
+          if (pendingDeleteId) {
+            removeBuilding(pendingDeleteId);
+          }
+          setPendingDeleteId(null);
+        }}
       />
     </SafeAreaView>
   );

@@ -8,15 +8,24 @@ import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 interface EditableRoomCardProps {
   roomNumber: string;
   shareType: ShareType;
+  bedCount?: number;
   onUpdate: (newRoomNumber: string) => void;
   onRemove: () => void;
 }
 
-const getShareTypeLabel = (shareType: ShareType): string => {
+const getShareTypeLabel = (shareType: ShareType, bedCount?: number): string => {
+  if (bedCount && bedCount > 3) {
+    return `${bedCount} Beds`;
+  }
+
   return shareType.charAt(0).toUpperCase() + shareType.slice(1);
 };
 
-const getBedCount = (shareType: ShareType): number => {
+const getBedCount = (shareType: ShareType, bedCount?: number): number => {
+  if (bedCount && bedCount > 0) {
+    return bedCount;
+  }
+
   switch (shareType) {
     case 'single':
       return 1;
@@ -32,6 +41,7 @@ const getBedCount = (shareType: ShareType): number => {
 export default function EditableRoomCard({
   roomNumber,
   shareType,
+  bedCount,
   onUpdate,
   onRemove,
 }: EditableRoomCardProps) {
@@ -51,7 +61,7 @@ export default function EditableRoomCard({
     setIsEditing(false);
   };
 
-  const bedCount = getBedCount(shareType);
+  const resolvedBedCount = getBedCount(shareType, bedCount);
 
   return (
     <Animated.View
@@ -93,10 +103,10 @@ export default function EditableRoomCard({
           )}
           <View style={styles.shareTypeContainer}>
             <Text style={[styles.shareType, { color: theme.textSecondary }]}>
-              {getShareTypeLabel(shareType)}
+              {getShareTypeLabel(shareType, resolvedBedCount)}
             </Text>
             <View style={styles.bedPreview}>
-              {Array.from({ length: bedCount }).map((_, index) => (
+              {Array.from({ length: resolvedBedCount }).map((_, index) => (
                 <Bed
                   key={index}
                   size={14}

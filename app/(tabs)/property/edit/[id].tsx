@@ -7,19 +7,19 @@ import {
     SafeAreaView,
     ScrollView,
     TouchableOpacity,
-    Alert,
-    Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
-import { generateBedsByShareType } from '@/utils/bedHelpers';
-import { Building, Floor, Property, ShareType } from '@/types/property';
+import { generateBedsByCount } from '@/utils/bedHelpers';
+import { BillingPeriod, Building, Floor, Property, ShareType } from '@/types/property';
 import FloorCard from '@/components/FloorCard';
 import EditableRoomCard from '@/components/EditableRoomCard';
+import ConfirmModal from '@/components/ConfirmModal';
 import { Building2, DoorOpen, Save, Trash2 } from 'lucide-react-native';
 
 const BED_COUNTS = [1, 2, 3];
+const PERIODS: BillingPeriod[] = ['monthly', 'weekly', 'hourly', 'yearly'];
 
 const getShareTypeFromBedCount = (bedCount: number): ShareType => {
     if (bedCount === 1) return 'single';
@@ -47,6 +47,12 @@ export default function EditPropertyScreen() {
     const [selectedRoomFloorId, setSelectedRoomFloorId] = useState('');
     const [roomNumber, setRoomNumber] = useState('');
     const [selectedBedCount, setSelectedBedCount] = useState<number>(BED_COUNTS[0]);
+    const [pricingByCount, setPricingByCount] = useState<Record<number, { price: string; period: BillingPeriod }>>({});
+    const [confirmConfig, setConfirmConfig] = useState<{
+        title: string;
+        message: string;
+        onConfirm: () => void;
+    } | null>(null);
 
     useEffect(() => {
         loadProperties();
@@ -61,6 +67,44 @@ export default function EditPropertyScreen() {
         if (!property) return;
         setDraft(JSON.parse(JSON.stringify(property)) as Property);
     }, [property]);
+
+    useEffect(() => {
+        if (!draft) return;
+
+        const bedCounts = new Set<number>();
+        (draft.bedPricing || []).forEach((pricing) => bedCounts.add(pricing.bedCount));
+
+        draft.buildings.forEach((building) => {
+            building.floors.forEach((floor) => {
+                floor.rooms.forEach((room) => {
+                    const count = room.bedCount ?? room.beds.length;
+                    if (count > 0) {
+                        bedCounts.add(count);
+                    }
+                });
+            });
+        });
+
+        const mapped: Record<number, { price: string; period: BillingPeriod }> = {};
+        (draft.bedPricing || []).forEach((pricing) => {
+            mapped[pricing.bedCount] = {
+                price: pricing.price.toString(),
+                period: pricing.period,
+            };
+        });
+
+        bedCounts.forEach((count) => {
+            if (!mapped[count]) {
+                mapped[count] = { price: '0', period: 'monthly' };
+            }
+        });
+
+        setPricingByCount(mapped);
+        const sortedCounts = Array.from(bedCounts).sort((a, b) => a - b);
+        if (sortedCounts.length > 0 && !sortedCounts.includes(selectedBedCount)) {
+            setSelectedBedCount(sortedCounts[0]);
+        }
+    }, [draft]);
 
     useEffect(() => {
         if (!draft) return;
@@ -91,6 +135,9 @@ export default function EditPropertyScreen() {
     const selectedFloorBuilding = draft?.buildings.find((b) => b.id === selectedFloorBuildingId);
     const selectedRoomBuilding = draft?.buildings.find((b) => b.id === selectedRoomBuildingId);
     const selectedRoomFloor = selectedRoomBuilding?.floors.find((f) => f.id === selectedRoomFloorId);
+    const availableBedCounts = Object.keys(pricingByCount).length > 0
+        ? Object.keys(pricingByCount).map((count) => Number(count)).sort((a, b) => a - b)
+        : BED_COUNTS;
 
     const updateDraft = (updater: (current: Property) => Property) => {
         setDraft((current) => (current ? updater(current) : current));
@@ -119,29 +166,26 @@ export default function EditPropertyScreen() {
     const commitDraft = async (nextDraft: Property) => {
         setDraft(nextDraft);
         const totals = getTotals(nextDraft.buildings);
+        const bedPricing = Object.entries(pricingByCount)
+            .map(([count, entry]) => ({
+                bedCount: Number(count),
+                price: Number(entry.price) || 0,
+                period: entry.period,
+            }))
+            .sort((a, b) => a.bedCount - b.bedCount);
 
         await updateProperty(nextDraft.id, {
             name: nextDraft.name,
             city: nextDraft.city,
             buildings: nextDraft.buildings,
+            bedPricing,
             totalRooms: totals.totalRooms,
             totalBeds: totals.totalBeds,
         });
     };
 
     const confirmDelete = (title: string, message: string, onConfirm: () => void) => {
-        if (Platform.OS === 'web') {
-            const confirmed = typeof window !== 'undefined' ? window.confirm(message) : true;
-            if (confirmed) {
-                onConfirm();
-            }
-            return;
-        }
-
-        Alert.alert(title, message, [
-            { text: 'No', style: 'cancel' },
-            { text: 'Yes', style: 'destructive', onPress: onConfirm },
-        ]);
+        setConfirmConfig({ title, message, onConfirm });
     };
 
     const handleSave = async () => {
@@ -287,7 +331,8 @@ export default function EditPropertyScreen() {
                                             id: Date.now().toString() + Math.random(),
                                             roomNumber: roomNumber.trim(),
                                             shareType,
-                                            beds: generateBedsByShareType(shareType),
+                                            bedCount: selectedBedCount,
+                                            beds: generateBedsByCount(selectedBedCount),
                                         },
                                     ],
                                 }
@@ -480,6 +525,87 @@ export default function EditPropertyScreen() {
                         >
                             <Text style={styles.addButtonText}>Add</Text>
                         </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.section}
+                    >
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Bed Pricing</Text>
+                        {Object.keys(pricingByCount).length === 0 ? (
+                            <Text style={[styles.emptyPricingText, { color: theme.textSecondary }]}>
+                                Add rooms to set pricing.
+                            </Text>
+                        ) : (
+                            <View style={styles.pricingList}>
+                                {Object.entries(pricingByCount)
+                                    .sort(([a], [b]) => Number(a) - Number(b))
+                                    .map(([count, entry]) => (
+                                        <View key={count} style={styles.pricingCard}>
+                                            <Text style={[styles.pricingLabel, { color: theme.text }]}
+                                            >
+                                                {count} Beds
+                                            </Text>
+                                            <TextInput
+                                                style={[
+                                                    styles.pricingInput,
+                                                    {
+                                                        backgroundColor: theme.inputBackground,
+                                                        borderColor: theme.inputBorder,
+                                                        color: theme.text,
+                                                    },
+                                                ]}
+                                                placeholder="Price"
+                                                placeholderTextColor={theme.textSecondary}
+                                                keyboardType="decimal-pad"
+                                                value={entry.price}
+                                                onChangeText={(value) =>
+                                                    setPricingByCount((current) => ({
+                                                        ...current,
+                                                        [count]: { price: value, period: entry.period },
+                                                    }))
+                                                }
+                                            />
+                                            <View style={styles.periodRow}
+                                            >
+                                                {PERIODS.map((period) => {
+                                                    const isActive = entry.period === period;
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={period}
+                                                            style={[
+                                                                styles.periodButton,
+                                                                {
+                                                                    backgroundColor: isActive
+                                                                        ? theme.primary
+                                                                        : theme.inputBackground,
+                                                                    borderColor: isActive
+                                                                        ? theme.primary
+                                                                        : theme.inputBorder,
+                                                                },
+                                                            ]}
+                                                            onPress={() =>
+                                                                setPricingByCount((current) => ({
+                                                                    ...current,
+                                                                    [count]: { price: entry.price, period },
+                                                                }))
+                                                            }
+                                                            activeOpacity={0.7}
+                                                        >
+                                                            <Text
+                                                                style={[
+                                                                    styles.periodText,
+                                                                    { color: isActive ? '#ffffff' : theme.text },
+                                                                ]}
+                                                            >
+                                                                {period}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </View>
+                                        </View>
+                                    ))}
+                            </View>
+                        )}
                     </View>
 
                     {draft.buildings.map((building) => (
@@ -722,7 +848,7 @@ export default function EditPropertyScreen() {
                                         <Text style={[styles.label, { color: theme.text }]}>Bed Count</Text>
                                         <View style={styles.bedCountRow}
                                         >
-                                            {BED_COUNTS.map((count) => {
+                                            {availableBedCounts.map((count) => {
                                                 const isSelected = count === selectedBedCount;
                                                 return (
                                                     <TouchableOpacity
@@ -769,6 +895,7 @@ export default function EditPropertyScreen() {
                                                 key={room.id}
                                                 roomNumber={room.roomNumber}
                                                 shareType={room.shareType}
+                                                bedCount={room.bedCount ?? room.beds.length}
                                                 onUpdate={(newNumber) => handleUpdateRoom(room.id, newNumber)}
                                                 onRemove={() => handleRemoveRoom(room.id)}
                                             />
@@ -795,6 +922,17 @@ export default function EditPropertyScreen() {
                     </Text>
                 </TouchableOpacity>
             </View>
+            <ConfirmModal
+                visible={!!confirmConfig}
+                title={confirmConfig?.title ?? ''}
+                message={confirmConfig?.message ?? ''}
+                onCancel={() => setConfirmConfig(null)}
+                onConfirm={() => {
+                    const action = confirmConfig?.onConfirm;
+                    setConfirmConfig(null);
+                    action?.();
+                }}
+            />
         </SafeAreaView>
     );
 }
@@ -965,6 +1103,42 @@ const styles = StyleSheet.create({
     },
     roomSection: {
         gap: 14,
+    },
+    pricingList: {
+        gap: 12,
+    },
+    pricingCard: {
+        gap: 10,
+    },
+    pricingLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    pricingInput: {
+        height: 44,
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        fontSize: 14,
+    },
+    emptyPricingText: {
+        fontSize: 13,
+    },
+    periodRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    periodButton: {
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 10,
+        borderWidth: 1,
+    },
+    periodText: {
+        fontSize: 12,
+        fontWeight: '600',
+        textTransform: 'capitalize',
     },
     bedCountRow: {
         flexDirection: 'row',

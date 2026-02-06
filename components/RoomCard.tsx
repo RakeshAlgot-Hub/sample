@@ -13,6 +13,15 @@ const getShareTypeLabel = (shareType: string): string => {
   return shareType.charAt(0).toUpperCase() + shareType.slice(1);
 };
 
+const getRoomLabel = (room: Room): string => {
+  const count = room.bedCount ?? room.beds.length;
+  if (count > 3) {
+    return `${count} Beds`;
+  }
+
+  return getShareTypeLabel(room.shareType);
+};
+
 export default function RoomCard({ room, onRemove }: RoomCardProps) {
   const theme = useTheme();
 
@@ -38,7 +47,7 @@ export default function RoomCard({ room, onRemove }: RoomCardProps) {
           </Text>
           <View style={styles.shareTypeContainer}>
             <Text style={[styles.shareType, { color: theme.textSecondary }]}>
-              {getShareTypeLabel(room.shareType)}
+              {getRoomLabel(room)}
             </Text>
             <View style={styles.bedPreview}>
               {room.beds.map((bed) => (

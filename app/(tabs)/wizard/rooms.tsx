@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -15,6 +14,7 @@ import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
+import ConfirmModal from '@/components/ConfirmModal';
 import { RoomType } from '@/components/RoomTypeSelector';
 import EditableRoomCard from '@/components/EditableRoomCard';
 import { DoorOpen, Plus } from 'lucide-react-native';
@@ -56,24 +56,48 @@ export default function RoomsScreen() {
   const [selectedFloorId, setSelectedFloorId] = useState<string>('');
   const [roomNumber, setRoomNumber] = useState('');
   const [selectedRoomType, setSelectedRoomType] = useState<RoomType | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{
+    buildingId: string;
+    floorId: string;
+    roomId: string;
+  } | null>(null);
 
   useEffect(() => {
-    if (buildings.length > 0) {
-      if (!selectedBuildingId) {
-        setSelectedBuildingId(buildings[0].id);
-      }
-      const building = buildings.find((b) => b.id === selectedBuildingId);
-      if (building && building.floors.length > 0 && !selectedFloorId) {
-        setSelectedFloorId(building.floors[0].id);
-      }
+    if (buildings.length === 0) {
+      return;
     }
-  }, [buildings, selectedBuildingId]);
+
+    const selectedExists = buildings.some((b) => b.id === selectedBuildingId);
+    const nextBuildingId = !selectedBuildingId || !selectedExists
+      ? buildings[0].id
+      : selectedBuildingId;
+
+    if (nextBuildingId !== selectedBuildingId) {
+      setSelectedBuildingId(nextBuildingId);
+    }
+
+    const building = buildings.find((b) => b.id === nextBuildingId);
+    if (!building || building.floors.length === 0) {
+      if (selectedFloorId) {
+        setSelectedFloorId('');
+      }
+      return;
+    }
+
+    const floorExists = building.floors.some((f) => f.id === selectedFloorId);
+    if (!selectedFloorId || !floorExists) {
+      setSelectedFloorId(building.floors[0].id);
+    }
+  }, [buildings, selectedBuildingId, selectedFloorId]);
 
   const selectedBuilding = buildings.find((b) => b.id === selectedBuildingId);
   const selectedFloor = selectedBuilding?.floors.find(
     (f) => f.id === selectedFloorId
   );
   const existingRooms = selectedFloor?.rooms || [];
+  const hasBuildings = buildings.length > 0;
+  const hasFloors = !!selectedBuilding && selectedBuilding.floors.length > 0;
+  const hasRoomTypes = availableRoomTypes.length > 0;
 
   const handleClose = () => {
     resetWizard();
@@ -111,6 +135,7 @@ export default function RoomsScreen() {
       id: Date.now().toString() + Math.random(),
       roomNumber: roomNumber.trim(),
       shareType,
+      bedCount: selectedRoomType.bedCount,
       beds: [],
     });
 
@@ -132,19 +157,11 @@ export default function RoomsScreen() {
 
   const handleRemoveRoom = (roomId: string) => {
     if (!selectedBuildingId || !selectedFloorId) return;
-
-    Alert.alert(
-      'Delete Room',
-      'Delete this room and its beds?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Yes',
-          style: 'destructive',
-          onPress: () => removeRoom(selectedBuildingId, selectedFloorId, roomId),
-        },
-      ]
-    );
+    setPendingDelete({
+      buildingId: selectedBuildingId,
+      floorId: selectedFloorId,
+      roomId,
+    });
   };
 
   const canProceed = true;
@@ -165,48 +182,67 @@ export default function RoomsScreen() {
         showSteps
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Select Building
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.buildingTabs}
-          >
-            {buildings.map((building) => {
-              const isSelected = building.id === selectedBuildingId;
-              return (
-                <TouchableOpacity
-                  key={building.id}
-                  style={[
-                    styles.tab,
-                    {
-                      backgroundColor: isSelected
-                        ? theme.primary
-                        : theme.inputBackground,
-                      borderColor: isSelected ? theme.primary : theme.inputBorder,
-                    },
-                  ]}
-                  onPress={() => handleBuildingChange(building.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {hasBuildings ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              Select Building
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.buildingTabs}
+            >
+              {buildings.map((building) => {
+                const isSelected = building.id === selectedBuildingId;
+                return (
+                  <TouchableOpacity
+                    key={building.id}
                     style={[
-                      styles.tabText,
-                      { color: isSelected ? '#ffffff' : theme.text },
+                      styles.tab,
+                      {
+                        backgroundColor: isSelected
+                          ? theme.primary
+                          : theme.inputBackground,
+                        borderColor: isSelected ? theme.primary : theme.inputBorder,
+                      },
                     ]}
+                    onPress={() => handleBuildingChange(building.id)}
+                    activeOpacity={0.7}
                   >
-                    {building.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+                    <Text
+                      style={[
+                        styles.tabText,
+                        { color: isSelected ? '#ffffff' : theme.text },
+                      ]}
+                    >
+                      {building.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>No buildings yet</Text>
+            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+              Add a building first so you can create rooms.
+            </Text>
+            <TouchableOpacity
+              style={[styles.emptyButton, { backgroundColor: theme.primary }]}
+              onPress={() => router.push('/wizard/buildings')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.emptyButtonText}>Go to Buildings</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        {selectedBuilding && selectedBuilding.floors.length > 0 && (
+        {hasFloors ? (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
               Select Floor
@@ -272,6 +308,22 @@ export default function RoomsScreen() {
               })}
             </ScrollView>
           </View>
+        ) : (
+          selectedBuilding && (
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>No floors yet</Text>
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                Add a floor to start creating rooms.
+              </Text>
+              <TouchableOpacity
+                style={[styles.emptyButton, { backgroundColor: theme.primary }]}
+                onPress={() => router.push('/wizard/floors')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.emptyButtonText}>Go to Floors</Text>
+              </TouchableOpacity>
+            </View>
+          )
         )}
 
 
@@ -313,38 +365,53 @@ export default function RoomsScreen() {
               <Text style={[styles.label, { color: theme.text }]}>
                 Room Type
               </Text>
-              <View style={styles.roomTypeGrid}>
-                {availableRoomTypes.map((type) => {
-                  const isSelected = selectedRoomType?.id === type.id;
-                  return (
-                    <TouchableOpacity
-                      key={type.id}
-                      style={[
-                        styles.roomTypeButton,
-                        {
-                          backgroundColor: isSelected
-                            ? theme.primary
-                            : theme.inputBackground,
-                          borderColor: isSelected
-                            ? theme.primary
-                            : theme.inputBorder,
-                        },
-                      ]}
-                      onPress={() => setSelectedRoomType(type)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
+              {hasRoomTypes ? (
+                <View style={styles.roomTypeGrid}>
+                  {availableRoomTypes.map((type) => {
+                    const isSelected = selectedRoomType?.id === type.id;
+                    return (
+                      <TouchableOpacity
+                        key={type.id}
                         style={[
-                          styles.roomTypeText,
-                          { color: isSelected ? '#ffffff' : theme.text },
+                          styles.roomTypeButton,
+                          {
+                            backgroundColor: isSelected
+                              ? theme.primary
+                              : theme.inputBackground,
+                            borderColor: isSelected
+                              ? theme.primary
+                              : theme.inputBorder,
+                          },
                         ]}
+                        onPress={() => setSelectedRoomType(type)}
+                        activeOpacity={0.7}
                       >
-                        {type.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                        <Text
+                          style={[
+                            styles.roomTypeText,
+                            { color: isSelected ? '#ffffff' : theme.text },
+                          ]}
+                        >
+                          {type.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.emptyInline}>
+                  <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                    No bed counts selected. Go back to Share Types and pick at least one.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.emptyButton, { backgroundColor: theme.primary }]}
+                    onPress={() => router.push('/wizard/share-types')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.emptyButtonText}>Go to Share Types</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             <TouchableOpacity
@@ -378,6 +445,7 @@ export default function RoomsScreen() {
                   key={room.id}
                   roomNumber={room.roomNumber}
                   shareType={room.shareType}
+                  bedCount={room.bedCount ?? room.beds.length}
                   onUpdate={() => { }}
                   onRemove={() => {
                     handleRemoveRoom(room.id);
@@ -396,6 +464,18 @@ export default function RoomsScreen() {
         nextDisabled={!canProceed}
         showBack={true}
       />
+      <ConfirmModal
+        visible={pendingDelete !== null}
+        title="Delete Room"
+        message="Delete this room and its beds?"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) {
+            removeRoom(pendingDelete.buildingId, pendingDelete.floorId, pendingDelete.roomId);
+          }
+          setPendingDelete(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -410,6 +490,35 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: 12,
+  },
+  emptyState: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#00000010',
+    gap: 8,
+  },
+  emptyInline: {
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  emptyButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  emptyButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   sectionTitle: {
     fontSize: 16,

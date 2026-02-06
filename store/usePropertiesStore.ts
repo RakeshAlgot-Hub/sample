@@ -161,7 +161,10 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
       const savedProperties = await AsyncStorage.getItem('properties');
       const activeId = await AsyncStorage.getItem('activePropertyId');
       if (savedProperties) {
-        const properties: Property[] = JSON.parse(savedProperties);
+        const properties: Property[] = JSON.parse(savedProperties).map((property: Property) => ({
+          ...property,
+          bedPricing: property.bedPricing ?? [],
+        }));
         set({ properties, activePropertyId: activeId });
 
         if (!activeId && properties.length > 0) {

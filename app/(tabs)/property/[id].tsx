@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,13 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
 import { useMembersStore } from '@/store/useMembersStore';
 import BuildingAccordion from '@/components/BuildingAccordion';
+import ConfirmModal from '@/components/ConfirmModal';
 import { Home, MapPin, ChevronLeft, Building2, Bed, Pencil, Trash2 } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -23,6 +23,7 @@ export default function PropertyDetailsScreen() {
   const { properties, loadProperties, syncBedOccupancyWithMembers, removeProperty } =
     usePropertiesStore();
   const { members, loadMembers } = useMembersStore();
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -102,26 +103,7 @@ export default function PropertyDetailsScreen() {
 
   const handleDelete = () => {
     if (!property) return;
-    const memberCount = assignedMembers.length;
-    const memberNote = memberCount > 0
-      ? `\n\n${memberCount} member(s) are assigned to this property.`
-      : '';
-
-    Alert.alert(
-      'Delete Property',
-      `Are you sure you want to delete "${property.name}"? This action cannot be undone.${memberNote}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await removeProperty(property.id);
-            router.replace('/(tabs)/properties');
-          },
-        },
-      ]
-    );
+    setConfirmVisible(true);
   };
 
   return (
@@ -246,6 +228,22 @@ export default function PropertyDetailsScreen() {
           </View>
         </View>
       </ScrollView>
+      <ConfirmModal
+        visible={confirmVisible}
+        title="Delete Property"
+        message={
+          `Are you sure you want to delete "${property.name}"? This action cannot be undone.` +
+          (assignedMembers.length > 0
+            ? `\n\n${assignedMembers.length} member(s) are assigned to this property.`
+            : '')
+        }
+        onCancel={() => setConfirmVisible(false)}
+        onConfirm={async () => {
+          await removeProperty(property.id);
+          setConfirmVisible(false);
+          router.replace('/(tabs)/properties');
+        }}
+      />
     </SafeAreaView>
   );
 }

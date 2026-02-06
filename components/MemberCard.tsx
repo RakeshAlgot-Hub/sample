@@ -1,7 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Member } from '@/types/member';
 import { useTheme } from '@/theme/useTheme';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
+import ConfirmModal from '@/components/ConfirmModal';
 import { User, Phone, Bed, Trash2, Home, Building2 } from 'lucide-react-native';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 
@@ -13,6 +15,7 @@ interface MemberCardProps {
 export default function MemberCard({ member, onRemove }: MemberCardProps) {
   const theme = useTheme();
   const { properties } = usePropertiesStore();
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
   const property = properties.find((p) => p.id === member.propertyId);
   const building = property?.buildings.find((b) => b.id === member.buildingId);
@@ -20,21 +23,7 @@ export default function MemberCard({ member, onRemove }: MemberCardProps) {
   const room = floor?.rooms.find((r) => r.id === member.roomId);
 
   const handleRemove = () => {
-    Alert.alert(
-      'Remove Member',
-      `Are you sure you want to remove ${member.name}? This will free their assigned bed.`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: onRemove,
-        },
-      ]
-    );
+    setConfirmVisible(true);
   };
 
   return (
@@ -92,6 +81,16 @@ export default function MemberCard({ member, onRemove }: MemberCardProps) {
       >
         <Trash2 size={20} color={theme.error} strokeWidth={2} />
       </TouchableOpacity>
+      <ConfirmModal
+        visible={confirmVisible}
+        title="Remove Member"
+        message={`Are you sure you want to remove ${member.name}? This will free their assigned bed.`}
+        onCancel={() => setConfirmVisible(false)}
+        onConfirm={() => {
+          setConfirmVisible(false);
+          onRemove();
+        }}
+      />
     </Animated.View>
   );
 }

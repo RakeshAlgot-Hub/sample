@@ -1,5 +1,12 @@
 export type PropertyType = 'Hostel/PG' | 'Apartment';
 export type ShareType = 'single' | 'double' | 'triple';
+export type BillingPeriod = 'monthly' | 'weekly' | 'hourly' | 'yearly';
+
+export interface BedPricing {
+  bedCount: number;
+  price: number;
+  period: BillingPeriod;
+}
 
 export interface Bed {
   id: string;
@@ -10,6 +17,7 @@ export interface Room {
   id: string;
   roomNumber: string;
   shareType: ShareType;
+  bedCount?: number;
   beds: Bed[];
 }
 
@@ -37,6 +45,7 @@ export interface Property {
   type: PropertyType;
   city: string;
   buildings: Building[];
+  bedPricing: BedPricing[];
   totalRooms: number;
   totalBeds: number;
   createdAt: string;
@@ -47,5 +56,6 @@ export interface WizardState {
   propertyDetails: PropertyDetails;
   buildings: Building[];
   allowedBedCounts: number[];
+  bedPricing: BedPricing[];
   editingPropertyId?: string | null;
 }

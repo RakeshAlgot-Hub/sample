@@ -124,6 +124,15 @@ function RoomItem({ room }: { room: Room }) {
     return shareType.charAt(0).toUpperCase() + shareType.slice(1);
   };
 
+  const getRoomLabel = (room: Room): string => {
+    const count = room.bedCount ?? room.beds.length;
+    if (count > 3) {
+      return `${count} Beds`;
+    }
+
+    return getShareTypeLabel(room.shareType);
+  };
+
   return (
     <View
       style={[
@@ -145,7 +154,7 @@ function RoomItem({ room }: { room: Room }) {
               Room {room.roomNumber}
             </Text>
             <Text style={[styles.roomStats, { color: theme.textSecondary }]}>
-              {getShareTypeLabel(room.shareType)} • {room.beds.length} {room.beds.length === 1 ? 'Bed' : 'Beds'}
+              {getRoomLabel(room)} • {room.beds.length} {room.beds.length === 1 ? 'Bed' : 'Beds'}
             </Text>
           </View>
         </View>

@@ -6,7 +6,6 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -14,6 +13,7 @@ import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
+import ConfirmModal from '@/components/ConfirmModal';
 import FloorCard from '@/components/FloorCard';
 import FloorSelector from '@/components/FloorSelector';
 import { Floor } from '@/types/property';
@@ -35,16 +35,40 @@ export default function FloorsScreen() {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>(
     buildings[0]?.id || ''
   );
-  const [selectedFloors, setSelectedFloors] = useState<string[]>([]);
+  const [selectedFloorsByBuilding, setSelectedFloorsByBuilding] = useState<Record<string, string[]>>({});
+  const [pendingDelete, setPendingDelete] = useState<{
+    buildingId: string;
+    floorId: string;
+  } | null>(null);
 
   useEffect(() => {
-    if (buildings.length > 0 && !selectedBuildingId) {
+    if (buildings.length === 0) {
+      return;
+    }
+
+    const selectedExists = buildings.some((b) => b.id === selectedBuildingId);
+    if (!selectedBuildingId || !selectedExists) {
       setSelectedBuildingId(buildings[0].id);
     }
-  }, [buildings]);
+  }, [buildings, selectedBuildingId]);
+
+  useEffect(() => {
+    if (!selectedBuildingId) {
+      return;
+    }
+
+    setSelectedFloorsByBuilding((prev) =>
+      prev[selectedBuildingId]
+        ? prev
+        : { ...prev, [selectedBuildingId]: [] }
+    );
+  }, [selectedBuildingId]);
 
   const selectedBuilding = buildings.find((b) => b.id === selectedBuildingId);
   const floors = selectedBuilding?.floors || [];
+  const selectedFloors = selectedBuildingId
+    ? selectedFloorsByBuilding[selectedBuildingId] || []
+    : [];
   const existingFloorLabels = floors.map((f) => f.label);
 
   const handleClose = () => {
@@ -58,28 +82,52 @@ export default function FloorsScreen() {
   };
 
   const handleSelectFloors = (floors: string[]) => {
-    setSelectedFloors(floors);
+    if (!selectedBuildingId) {
+      return;
+    }
+
+    setSelectedFloorsByBuilding((prev) => ({
+      ...prev,
+      [selectedBuildingId]: floors,
+    }));
   };
 
-  const addSelectedFloors = () => {
-    if (selectedBuildingId && selectedFloors.length > 0) {
-      selectedFloors.forEach((floorLabel) => {
+  const addSelectedFloors = (buildingId?: string) => {
+    const entries: Array<[string, string[]]> = buildingId
+      ? [[buildingId, selectedFloorsByBuilding[buildingId] ?? []]]
+      : Object.entries(selectedFloorsByBuilding).map(([id, floors]) => [id, floors ?? []]);
+
+    entries.forEach(([currentBuildingId, floorLabels]) => {
+      if (floorLabels.length === 0) {
+        return;
+      }
+
+      const existing = buildings
+        .find((b) => b.id === currentBuildingId)
+        ?.floors.map((f) => f.label) || [];
+
+      floorLabels.forEach((floorLabel: string) => {
         const trimmedFloorLabel = floorLabel.trim();
-        if (
-          trimmedFloorLabel &&
-          !existingFloorLabels.includes(trimmedFloorLabel)
-        ) {
+        if (trimmedFloorLabel && !existing.includes(trimmedFloorLabel)) {
           const floor: Floor = {
             id: Date.now().toString() + Math.random(),
             label: trimmedFloorLabel,
             rooms: [],
           };
-          addFloor(selectedBuildingId, floor);
+          addFloor(currentBuildingId, floor);
         }
       });
+    });
 
-      setSelectedFloors([]);
+    if (buildingId) {
+      setSelectedFloorsByBuilding((prev) => ({
+        ...prev,
+        [buildingId]: [],
+      }));
+      return;
     }
+
+    setSelectedFloorsByBuilding({});
   };
 
   const handleUpdateFloor = (floorId: string, label: string) => {
@@ -90,18 +138,7 @@ export default function FloorsScreen() {
 
   const handleRemoveFloor = (floorId: string) => {
     if (selectedBuildingId) {
-      Alert.alert(
-        'Delete Floor',
-        'Delete this floor and all its rooms and beds?',
-        [
-          { text: 'No', style: 'cancel' },
-          {
-            text: 'Yes',
-            style: 'destructive',
-            onPress: () => removeFloor(selectedBuildingId, floorId),
-          },
-        ]
-      );
+      setPendingDelete({ buildingId: selectedBuildingId, floorId });
     }
   };
 
@@ -111,8 +148,11 @@ export default function FloorsScreen() {
     router.push('/wizard/share-types');
   };
 
-  const hasFloors = floors.length > 0;
-  const canProceed = hasFloors || selectedFloors.length > 0;
+  const hasFloors = buildings.some((building) => building.floors.length > 0);
+  const hasPendingSelections = Object.values(selectedFloorsByBuilding).some(
+    (floorLabels) => floorLabels.length > 0
+  );
+  const canProceed = hasFloors || hasPendingSelections;
 
   return (
     <SafeAreaView
@@ -128,7 +168,10 @@ export default function FloorsScreen() {
         showSteps
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>
             Select Building
@@ -210,6 +253,22 @@ export default function FloorsScreen() {
               existingFloors={existingFloorLabels}
             />
 
+            <TouchableOpacity
+              style={[
+                styles.addSelectedButton,
+                {
+                  backgroundColor: selectedFloors.length > 0
+                    ? theme.primary
+                    : theme.inputBorder,
+                },
+              ]}
+              onPress={() => addSelectedFloors(selectedBuilding.id)}
+              disabled={selectedFloors.length === 0}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.addSelectedText}>Add Selected Floors</Text>
+            </TouchableOpacity>
+
           </View>
         )}
 
@@ -231,6 +290,7 @@ export default function FloorsScreen() {
           </View>
         )}
 
+
       </ScrollView>
 
       <WizardFooter
@@ -239,6 +299,18 @@ export default function FloorsScreen() {
         nextLabel="Next"
         nextDisabled={!canProceed}
         showBack={true}
+      />
+      <ConfirmModal
+        visible={pendingDelete !== null}
+        title="Delete Floor"
+        message="Delete this floor and all its rooms and beds?"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) {
+            removeFloor(pendingDelete.buildingId, pendingDelete.floorId);
+          }
+          setPendingDelete(null);
+        }}
       />
     </SafeAreaView>
   );
@@ -298,6 +370,17 @@ const styles = StyleSheet.create({
   },
   floorsList: {
     gap: 12,
+  },
+  addSelectedButton: {
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addSelectedText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 
