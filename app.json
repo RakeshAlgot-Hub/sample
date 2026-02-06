@@ -16,8 +16,7 @@
 
     "web": {
       "bundler": "metro",
-      "output": "single",
-      "publicPath": "/sample/",
+      "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
 
