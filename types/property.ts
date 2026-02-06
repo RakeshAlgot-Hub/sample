@@ -47,4 +47,5 @@ export interface WizardState {
   propertyDetails: PropertyDetails;
   buildings: Building[];
   allowedBedCounts: number[];
+  editingPropertyId?: string | null;
 }

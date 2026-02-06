@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -89,7 +90,18 @@ export default function FloorsScreen() {
 
   const handleRemoveFloor = (floorId: string) => {
     if (selectedBuildingId) {
-      removeFloor(selectedBuildingId, floorId);
+      Alert.alert(
+        'Delete Floor',
+        'Delete this floor and all its rooms and beds?',
+        [
+          { text: 'No', style: 'cancel' },
+          {
+            text: 'Yes',
+            style: 'destructive',
+            onPress: () => removeFloor(selectedBuildingId, floorId),
+          },
+        ]
+      );
     }
   };
 

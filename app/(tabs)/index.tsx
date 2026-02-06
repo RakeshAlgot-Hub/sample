@@ -29,7 +29,7 @@ export default function DashboardScreen() {
   const theme = useTheme();
   const router = useRouter();
   const user = useStore((state) => state.user);
-  const { properties, loadProperties, syncBedOccupancyWithMembers } =
+  const { properties, activePropertyId, loadProperties, syncBedOccupancyWithMembers } =
     usePropertiesStore();
   const { members, loadMembers } = useMembersStore();
 
@@ -43,12 +43,17 @@ export default function DashboardScreen() {
   }, []);
 
   const analytics = useMemo(() => {
-    const totalProperties = properties.length;
-    const totalBuildings = properties.reduce(
+    const activeProperty =
+      properties.find((property) => property.id === activePropertyId) ??
+      properties[0];
+
+    const activeProperties = activeProperty ? [activeProperty] : [];
+    const totalProperties = activeProperties.length;
+    const totalBuildings = activeProperties.reduce(
       (acc, property) => acc + property.buildings.length,
       0
     );
-    const totalFloors = properties.reduce(
+    const totalFloors = activeProperties.reduce(
       (acc, property) =>
         acc +
         property.buildings.reduce(
@@ -57,7 +62,7 @@ export default function DashboardScreen() {
         ),
       0
     );
-    const totalRooms = properties.reduce(
+    const totalRooms = activeProperties.reduce(
       (acc, property) =>
         acc +
         property.buildings.reduce(
@@ -68,7 +73,7 @@ export default function DashboardScreen() {
         ),
       0
     );
-    const totalBeds = properties.reduce(
+    const totalBeds = activeProperties.reduce(
       (acc, property) =>
         acc +
         property.buildings.reduce(
@@ -85,7 +90,7 @@ export default function DashboardScreen() {
       0
     );
 
-    const occupiedBeds = properties.reduce(
+    const occupiedBeds = activeProperties.reduce(
       (acc, property) =>
         acc +
         property.buildings.reduce(
@@ -119,7 +124,7 @@ export default function DashboardScreen() {
       availableBeds,
       occupancyRate,
     };
-  }, [properties]);
+  }, [properties, activePropertyId]);
 
   const handleCreateProperty = () => {
     router.push('/wizard/property-details');

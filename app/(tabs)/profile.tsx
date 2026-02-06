@@ -6,20 +6,66 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useStore } from '@/store/useStore';
+import { usePropertiesStore } from '@/store/usePropertiesStore';
 import { User, Mail, Moon, Sun, LogOut } from 'lucide-react-native';
+import { useEffect } from 'react';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { user, themeMode, toggleTheme, logout } = useStore();
+  const {
+    properties,
+    activePropertyId,
+    loadProperties,
+    setActiveProperty,
+  } = usePropertiesStore();
+
+  useEffect(() => {
+    loadProperties();
+  }, [loadProperties]);
 
   const handleLogout = async () => {
     await logout();
     router.replace('/(auth)/login');
+  };
+
+  const handleSwitchProperty = (propertyId: string, propertyName: string) => {
+    if (propertyId === activePropertyId) {
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined'
+        ? window.confirm(`Use "${propertyName}" as the active property?`)
+        : true;
+
+      if (confirmed) {
+        void setActiveProperty(propertyId);
+      }
+
+      return;
+    }
+
+    Alert.alert(
+      'Switch Property',
+      `Use "${propertyName}" as the active property?`,
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes',
+          onPress: () => {
+            void setActiveProperty(propertyId);
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -69,6 +115,64 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
+        </View>
+
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.card, borderColor: theme.cardBorder },
+          ]}
+        >
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Active Property
+          </Text>
+          {properties.length === 0 ? (
+            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+              No properties created yet.
+            </Text>
+          ) : (
+            <View style={styles.propertyList}>
+              {properties.map((property) => {
+                const isActive = property.id === activePropertyId;
+                return (
+                  <View key={property.id} style={styles.propertyRow}>
+                    <View style={styles.propertyInfo}>
+                      <Text style={[styles.propertyName, { color: theme.text }]}>
+                        {property.name}
+                      </Text>
+                      <Text style={[styles.propertyMeta, { color: theme.textSecondary }]}>
+                        {property.type}
+                        {property.city ? ` • ${property.city}` : ''}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[
+                        styles.switchButton,
+                        {
+                          backgroundColor: isActive
+                            ? theme.primary + '15'
+                            : theme.inputBackground,
+                          borderColor: isActive ? theme.primary : theme.inputBorder,
+                        },
+                      ]}
+                      onPress={() => handleSwitchProperty(property.id, property.name)}
+                      activeOpacity={0.8}
+                      disabled={isActive}
+                    >
+                      <Text
+                        style={[
+                          styles.switchText,
+                          { color: isActive ? theme.primary : theme.text },
+                        ]}
+                      >
+                        {isActive ? 'Active' : 'Switch'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         <View
@@ -198,5 +302,45 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  emptyText: {
+    fontSize: 13,
+  },
+  propertyList: {
+    gap: 12,
+  },
+  propertyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  propertyInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  propertyName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  propertyMeta: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  switchButton: {
+    paddingHorizontal: 12,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  switchText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -16,7 +17,7 @@ import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
 import { RoomType } from '@/components/RoomTypeSelector';
 import EditableRoomCard from '@/components/EditableRoomCard';
-import { DoorOpen, AlertCircle, Plus } from 'lucide-react-native';
+import { DoorOpen, Plus } from 'lucide-react-native';
 
 export default function RoomsScreen() {
   const theme = useTheme();
@@ -129,12 +130,24 @@ export default function RoomsScreen() {
     router.push('/wizard/review');
   };
 
-  const floorsWithoutRooms = buildings.flatMap((building) =>
-    building.floors
-      .filter((floor) => floor.rooms.length === 0)
-      .map((floor) => ({ buildingName: building.name, floorLabel: floor.label }))
-  );
-  const canProceed = floorsWithoutRooms.length === 0;
+  const handleRemoveRoom = (roomId: string) => {
+    if (!selectedBuildingId || !selectedFloorId) return;
+
+    Alert.alert(
+      'Delete Room',
+      'Delete this room and its beds?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes',
+          style: 'destructive',
+          onPress: () => removeRoom(selectedBuildingId, selectedFloorId, roomId),
+        },
+      ]
+    );
+  };
+
+  const canProceed = true;
 
 
 
@@ -261,29 +274,6 @@ export default function RoomsScreen() {
           </View>
         )}
 
-        {floorsWithoutRooms.length > 0 && (
-          <View
-            style={[
-              styles.warningCard,
-              {
-                backgroundColor: theme.warning + '15',
-                borderColor: theme.warning,
-              },
-            ]}
-          >
-            <AlertCircle size={20} color={theme.warning} strokeWidth={2} />
-            <View style={styles.warningTextContainer}>
-              <Text style={[styles.warningTitle, { color: theme.warning }]}>
-                Missing Rooms
-              </Text>
-              <Text
-                style={[styles.warningText, { color: theme.textSecondary }]}
-              >
-                {floorsWithoutRooms.length} floor(s) need at least one room
-              </Text>
-            </View>
-          </View>
-        )}
 
         {selectedFloor && (
           <View style={styles.section}>
@@ -390,9 +380,7 @@ export default function RoomsScreen() {
                   shareType={room.shareType}
                   onUpdate={() => { }}
                   onRemove={() => {
-                    if (selectedBuildingId && selectedFloorId) {
-                      removeRoom(selectedBuildingId, selectedFloorId, room.id);
-                    }
+                    handleRemoveRoom(room.id);
                   }}
                 />
               ))}
@@ -458,25 +446,6 @@ const styles = StyleSheet.create({
   countText: {
     fontSize: 12,
     fontWeight: '700',
-  },
-  warningCard: {
-    flexDirection: 'row',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 12,
-  },
-  warningTextContainer: {
-    flex: 1,
-    gap: 4,
-  },
-  warningTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  warningText: {
-    fontSize: 13,
-    lineHeight: 18,
   },
   labelContainer: {
     flexDirection: 'row',

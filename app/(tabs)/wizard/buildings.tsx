@@ -81,7 +81,18 @@ export default function BuildingsScreen() {
   };
 
   const handleRemoveBuilding = (id: string) => {
-    removeBuilding(id);
+    Alert.alert(
+      'Delete Building',
+      'Delete this building and all its floors, rooms, and beds?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes',
+          style: 'destructive',
+          onPress: () => removeBuilding(id),
+        },
+      ]
+    );
   };
 
   const handleNext = () => {

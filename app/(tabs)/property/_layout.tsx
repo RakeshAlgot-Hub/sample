@@ -9,6 +9,7 @@ export default function PropertyLayout() {
       }}
     >
       <Stack.Screen name="[id]" />
+      <Stack.Screen name="edit/[id]" />
     </Stack>
   );
 }

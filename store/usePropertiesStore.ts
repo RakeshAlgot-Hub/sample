@@ -4,9 +4,11 @@ import { Property } from '@/types/property';
 
 interface PropertiesStore {
   properties: Property[];
+  activePropertyId: string | null;
   addProperty: (property: Property) => Promise<void>;
   removeProperty: (id: string) => Promise<void>;
   updateProperty: (id: string, updates: Partial<Property>) => Promise<void>;
+  setActiveProperty: (id: string | null) => Promise<void>;
   updateBedOccupancy: (
     propertyId: string,
     buildingId: string,
@@ -23,12 +25,18 @@ interface PropertiesStore {
 
 export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
   properties: [],
+  activePropertyId: null,
 
   addProperty: async (property: Property) => {
     set((state) => ({
       properties: [...state.properties, property],
     }));
     await get().saveProperties();
+
+    const { activePropertyId } = get();
+    if (!activePropertyId) {
+      await get().setActiveProperty(property.id);
+    }
   },
 
   removeProperty: async (id: string) => {
@@ -36,6 +44,12 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
       properties: state.properties.filter((p) => p.id !== id),
     }));
     await get().saveProperties();
+
+    const { activePropertyId, properties } = get();
+    if (activePropertyId === id) {
+      const nextActive = properties.length > 0 ? properties[0].id : null;
+      await get().setActiveProperty(nextActive);
+    }
   },
 
   updateProperty: async (id: string, updates: Partial<Property>) => {
@@ -45,6 +59,15 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
       ),
     }));
     await get().saveProperties();
+  },
+
+  setActiveProperty: async (id: string | null) => {
+    set({ activePropertyId: id });
+    if (id) {
+      await AsyncStorage.setItem('activePropertyId', id);
+    } else {
+      await AsyncStorage.removeItem('activePropertyId');
+    }
   },
 
   updateBedOccupancy: async (
@@ -136,9 +159,18 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
   loadProperties: async () => {
     try {
       const savedProperties = await AsyncStorage.getItem('properties');
+      const activeId = await AsyncStorage.getItem('activePropertyId');
       if (savedProperties) {
         const properties: Property[] = JSON.parse(savedProperties);
-        set({ properties });
+        set({ properties, activePropertyId: activeId });
+
+        if (!activeId && properties.length > 0) {
+          await get().setActiveProperty(properties[0].id);
+        }
+        if (activeId && !properties.some((p) => p.id === activeId)) {
+          const fallbackId = properties.length > 0 ? properties[0].id : null;
+          await get().setActiveProperty(fallbackId);
+        }
       }
     } catch (error) {
       console.error('Failed to load properties:', error);
@@ -155,6 +187,7 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
   },
 
   reset: () => {
-    set({ properties: [] });
+    set({ properties: [], activePropertyId: null });
+    AsyncStorage.removeItem('activePropertyId').catch(console.error);
   },
 }));

@@ -18,7 +18,7 @@ export default function MembersScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { members, loadMembers, removeMember } = useMembersStore();
-  const { loadProperties } = usePropertiesStore();
+  const { activePropertyId, loadProperties } = usePropertiesStore();
 
   useEffect(() => {
     loadMembers();
@@ -33,7 +33,11 @@ export default function MembersScreen() {
     await removeMember(id);
   };
 
-  if (members.length === 0) {
+  const visibleMembers = activePropertyId
+    ? members.filter((member) => member.propertyId === activePropertyId)
+    : members;
+
+  if (visibleMembers.length === 0) {
     return (
       <SafeAreaView
         style={[styles.container, { backgroundColor: theme.background }]}
@@ -78,7 +82,7 @@ export default function MembersScreen() {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <ScrollView contentContainerStyle={styles.listContent}>
-        {members.map((member) => (
+        {visibleMembers.map((member) => (
           <MemberCard
             key={member.id}
             member={member}

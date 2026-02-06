@@ -75,7 +75,7 @@ export default function MemberAssignmentForm({
   initialProfilePic = null,
 }: MemberAssignmentFormProps) {
   const theme = useTheme();
-  const { properties, loadProperties } = usePropertiesStore();
+  const { properties, activePropertyId, loadProperties } = usePropertiesStore();
 
   const [name, setName] = useState(initialName);
   const [phone, setPhone] = useState(initialPhone);
@@ -152,10 +152,15 @@ export default function MemberAssignmentForm({
   }, []);
 
   useEffect(() => {
+    if (activePropertyId) {
+      setSelectedPropertyId(activePropertyId);
+      return;
+    }
+
     if (properties.length > 0 && !selectedPropertyId) {
       setSelectedPropertyId(properties[0].id);
     }
-  }, [properties]);
+  }, [properties, activePropertyId]);
 
   const handleSubmit = () => {
     setValidationError(null);
@@ -245,6 +250,10 @@ export default function MemberAssignmentForm({
   };
 
   const handlePropertyChange = (propertyId: string) => {
+    if (activePropertyId) {
+      return;
+    }
+
     setSelectedPropertyId(propertyId);
     setSelectedBuildingId(null);
     setSelectedFloorId(null);

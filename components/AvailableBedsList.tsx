@@ -24,7 +24,7 @@ interface BedSelectorProps {
 
 export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSelectorProps) {
   const theme = useTheme();
-  const { properties } = usePropertiesStore();
+  const { properties, activePropertyId } = usePropertiesStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -41,30 +41,32 @@ export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSel
   const allAvailableBeds = useMemo(() => {
     const beds: AvailableBed[] = [];
 
-    properties.forEach((property) => {
-      property.buildings.forEach((building) => {
-        building.floors.forEach((floor) => {
-          floor.rooms.forEach((room) => {
-            room.beds.forEach((bed, bedIndex) => {
-              if (!bed.occupied) {
-                beds.push({
-                  propertyId: property.id,
-                  propertyName: property.name,
-                  buildingId: building.id,
-                  buildingName: building.name,
-                  floorId: floor.id,
-                  floorLabel: floor.label,
-                  roomId: room.id,
-                  roomNumber: room.roomNumber,
-                  bedId: bed.id,
-                  bedNumber: bedIndex + 1,
-                });
-              }
+    properties
+      .filter((property) => !activePropertyId || property.id === activePropertyId)
+      .forEach((property) => {
+        property.buildings.forEach((building) => {
+          building.floors.forEach((floor) => {
+            floor.rooms.forEach((room) => {
+              room.beds.forEach((bed, bedIndex) => {
+                if (!bed.occupied) {
+                  beds.push({
+                    propertyId: property.id,
+                    propertyName: property.name,
+                    buildingId: building.id,
+                    buildingName: building.name,
+                    floorId: floor.id,
+                    floorLabel: floor.label,
+                    roomId: room.id,
+                    roomNumber: room.roomNumber,
+                    bedId: bed.id,
+                    bedNumber: bedIndex + 1,
+                  });
+                }
+              });
             });
           });
         });
       });
-    });
 
     return beds;
   }, [properties]);
@@ -90,10 +92,15 @@ export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSel
 
   // Auto-select first property if not selected
   useEffect(() => {
+    if (activePropertyId) {
+      setSelectedPropertyId(activePropertyId);
+      return;
+    }
+
     if (!selectedPropertyId && properties.length > 0) {
       setSelectedPropertyId(properties[0].id);
     }
-  }, [properties]);
+  }, [properties, activePropertyId]);
 
   // Auto-select first building when property changes
   useEffect(() => {

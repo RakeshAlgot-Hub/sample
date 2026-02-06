@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
@@ -24,21 +24,27 @@ const PROPERTY_TYPES: PropertyType[] = ['Hostel/PG', 'Apartment'];
 export default function PropertyDetailsScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const {
     propertyDetails,
     updatePropertyDetails,
     nextStep,
     resetWizard,
     loadWizardState,
+    editingPropertyId,
   } = useWizardStore();
 
   const [name, setName] = useState(propertyDetails.name);
   const [type, setType] = useState<PropertyType | null>(propertyDetails.type);
   const [city, setCity] = useState(propertyDetails.city);
 
+  const isEditing = mode === 'edit' || Boolean(editingPropertyId);
+
   useEffect(() => {
-    loadWizardState();
-  }, []);
+    if (!isEditing) {
+      loadWizardState();
+    }
+  }, [isEditing, loadWizardState]);
 
   useEffect(() => {
     setName(propertyDetails.name);
@@ -129,9 +135,11 @@ export default function PropertyDetailsScreen() {
                           : theme.inputBackground,
                       borderColor:
                         type === propertyType ? theme.primary : theme.inputBorder,
+                      opacity: isEditing ? 0.6 : 1,
                     },
                   ]}
                   onPress={() => setType(propertyType)}
+                  disabled={isEditing}
                   activeOpacity={0.7}
                 >
                   <Text
@@ -148,6 +156,12 @@ export default function PropertyDetailsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            {isEditing && (
+              <Text style={[styles.helperText, { color: theme.textSecondary }]}
+              >
+                Property type is locked for existing properties.
+              </Text>
+            )}
           </View>
 
           <View style={styles.section}>
@@ -231,5 +245,8 @@ const styles = StyleSheet.create({
   },
   typeText: {
     fontSize: 15,
+  },
+  helperText: {
+    fontSize: 13,
   },
 });

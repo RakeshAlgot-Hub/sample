@@ -6,20 +6,21 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
 import { useMembersStore } from '@/store/useMembersStore';
 import BuildingAccordion from '@/components/BuildingAccordion';
-import { Home, MapPin, ChevronLeft, Building2, Bed } from 'lucide-react-native';
+import { Home, MapPin, ChevronLeft, Building2, Bed, Pencil, Trash2 } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function PropertyDetailsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { properties, loadProperties, syncBedOccupancyWithMembers } =
+  const { properties, loadProperties, syncBedOccupancyWithMembers, removeProperty } =
     usePropertiesStore();
   const { members, loadMembers } = useMembersStore();
 
@@ -35,6 +36,11 @@ export default function PropertyDetailsScreen() {
   const property = useMemo(
     () => properties.find((p) => p.id === id),
     [properties, id]
+  );
+
+  const assignedMembers = useMemo(
+    () => members.filter((member) => member.propertyId === id),
+    [members, id]
   );
 
   if (!property) {
@@ -88,6 +94,35 @@ export default function PropertyDetailsScreen() {
   );
 
   const availableBeds = totalBeds - occupiedBeds;
+
+  const handleEdit = () => {
+    if (!property) return;
+    router.push(`/property/edit/${property.id}`);
+  };
+
+  const handleDelete = () => {
+    if (!property) return;
+    const memberCount = assignedMembers.length;
+    const memberNote = memberCount > 0
+      ? `\n\n${memberCount} member(s) are assigned to this property.`
+      : '';
+
+    Alert.alert(
+      'Delete Property',
+      `Are you sure you want to delete "${property.name}"? This action cannot be undone.${memberNote}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await removeProperty(property.id);
+            router.replace('/(tabs)/properties');
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView
@@ -172,6 +207,25 @@ export default function PropertyDetailsScreen() {
             </View>
           </View>
         </Animated.View>
+
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: theme.primary }]}
+            onPress={handleEdit}
+            activeOpacity={0.8}
+          >
+            <Pencil size={18} color="#ffffff" strokeWidth={2} />
+            <Text style={styles.actionButtonText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: theme.error }]}
+            onPress={handleDelete}
+            activeOpacity={0.8}
+          >
+            <Trash2 size={18} color="#ffffff" strokeWidth={2} />
+            <Text style={styles.actionButtonText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.section}>
           <Animated.Text
@@ -271,6 +325,24 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  actionButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   statItem: {
     alignItems: 'center',

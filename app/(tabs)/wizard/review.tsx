@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -27,8 +28,21 @@ interface ValidationError {
 export default function ReviewScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { propertyDetails, buildings, allowedBedCounts, previousStep, resetWizard } = useWizardStore();
-  const { addProperty } = usePropertiesStore();
+  const {
+    propertyDetails,
+    buildings,
+    allowedBedCounts,
+    previousStep,
+    resetWizard,
+    editingPropertyId,
+  } = useWizardStore();
+  const {
+    addProperty,
+    updateProperty,
+    properties,
+    activePropertyId,
+    setActiveProperty,
+  } = usePropertiesStore();
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -104,29 +118,70 @@ export default function ReviewScreen() {
     router.back();
   };
 
+  const isEditing = Boolean(editingPropertyId);
+
   const handleFinish = async () => {
     if (!propertyDetails.type || !isValid) return;
 
     setIsSaving(true);
 
-    const newProperty = {
-      id: Date.now().toString(),
-      name: propertyDetails.name,
-      type: propertyDetails.type,
-      city: propertyDetails.city,
-      buildings: buildings,
-      totalRooms: totals.totalRooms,
-      totalBeds: totals.totalBeds,
-      createdAt: new Date().toISOString(),
-    };
+    if (isEditing && editingPropertyId) {
+      const existing = properties.find((p) => p.id === editingPropertyId);
 
-    await addProperty(newProperty);
+      await updateProperty(editingPropertyId, {
+        name: propertyDetails.name,
+        type: propertyDetails.type,
+        city: propertyDetails.city,
+        buildings: buildings,
+        totalRooms: totals.totalRooms,
+        totalBeds: totals.totalBeds,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      });
+    } else {
+      const newProperty = {
+        id: Date.now().toString(),
+        name: propertyDetails.name,
+        type: propertyDetails.type,
+        city: propertyDetails.city,
+        buildings: buildings,
+        totalRooms: totals.totalRooms,
+        totalBeds: totals.totalBeds,
+        createdAt: new Date().toISOString(),
+      };
+
+      await addProperty(newProperty);
+
+      if (activePropertyId && activePropertyId !== newProperty.id) {
+        Alert.alert(
+          'Switch Property',
+          `Do you want to switch to "${newProperty.name}"?`,
+          [
+            { text: 'No', style: 'cancel' },
+            {
+              text: 'Yes',
+              onPress: () => {
+                void setActiveProperty(newProperty.id);
+              },
+            },
+          ]
+        );
+      }
+    }
 
     setIsSaving(false);
     setShowSuccess(true);
 
     setTimeout(() => {
       resetWizard();
+
+      if (editingPropertyId) {
+        router.replace({
+          pathname: '/property/[id]',
+          params: { id: editingPropertyId },
+        });
+        return;
+      }
+
       router.replace('/(tabs)/properties');
     }, 800);
   };
@@ -223,7 +278,7 @@ export default function ReviewScreen() {
           >
             <CheckCircle size={48} color={theme.success} strokeWidth={2} />
             <Text style={[styles.successText, { color: theme.success }]}>
-              Property Saved Successfully!
+              {isEditing ? 'Property Updated Successfully!' : 'Property Saved Successfully!'}
             </Text>
           </View>
         </View>
@@ -232,7 +287,7 @@ export default function ReviewScreen() {
       <WizardFooter
         onBack={handleBack}
         onNext={isSaving ? undefined : handleFinish}
-        nextLabel={isSaving ? 'Saving...' : 'Confirm & Save'}
+        nextLabel={isSaving ? 'Saving...' : isEditing ? 'Save Changes' : 'Confirm & Save'}
         nextDisabled={!isValid || isSaving}
         showBack={!isSaving}
       />

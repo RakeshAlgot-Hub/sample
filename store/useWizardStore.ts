@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PropertyDetails, Building, Floor, Room, WizardState } from '@/types/property';
+import { PropertyDetails, Building, Floor, Room, WizardState, Property } from '@/types/property';
 import { generateBedsByShareType } from '@/utils/bedHelpers';
 
 interface WizardStore extends WizardState {
@@ -17,6 +17,7 @@ interface WizardStore extends WizardState {
   addRoom: (buildingId: string, floorId: string, room: Room) => void;
   removeRoom: (buildingId: string, floorId: string, roomId: string) => void;
   updateAllowedBedCounts: (bedCounts: number[]) => void;
+  setWizardFromProperty: (property: Property) => void;
   resetWizard: () => void;
   loadWizardState: () => Promise<void>;
   saveWizardState: () => Promise<void>;
@@ -33,6 +34,7 @@ const initialState: WizardState = {
   propertyDetails: initialPropertyDetails,
   buildings: [],
   allowedBedCounts: [],
+  editingPropertyId: null,
 };
 
 export const useWizardStore = create<WizardStore>((set, get) => ({
@@ -99,11 +101,11 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       buildings: state.buildings.map((b) =>
         b.id === buildingId
           ? {
-              ...b,
-              floors: b.floors.map((f) =>
-                f.id === floorId ? { ...f, label } : f
-              ),
-            }
+            ...b,
+            floors: b.floors.map((f) =>
+              f.id === floorId ? { ...f, label } : f
+            ),
+          }
           : b
       ),
     }));
@@ -131,13 +133,13 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       buildings: state.buildings.map((b) =>
         b.id === buildingId
           ? {
-              ...b,
-              floors: b.floors.map((f) =>
-                f.id === floorId
-                  ? { ...f, rooms: [...f.rooms, roomWithBeds] }
-                  : f
-              ),
-            }
+            ...b,
+            floors: b.floors.map((f) =>
+              f.id === floorId
+                ? { ...f, rooms: [...f.rooms, roomWithBeds] }
+                : f
+            ),
+          }
           : b
       ),
     }));
@@ -149,13 +151,13 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       buildings: state.buildings.map((b) =>
         b.id === buildingId
           ? {
-              ...b,
-              floors: b.floors.map((f) =>
-                f.id === floorId
-                  ? { ...f, rooms: f.rooms.filter((r) => r.id !== roomId) }
-                  : f
-              ),
-            }
+            ...b,
+            floors: b.floors.map((f) =>
+              f.id === floorId
+                ? { ...f, rooms: f.rooms.filter((r) => r.id !== roomId) }
+                : f
+            ),
+          }
           : b
       ),
     }));
@@ -164,6 +166,33 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
 
   updateAllowedBedCounts: (bedCounts: number[]) => {
     set({ allowedBedCounts: bedCounts });
+    get().saveWizardState();
+  },
+
+  setWizardFromProperty: (property: Property) => {
+    const bedCounts = new Set<number>();
+
+    property.buildings.forEach((building) => {
+      building.floors.forEach((floor) => {
+        floor.rooms.forEach((room) => {
+          if (room.beds.length > 0) {
+            bedCounts.add(room.beds.length);
+          }
+        });
+      });
+    });
+
+    set({
+      currentStep: 1,
+      propertyDetails: {
+        name: property.name,
+        type: property.type,
+        city: property.city,
+      },
+      buildings: property.buildings,
+      allowedBedCounts: Array.from(bedCounts).sort((a, b) => a - b),
+      editingPropertyId: property.id,
+    });
     get().saveWizardState();
   },
 
@@ -192,6 +221,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
         propertyDetails: state.propertyDetails,
         buildings: state.buildings,
         allowedBedCounts: state.allowedBedCounts,
+        editingPropertyId: state.editingPropertyId ?? null,
       };
       await AsyncStorage.setItem('wizardState', JSON.stringify(stateToSave));
     } catch (error) {

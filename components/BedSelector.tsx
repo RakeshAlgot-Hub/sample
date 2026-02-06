@@ -33,7 +33,11 @@ export default function BedSelector({
   excludeMemberId,
 }: BedSelectorProps) {
   const theme = useTheme();
-  const { properties } = usePropertiesStore();
+  const { properties, activePropertyId } = usePropertiesStore();
+
+  const propertyOptions = activePropertyId
+    ? properties.filter((property) => property.id === activePropertyId)
+    : properties;
 
   const selectedProperty = properties.find((p) => p.id === selectedPropertyId);
   const selectedBuilding = selectedProperty?.buildings.find(
@@ -62,7 +66,7 @@ export default function BedSelector({
     }
   }, [selectedFloor, selectedRoomId]);
 
-  if (properties.length === 0) {
+  if (propertyOptions.length === 0) {
     return (
       <View
         style={[
@@ -95,7 +99,7 @@ export default function BedSelector({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.optionsList}
         >
-          {properties.map((property) => {
+          {propertyOptions.map((property) => {
             const isSelected = property.id === selectedPropertyId;
             return (
               <TouchableOpacity
@@ -107,9 +111,11 @@ export default function BedSelector({
                       ? theme.primary
                       : theme.inputBackground,
                     borderColor: isSelected ? theme.primary : theme.inputBorder,
+                    opacity: activePropertyId ? 0.7 : 1,
                   },
                 ]}
                 onPress={() => onPropertyChange(property.id)}
+                disabled={Boolean(activePropertyId)}
                 activeOpacity={0.7}
               >
                 <Text
@@ -309,13 +315,13 @@ export default function BedSelector({
                         backgroundColor: isDisabled
                           ? theme.inputBackground
                           : isSelected
-                          ? theme.primary
-                          : theme.inputBackground,
+                            ? theme.primary
+                            : theme.inputBackground,
                         borderColor: isDisabled
                           ? theme.border
                           : isSelected
-                          ? theme.primary
-                          : theme.inputBorder,
+                            ? theme.primary
+                            : theme.inputBorder,
                         opacity: isDisabled ? 0.5 : 1,
                       },
                     ]}
@@ -329,8 +335,8 @@ export default function BedSelector({
                         isDisabled
                           ? theme.textSecondary
                           : isSelected
-                          ? '#ffffff'
-                          : theme.text
+                            ? '#ffffff'
+                            : theme.text
                       }
                       strokeWidth={2}
                     />
@@ -341,8 +347,8 @@ export default function BedSelector({
                           color: isDisabled
                             ? theme.textSecondary
                             : isSelected
-                            ? '#ffffff'
-                            : theme.text,
+                              ? '#ffffff'
+                              : theme.text,
                         },
                       ]}
                     >

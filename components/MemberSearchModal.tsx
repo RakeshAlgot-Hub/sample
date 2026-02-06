@@ -24,15 +24,26 @@ export default function MemberSearchModal({ visible, onClose }: MemberSearchModa
     const theme = useTheme();
     const [searchQuery, setSearchQuery] = useState('');
     const { members } = useMembersStore();
-    const { properties } = usePropertiesStore();
+    const { properties, activePropertyId } = usePropertiesStore();
     const webInputStyle = Platform.OS === 'web'
         ? ({ outlineStyle: 'none', boxShadow: 'none' } as any)
         : undefined;
 
-    const filteredMembers = members.filter((member) =>
-        member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        member.phone.includes(searchQuery)
-    );
+    const filteredMembers = members.filter((member) => {
+        const matchesQuery =
+            member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            member.phone.includes(searchQuery);
+
+        if (!matchesQuery) {
+            return false;
+        }
+
+        if (!activePropertyId) {
+            return true;
+        }
+
+        return member.propertyId === activePropertyId;
+    });
 
     const getMemberLocation = (member: typeof members[0]) => {
         const property = properties.find((p) => p.id === member.propertyId);
