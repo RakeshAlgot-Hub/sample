@@ -1,16 +1,14 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/useTheme';
 import { X } from 'lucide-react-native';
-import Animated, {
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated';
 
 interface WizardHeaderProps {
   currentStep: number;
   totalSteps: number;
   title: string;
   onClose: () => void;
+  showClose?: boolean;
+  showSteps?: boolean;
 }
 
 export default function WizardHeader({
@@ -18,49 +16,54 @@ export default function WizardHeader({
   totalSteps,
   title,
   onClose,
+  showClose = true,
+  showSteps = true,
 }: WizardHeaderProps) {
   const theme = useTheme();
-  const progress = (currentStep / totalSteps) * 100;
-
-  const progressStyle = useAnimatedStyle(() => ({
-    width: withTiming(`${progress}%`, { duration: 300 }),
-  }));
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.card }]}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, !showClose && styles.headerNoClose]}>
         <View style={styles.titleContainer}>
           <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
-          <Text style={[styles.stepText, { color: theme.textSecondary }]}>
-            Step {currentStep} of {totalSteps}
-          </Text>
+          {showSteps && (
+            <Text style={[styles.stepText, { color: theme.textSecondary }]}>
+              Step {currentStep} of {totalSteps}
+            </Text>
+          )}
         </View>
-        <TouchableOpacity
-          onPress={onClose}
-          style={[styles.closeButton, { backgroundColor: theme.inputBackground }]}
-          activeOpacity={0.7}
-        >
-          <X size={20} color={theme.text} strokeWidth={2} />
-        </TouchableOpacity>
+        {showClose && (
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.closeButton, { backgroundColor: theme.inputBackground }]}
+            activeOpacity={0.7}
+          >
+            <X size={20} color={theme.text} strokeWidth={2} />
+          </TouchableOpacity>
+        )}
       </View>
-      <View style={[styles.progressContainer, { backgroundColor: theme.border }]}>
-        <Animated.View
-          style={[
-            styles.progressBar,
-            { backgroundColor: theme.primary },
-            progressStyle,
-          ]}
-        />
-      </View>
+      {showSteps && (
+        <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                backgroundColor: theme.primary,
+                width: `${Math.max(0, Math.min(1, currentStep / totalSteps)) * 100}%`,
+              },
+            ]}
+          />
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 12,
+    paddingTop: 6,
     paddingBottom: 8,
-    gap: 12,
+    gap: 8,
     borderBottomWidth: 1,
     borderBottomColor: 'transparent',
   },
@@ -68,34 +71,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+  },
+  headerNoClose: {
+    justifyContent: 'flex-start',
   },
   titleContainer: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
   title: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
   },
   stepText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
   closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  progressContainer: {
+  progressTrack: {
     height: 4,
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     borderRadius: 2,
     overflow: 'hidden',
   },
-  progressBar: {
+  progressFill: {
     height: '100%',
     borderRadius: 2,
   },

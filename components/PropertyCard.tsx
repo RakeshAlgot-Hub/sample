@@ -86,31 +86,31 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
     borderWidth: 1,
-    padding: 16,
-    gap: 16,
+    padding: 14,
+    gap: 14,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 46,
+    height: 46,
+    borderRadius: 11,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerText: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   propertyName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
   },
   propertyType: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   divider: {
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
 });

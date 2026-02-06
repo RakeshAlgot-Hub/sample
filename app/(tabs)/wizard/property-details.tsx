@@ -18,7 +18,7 @@ import WizardFooter from '@/components/WizardFooter';
 import { PropertyType } from '@/types/property';
 import { Home, MapPin } from 'lucide-react-native';
 
-const PROPERTY_TYPES: PropertyType[] = ['Hostel/PG','Apartment'];
+const PROPERTY_TYPES: PropertyType[] = ['Hostel/PG', 'Apartment'];
 
 export default function PropertyDetailsScreen() {
   const theme = useTheme();
@@ -67,6 +67,8 @@ export default function PropertyDetailsScreen() {
         totalSteps={6}
         title="Property Details"
         onClose={handleClose}
+        showClose={false}
+        showSteps={false}
       />
 
       <KeyboardAvoidingView
@@ -187,44 +189,45 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    gap: 24,
+    padding: 16,
+    paddingBottom: 100,
+    gap: 20,
   },
   section: {
-    gap: 12,
+    gap: 10,
   },
   labelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   label: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   required: {
-    fontSize: 16,
+    fontSize: 15,
   },
   input: {
-    height: 52,
+    height: 50,
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    paddingHorizontal: 14,
+    fontSize: 15,
   },
   typeContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   typeButton: {
     flex: 1,
-    height: 52,
+    height: 48,
     borderRadius: 12,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
   typeText: {
-    fontSize: 16,
+    fontSize: 15,
   },
 });

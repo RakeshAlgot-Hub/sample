@@ -139,6 +139,8 @@ export default function ReviewScreen() {
         totalSteps={6}
         title="Review"
         onClose={handleClose}
+        showClose={false}
+        showSteps={false}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>

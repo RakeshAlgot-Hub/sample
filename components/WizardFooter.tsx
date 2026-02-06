@@ -23,7 +23,7 @@ export default function WizardFooter({
     <View
       style={[
         styles.container,
-        { backgroundColor: theme.card, borderTopColor: theme.border },
+        { backgroundColor: theme.background, borderTopColor: 'transparent' },
       ]}
     >
       {showBack && onBack ? (
@@ -67,33 +67,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderTopWidth: 1,
+    padding: 16,
+    borderTopWidth: 0,
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 48,
-    paddingHorizontal: 20,
+    height: 46,
+    paddingHorizontal: 18,
     borderRadius: 12,
-    gap: 8,
+    gap: 6,
   },
   backButton: {
-    minWidth: 100,
+    minWidth: 90,
   },
   nextButton: {
-    minWidth: 120,
+    minWidth: 110,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   nextButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#ffffff',
   },
   spacer: {
-    width: 100,
+    width: 90,
   },
 });

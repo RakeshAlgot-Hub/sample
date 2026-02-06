@@ -99,6 +99,8 @@ export default function BuildingsScreen() {
         totalSteps={6}
         title="Buildings"
         onClose={handleClose}
+        showClose={false}
+        showSteps={false}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>

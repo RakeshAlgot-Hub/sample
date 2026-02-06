@@ -70,22 +70,18 @@ export default function PropertiesScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Properties</Text>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: theme.accent }]}
-          onPress={handleCreateProperty}
-          activeOpacity={0.8}
-        >
-          <Plus size={20} color="#ffffff" strokeWidth={2} />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView contentContainerStyle={styles.listContent}>
         {properties.map((property) => (
           <PropertyCard key={property.id} property={property} />
         ))}
       </ScrollView>
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: theme.accent }]}
+        onPress={handleCreateProperty}
+        activeOpacity={0.8}
+      >
+        <Plus size={24} color="#ffffff" strokeWidth={2} />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -101,22 +97,23 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyCard: {
-    padding: 32,
+    padding: 28,
     borderRadius: 16,
     borderWidth: 1,
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
+    width: '100%',
     maxWidth: 400,
   },
   iconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
+    width: 90,
+    height: 90,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -124,42 +121,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 48,
-    paddingHorizontal: 24,
+    height: 46,
+    paddingHorizontal: 22,
     borderRadius: 12,
     gap: 8,
   },
   createButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12,
+  listContent: {
+    padding: 16,
+    paddingBottom: 100,
+    gap: 14,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-  },
-  addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 90,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  listContent: {
-    padding: 20,
-    gap: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });

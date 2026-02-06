@@ -13,22 +13,9 @@ import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
 import WizardFooter from '@/components/WizardFooter';
-import RoomTypeSelector, { RoomType } from '@/components/RoomTypeSelector';
-import RoomAssignmentCard from '@/components/RoomAssignmentCard';
-import RoomTypeSelectionModal from '@/components/RoomTypeSelectionModal';
+import { RoomType } from '@/components/RoomTypeSelector';
 import EditableRoomCard from '@/components/EditableRoomCard';
-import { DoorOpen, AlertCircle, Hash, ChevronRight, CheckCircle } from 'lucide-react-native';
-
-type FlowStep = 'count' | 'generate' | 'assign';
-
-type GeneratedRoom = {
-  tempId: string;
-  roomNumber: string;
-};
-
-type RoomAssignment = {
-  [tempId: string]: RoomType;
-};
+import { DoorOpen, AlertCircle, Plus } from 'lucide-react-native';
 
 export default function RoomsScreen() {
   const theme = useTheme();
@@ -65,19 +52,8 @@ export default function RoomsScreen() {
     buildings[0]?.id || ''
   );
   const [selectedFloorId, setSelectedFloorId] = useState<string>('');
-
-  const [step, setStep] = useState<FlowStep>('count');
-
-
-
-
-  const [roomCount, setRoomCount] = useState('');
-  const [startingRoomNumber, setStartingRoomNumber] = useState('');
-  const [generatedRooms, setGeneratedRooms] = useState<GeneratedRoom[]>([]);
-
-  const [roomAssignments, setRoomAssignments] = useState<RoomAssignment>({});
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedRoomForAssignment, setSelectedRoomForAssignment] = useState<string | null>(null);
+  const [roomNumber, setRoomNumber] = useState('');
+  const [selectedRoomType, setSelectedRoomType] = useState<RoomType | null>(null);
 
   useEffect(() => {
     if (buildings.length > 0) {
@@ -113,124 +89,32 @@ export default function RoomsScreen() {
     if (building && building.floors.length > 0) {
       setSelectedFloorId(building.floors[0].id);
     }
-    resetFlowState();
+    setRoomNumber('');
+    setSelectedRoomType(null);
   };
 
   const handleFloorChange = (floorId: string) => {
     setSelectedFloorId(floorId);
-    resetFlowState();
+    setRoomNumber('');
+    setSelectedRoomType(null);
   };
 
-  const resetFlowState = () => {
-    setStep('count');
-    setRoomCount('');
-    setStartingRoomNumber('');
-    setGeneratedRooms([]);
-    setRoomAssignments({});
-  };
-
-  const getSuggestedStartingRoom = (floorLabel: string): string => {
-    if (floorLabel === 'G' || floorLabel === '0') {
-      return '001';
-    }
-    const floorNum = parseInt(floorLabel);
-    if (!isNaN(floorNum)) {
-      return `${floorNum}01`;
-    }
-    return '001';
-  };
-
-
-
-
-
-
-
-  const handleRoomCountNext = () => {
-    if (selectedFloor && roomCount && parseInt(roomCount) > 0) {
-      const suggested = getSuggestedStartingRoom(selectedFloor.label);
-      setStartingRoomNumber(suggested);
-      setStep('generate');
-    }
-  };
-
-  const handleGenerateRooms = () => {
-    if (!startingRoomNumber.trim()) return;
-
-    const count = parseInt(roomCount);
-    const rooms: GeneratedRoom[] = [];
-
-    const isNumeric = /^\d+$/.test(startingRoomNumber);
-
-    for (let i = 0; i < count; i++) {
-      let roomNumber: string;
-      if (isNumeric) {
-        const num = parseInt(startingRoomNumber) + i;
-        roomNumber = num.toString().padStart(startingRoomNumber.length, '0');
-      } else {
-        roomNumber = `${startingRoomNumber}-${i + 1}`;
-      }
-
-      rooms.push({
-        tempId: `temp-${Date.now()}-${i}`,
-        roomNumber,
-      });
+  const handleAddRoom = () => {
+    if (!selectedBuildingId || !selectedFloorId || !roomNumber.trim() || !selectedRoomType) {
+      return;
     }
 
-    setGeneratedRooms(rooms);
-    setStep('assign');
-  };
-
-  const handleUpdateRoom = (tempId: string, newRoomNumber: string) => {
-    setGeneratedRooms((prev) =>
-      prev.map((room) =>
-        room.tempId === tempId ? { ...room, roomNumber: newRoomNumber } : room
-      )
-    );
-  };
-
-  const handleRemoveRoom = (tempId: string) => {
-    setGeneratedRooms((prev) => prev.filter((room) => room.tempId !== tempId));
-    setRoomAssignments((prev) => {
-      const updated = { ...prev };
-      delete updated[tempId];
-      return updated;
-    });
-  };
-
-  const handleOpenAssignmentModal = (tempId: string) => {
-    setSelectedRoomForAssignment(tempId);
-    setModalVisible(true);
-  };
-
-  const handleAssignRoomType = (type: RoomType) => {
-    if (selectedRoomForAssignment) {
-      setRoomAssignments((prev) => ({
-        ...prev,
-        [selectedRoomForAssignment]: type,
-      }));
-    }
-  };
-
-  const allRoomsAssigned = generatedRooms.every((room) => roomAssignments[room.tempId]);
-
-  const handleSaveRooms = () => {
-    if (!selectedBuildingId || !selectedFloorId) return;
-
-    generatedRooms.forEach((room) => {
-      const assignment = roomAssignments[room.tempId];
-      if (assignment) {
-        const shareType = getShareTypeFromBedCount(assignment.bedCount);
-        addRoom(selectedBuildingId, selectedFloorId, {
-          id: Date.now().toString() + Math.random(),
-          roomNumber: room.roomNumber,
-          shareType,
-          beds: [],
-        });
-      }
+    const shareType = getShareTypeFromBedCount(selectedRoomType.bedCount);
+    addRoom(selectedBuildingId, selectedFloorId, {
+      id: Date.now().toString() + Math.random(),
+      roomNumber: roomNumber.trim(),
+      shareType,
+      beds: [],
     });
 
-    resetFlowState();
+    // Clear form for next room
+    setRoomNumber('');
+    setSelectedRoomType(null);
   };
 
   const getShareTypeFromBedCount = (bedCount: number): 'single' | 'double' | 'triple' => {
@@ -262,6 +146,8 @@ export default function RoomsScreen() {
         totalSteps={6}
         title="Rooms"
         onClose={handleClose}
+        showClose={false}
+        showSteps={false}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -397,175 +283,94 @@ export default function RoomsScreen() {
           </View>
         )}
 
-
-
-        {selectedFloor && step === 'count' && (
+        {selectedFloor && (
           <View style={styles.section}>
-            <View style={styles.labelContainer}>
-              <DoorOpen
-                size={18}
-                color={theme.textSecondary}
-                strokeWidth={2}
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              Add Room to Floor {selectedFloor.label}
+            </Text>
+
+            <View style={styles.formField}>
+              <View style={styles.labelContainer}>
+                <DoorOpen
+                  size={18}
+                  color={theme.textSecondary}
+                  strokeWidth={2}
+                />
+                <Text style={[styles.label, { color: theme.text }]}>
+                  Room Number
+                </Text>
+              </View>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
+                placeholder="e.g., 101, 201, A1"
+                placeholderTextColor={theme.textSecondary}
+                value={roomNumber}
+                onChangeText={setRoomNumber}
+                keyboardType="default"
               />
-              <Text style={[styles.label, { color: theme.text }]}>
-                How many rooms for Floor {selectedFloor.label}?
-              </Text>
             </View>
 
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.inputBackground,
-                  borderColor: theme.inputBorder,
-                  color: theme.text,
-                },
-              ]}
-              placeholder="Enter number of rooms"
-              placeholderTextColor={theme.textSecondary}
-              value={roomCount}
-              onChangeText={setRoomCount}
-              keyboardType="number-pad"
-              autoFocus
-            />
+            <View style={styles.formField}>
+              <Text style={[styles.label, { color: theme.text }]}>
+                Room Type
+              </Text>
+              <View style={styles.roomTypeGrid}>
+                {availableRoomTypes.map((type) => {
+                  const isSelected = selectedRoomType?.id === type.id;
+                  return (
+                    <TouchableOpacity
+                      key={type.id}
+                      style={[
+                        styles.roomTypeButton,
+                        {
+                          backgroundColor: isSelected
+                            ? theme.primary
+                            : theme.inputBackground,
+                          borderColor: isSelected
+                            ? theme.primary
+                            : theme.inputBorder,
+                        },
+                      ]}
+                      onPress={() => setSelectedRoomType(type)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.roomTypeText,
+                          { color: isSelected ? '#ffffff' : theme.text },
+                        ]}
+                      >
+                        {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
 
             <TouchableOpacity
               style={[
-                styles.nextButton,
+                styles.addButton,
                 {
                   backgroundColor:
-                    roomCount && parseInt(roomCount) > 0
+                    roomNumber.trim() && selectedRoomType
                       ? theme.primary
                       : theme.inputBorder,
                 },
               ]}
-              onPress={handleRoomCountNext}
-              disabled={!roomCount || parseInt(roomCount) <= 0}
+              onPress={handleAddRoom}
+              disabled={!roomNumber.trim() || !selectedRoomType}
               activeOpacity={0.7}
             >
-              <Text style={styles.nextButtonText}>Next</Text>
-              <ChevronRight size={20} color="#ffffff" strokeWidth={2} />
-            </TouchableOpacity>
-
-
-          </View>
-        )}
-
-        {selectedFloor && step === 'generate' && (
-          <View style={styles.section}>
-            <View style={styles.labelContainer}>
-              <Hash
-                size={18}
-                color={theme.textSecondary}
-                strokeWidth={2}
-              />
-              <Text style={[styles.label, { color: theme.text }]}>
-                Starting room number
-              </Text>
-            </View>
-
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.inputBackground,
-                  borderColor: theme.inputBorder,
-                  color: theme.text,
-                },
-              ]}
-              placeholder="e.g., 001, 101, 201"
-              placeholderTextColor={theme.textSecondary}
-              value={startingRoomNumber}
-              onChangeText={setStartingRoomNumber}
-              keyboardType="default"
-              autoFocus
-            />
-
-            <TouchableOpacity
-              style={[
-                styles.generateButton,
-                {
-                  backgroundColor: startingRoomNumber.trim()
-                    ? theme.accent
-                    : theme.inputBorder,
-                },
-              ]}
-              onPress={handleGenerateRooms}
-              disabled={!startingRoomNumber.trim()}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.generateButtonText}>
-                Generate {roomCount} Rooms
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.backLink}
-              onPress={() => setStep('count')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.backLinkText, { color: theme.primary }]}>
-                Back to room count
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {selectedFloor && step === 'assign' && generatedRooms.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.assignHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Assign Room Types ({generatedRooms.length} rooms)
-              </Text>
-              {allRoomsAssigned && (
-                <View style={styles.completeIndicator}>
-                  <CheckCircle size={20} color={theme.success} strokeWidth={2} />
-                  <Text style={[styles.completeText, { color: theme.success }]}>
-                    All assigned
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text style={[styles.assignHint, { color: theme.textSecondary }]}>
-              Select a room type for each room
-            </Text>
-
-            <View style={styles.roomsList}>
-              {generatedRooms.map((room) => (
-                <RoomAssignmentCard
-                  key={room.tempId}
-                  roomNumber={room.roomNumber}
-                  selectedType={roomAssignments[room.tempId] || null}
-                  availableTypes={availableRoomTypes}
-                  onPress={() => handleOpenAssignmentModal(room.tempId)}
-                />
-              ))}
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.saveButton,
-                {
-                  backgroundColor: allRoomsAssigned
-                    ? theme.accent
-                    : theme.inputBorder,
-                },
-              ]}
-              onPress={handleSaveRooms}
-              disabled={!allRoomsAssigned}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.saveButtonText}>Save Rooms</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.backLink}
-              onPress={() => setStep('generate')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.backLinkText, { color: theme.primary }]}>
-                Back to starting room number
-              </Text>
+              <Plus size={20} color="#ffffff" strokeWidth={2} />
+              <Text style={styles.addButtonText}>Add Room</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -581,7 +386,7 @@ export default function RoomsScreen() {
                   key={room.id}
                   roomNumber={room.roomNumber}
                   shareType={room.shareType}
-                  onUpdate={() => {}}
+                  onUpdate={() => { }}
                   onRemove={() => {
                     if (selectedBuildingId && selectedFloorId) {
                       removeRoom(selectedBuildingId, selectedFloorId, room.id);
@@ -600,23 +405,6 @@ export default function RoomsScreen() {
         nextLabel="Next"
         nextDisabled={!canProceed}
         showBack={true}
-      />
-
-      <RoomTypeSelectionModal
-        visible={modalVisible}
-        roomNumber={
-          selectedRoomForAssignment
-            ? generatedRooms.find((r) => r.tempId === selectedRoomForAssignment)?.roomNumber || ''
-            : ''
-        }
-        availableTypes={availableRoomTypes}
-        selectedType={
-          selectedRoomForAssignment
-            ? roomAssignments[selectedRoomForAssignment] || null
-            : null
-        }
-        onSelect={handleAssignRoomType}
-        onClose={() => setModalVisible(false)}
       />
     </SafeAreaView>
   );
@@ -704,7 +492,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
   },
-  nextButton: {
+  formField: {
+    gap: 8,
+  },
+  roomTypeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  roomTypeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  roomTypeText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addButton: {
     flexDirection: 'row',
     height: 52,
     borderRadius: 12,
@@ -712,60 +518,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  nextButtonText: {
+  addButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  generateButton: {
-    height: 52,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  generateButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  backLink: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  backLinkText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  assignHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  completeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  completeText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  assignHint: {
-    fontSize: 14,
-    lineHeight: 20,
   },
   roomsList: {
     gap: 12,
-  },
-  saveButton: {
-    height: 52,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

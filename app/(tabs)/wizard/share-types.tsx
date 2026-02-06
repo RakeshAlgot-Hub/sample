@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -14,7 +15,7 @@ import WizardHeader from '@/components/WizardHeader';
 import WizardFooter from '@/components/WizardFooter';
 import { Bed } from 'lucide-react-native';
 
-const AVAILABLE_BED_COUNTS = [1, 2, 3, 4, 5, 6, 7];
+const AVAILABLE_BED_COUNTS = [1, 2, 3, 4, 5, 6];
 
 export default function ShareTypesScreen() {
   const theme = useTheme();
@@ -22,9 +23,18 @@ export default function ShareTypesScreen() {
   const { allowedBedCounts, updateAllowedBedCounts, nextStep, previousStep, resetWizard } = useWizardStore();
 
   const [selectedCounts, setSelectedCounts] = useState<number[]>(allowedBedCounts);
+  const [customCount, setCustomCount] = useState('');
+  const [customCounts, setCustomCounts] = useState<number[]>([]);
+
+  const mergedCounts = useMemo(() => {
+    const merged = [...AVAILABLE_BED_COUNTS, ...customCounts];
+    return Array.from(new Set(merged)).sort((a, b) => a - b);
+  }, [customCounts]);
 
   useEffect(() => {
     setSelectedCounts(allowedBedCounts);
+    const custom = allowedBedCounts.filter((count) => count > 6);
+    setCustomCounts(custom);
   }, [allowedBedCounts]);
 
   const handleClose = () => {
@@ -47,6 +57,17 @@ export default function ShareTypesScreen() {
     });
   };
 
+  const handleAddCustom = () => {
+    const parsed = Number(customCount.trim());
+    if (!Number.isInteger(parsed) || parsed < 7) {
+      return;
+    }
+
+    setCustomCounts((prev) => Array.from(new Set([...prev, parsed])).sort((a, b) => a - b));
+    setSelectedCounts((prev) => Array.from(new Set([...prev, parsed])).sort((a, b) => a - b));
+    setCustomCount('');
+  };
+
   const handleNext = () => {
     updateAllowedBedCounts(selectedCounts);
     nextStep();
@@ -64,6 +85,8 @@ export default function ShareTypesScreen() {
         totalSteps={6}
         title="Share Types"
         onClose={handleClose}
+        showClose={false}
+        showSteps={false}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -79,7 +102,7 @@ export default function ShareTypesScreen() {
           </Text>
 
           <View style={styles.bedCountContainer}>
-            {AVAILABLE_BED_COUNTS.map((count) => {
+            {mergedCounts.map((count) => {
               const isSelected = selectedCounts.includes(count);
               return (
                 <TouchableOpacity
@@ -110,6 +133,34 @@ export default function ShareTypesScreen() {
                 </TouchableOpacity>
               );
             })}
+          </View>
+
+          <View style={styles.customSection}>
+            <Text style={[styles.customLabel, { color: theme.textSecondary }]}>Custom beds (7+)</Text>
+            <View style={styles.customRow}>
+              <TextInput
+                style={[
+                  styles.customInput,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
+                placeholder="e.g. 8"
+                placeholderTextColor={theme.textSecondary}
+                keyboardType="number-pad"
+                value={customCount}
+                onChangeText={setCustomCount}
+              />
+              <TouchableOpacity
+                style={[styles.customButton, { backgroundColor: theme.accent }]}
+                onPress={handleAddCustom}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.customButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -164,5 +215,38 @@ const styles = StyleSheet.create({
   },
   bedCountText: {
     fontSize: 16,
+  },
+  customSection: {
+    gap: 8,
+    marginTop: 8,
+  },
+  customLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  customRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  customInput: {
+    flex: 1,
+    height: 46,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+  },
+  customButton: {
+    height: 46,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

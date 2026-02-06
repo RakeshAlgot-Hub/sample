@@ -27,10 +27,6 @@ export default function ProfileScreen() {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>Profile</Text>
-        </View>
-
         <View
           style={[
             styles.card,
@@ -125,50 +121,44 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 20,
-    gap: 20,
-  },
-  header: {
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
+    padding: 16,
+    paddingBottom: 100,
+    gap: 18,
   },
   card: {
-    padding: 20,
-    borderRadius: 16,
+    padding: 18,
+    borderRadius: 14,
     borderWidth: 1,
-    gap: 20,
+    gap: 18,
   },
   avatarContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
   },
   userInfo: {
-    gap: 16,
+    gap: 14,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: 10,
   },
   infoTextContainer: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   infoLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   divider: {
@@ -182,29 +172,29 @@ const styles = StyleSheet.create({
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   settingLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   logoutButton: {
     flexDirection: 'row',
-    height: 52,
+    height: 48,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    marginTop: 12,
+    marginTop: 10,
   },
   logoutText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   footer: {
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 20,
   },
   footerText: {
     fontSize: 12,

@@ -15,7 +15,7 @@ import WizardFooter from '@/components/WizardFooter';
 import FloorCard from '@/components/FloorCard';
 import FloorSelector from '@/components/FloorSelector';
 import { Floor } from '@/types/property';
-import { Layers, Plus } from 'lucide-react-native';
+import { Layers } from 'lucide-react-native';
 
 export default function FloorsScreen() {
   const theme = useTheme();
@@ -59,7 +59,7 @@ export default function FloorsScreen() {
     setSelectedFloors(floors);
   };
 
-  const handleAddFloor = () => {
+  const addSelectedFloors = () => {
     if (selectedBuildingId && selectedFloors.length > 0) {
       selectedFloors.forEach((floorLabel) => {
         const trimmedFloorLabel = floorLabel.trim();
@@ -76,7 +76,7 @@ export default function FloorsScreen() {
         }
       });
 
-      setSelectedFloors([]); // Clear selected floors after adding
+      setSelectedFloors([]);
     }
   };
 
@@ -93,12 +93,13 @@ export default function FloorsScreen() {
   };
 
   const handleNext = () => {
+    addSelectedFloors();
     nextStep();
     router.push('/wizard/share-types');
   };
 
-  const canAddFloor = selectedFloors.length > 0;
   const hasFloors = floors.length > 0;
+  const canProceed = hasFloors || selectedFloors.length > 0;
 
   return (
     <SafeAreaView
@@ -109,6 +110,8 @@ export default function FloorsScreen() {
         totalSteps={6}
         title="Floors"
         onClose={handleClose}
+        showClose={false}
+        showSteps={false}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -183,7 +186,7 @@ export default function FloorsScreen() {
             <View style={styles.labelContainer}>
               <Layers size={18} color={theme.textSecondary} strokeWidth={2} />
               <Text style={[styles.label, { color: theme.text }]}>
-                Add Floor to {selectedBuilding.name}
+                Select Floors for {selectedBuilding.name}
               </Text>
             </View>
 
@@ -193,20 +196,6 @@ export default function FloorsScreen() {
               existingFloors={existingFloorLabels}
             />
 
-            <TouchableOpacity
-              style={[
-                styles.addButton,
-                {
-                  backgroundColor: canAddFloor ? theme.accent : theme.inputBorder,
-                },
-              ]}
-              onPress={handleAddFloor}
-              disabled={!canAddFloor}
-              activeOpacity={0.8}
-            >
-              <Plus size={20} color="#ffffff" strokeWidth={2} />
-              <Text style={styles.addButtonText}>Add Floor</Text>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -228,25 +217,13 @@ export default function FloorsScreen() {
           </View>
         )}
 
-        {floors.length === 0 && selectedBuilding && (
-          <View
-            style={[
-              styles.emptyCard,
-              { backgroundColor: theme.card, borderColor: theme.cardBorder },
-            ]}
-          >
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              No floors added to {selectedBuilding.name} yet
-            </Text>
-          </View>
-        )}
       </ScrollView>
 
       <WizardFooter
         onBack={handleBack}
         onNext={handleNext}
         nextLabel="Next"
-        nextDisabled={!hasFloors}
+        nextDisabled={!canProceed}
         showBack={true}
       />
     </SafeAreaView>
@@ -305,30 +282,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  addButton: {
-    flexDirection: 'row',
-    height: 52,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  addButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   floorsList: {
     gap: 12,
-  },
-  emptyCard: {
-    padding: 32,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
   },
 });
 

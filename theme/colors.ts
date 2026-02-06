@@ -1,7 +1,7 @@
 export const lightTheme = {
-  primary: '#075E54', 
-  secondary: '#F0F2F5', 
-  accent: '#25D366', 
+  primary: '#075E54',
+  secondary: '#F0F2F5',
+  accent: '#25D366',
   background: '#FFFFFF',
   text: '#111827',
   textSecondary: '#6B7280',
@@ -16,18 +16,18 @@ export const lightTheme = {
 };
 
 export const darkTheme = {
-  primary: '#25D366', 
-  secondary: '#232D36', 
-  accent: '#075E54', 
-  background: '#010409', 
+  primary: '#25D366',
+  secondary: '#232D36',
+  accent: '#075E54',
+  background: '#010409',
   text: '#f8fafc',
-  textSecondary: '#94a3b8',
+  textSecondary: '#cbd5e1',
   border: '#334155',
   card: '#232D36',
   cardBorder: '#334155',
   inputBackground: '#232D36',
   inputBorder: '#475569',
-  success: '#0BD953', 
+  success: '#0BD953',
   error: '#f87171',
   warning: '#fbbf24',
 };

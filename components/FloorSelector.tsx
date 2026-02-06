@@ -7,7 +7,6 @@ import {
   TextInput,
 } from 'react-native';
 import { useTheme } from '@/theme/useTheme';
-import { CheckCircle2 } from 'lucide-react-native';
 
 const PRESET_FLOORS = ['G', '1', '2', '3', '4'];
 
@@ -25,6 +24,9 @@ export default function FloorSelector({
   const theme = useTheme();
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customInputText, setCustomInputText] = useState('');
+  const customSelected = selectedFloors.some(
+    (floor) => !PRESET_FLOORS.includes(floor)
+  );
 
   const handlePresetFloorSelect = (floor: string) => {
     if (existingFloors.includes(floor)) {
@@ -43,7 +45,7 @@ export default function FloorSelector({
   const handleCustomInputChange = (text: string) => {
     setCustomInputText(text);
     const trimmedText = text.trim();
-    
+
     // Create a new array without any previous custom input, but keep presets
     let newSelectedFloors = selectedFloors.filter(f => PRESET_FLOORS.includes(f));
 
@@ -84,7 +86,6 @@ export default function FloorSelector({
   return (
     <View style={styles.container}>
       <Text style={[styles.label, { color: theme.text }]}>Select Floor(s)</Text>
-
       <View style={styles.floorsGrid}>
         {PRESET_FLOORS.map((floor) => {
           const isSelected = selectedFloors.includes(floor);
@@ -99,8 +100,8 @@ export default function FloorSelector({
                   backgroundColor: isSelected
                     ? theme.primary
                     : isDuplicate
-                    ? theme.inputBackground
-                    : theme.card,
+                      ? theme.inputBackground
+                      : theme.card,
                   borderColor: isSelected ? theme.primary : theme.cardBorder,
                   opacity: isDuplicate ? 0.5 : 1,
                 },
@@ -116,8 +117,8 @@ export default function FloorSelector({
                     color: isSelected
                       ? '#ffffff'
                       : isDuplicate
-                      ? theme.textSecondary
-                      : theme.text,
+                        ? theme.textSecondary
+                        : theme.text,
                   },
                 ]}
               >
@@ -131,10 +132,8 @@ export default function FloorSelector({
           style={[
             styles.floorButton,
             {
-              backgroundColor: showCustomInput
-                ? theme.primary
-                : theme.card,
-              borderColor: showCustomInput ? theme.primary : theme.cardBorder,
+              backgroundColor: customSelected ? theme.primary : theme.card,
+              borderColor: customSelected ? theme.primary : theme.cardBorder,
             },
           ]}
           onPress={toggleCustomInput}
@@ -144,7 +143,7 @@ export default function FloorSelector({
             style={[
               styles.floorButtonText,
               {
-                color: showCustomInput ? '#ffffff' : theme.text,
+                color: customSelected ? '#ffffff' : theme.text,
               },
             ]}
           >

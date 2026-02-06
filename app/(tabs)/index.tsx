@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -170,22 +171,33 @@ export default function DashboardScreen() {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        <Animated.View entering={FadeInDown.delay(0).springify()} style={styles.header}>
-          <Text style={[styles.greeting, { color: theme.text }]}>
-            Hello, {user?.name}
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Your property overview
-          </Text>
-        </Animated.View>
+        <View style={styles.section}>
+          <View style={styles.bedsGrid}>
+            <StatCard
+              icon={Bed}
+              label="Total Beds"
+              value={analytics.totalBeds}
+              delay={0}
+            />
+            <StatCard
+              icon={Bed}
+              label="Available Beds"
+              value={analytics.availableBeds}
+              delay={50}
+            />
+          </View>
+        </View>
 
         <View style={styles.section}>
-          <Animated.Text
-            entering={FadeInDown.delay(100).springify()}
-            style={[styles.sectionTitle, { color: theme.text }]}
-          >
-            Overview
-          </Animated.Text>
+          <OccupancyIndicator
+            occupancyRate={analytics.occupancyRate}
+            occupiedBeds={analytics.occupiedBeds}
+            totalBeds={analytics.totalBeds}
+            delay={100}
+          />
+        </View>
+
+        <View style={styles.section}>
           <View style={styles.statsGrid}>
             <StatCard
               icon={Home}
@@ -213,38 +225,6 @@ export default function DashboardScreen() {
             />
           </View>
         </View>
-
-        <View style={styles.section}>
-          <Animated.Text
-            entering={FadeInDown.delay(350).springify()}
-            style={[styles.sectionTitle, { color: theme.text }]}
-          >
-            Bed Occupancy
-          </Animated.Text>
-          <View style={styles.bedsGrid}>
-            <StatCard
-              icon={Bed}
-              label="Total Beds"
-              value={analytics.totalBeds}
-              delay={400}
-            />
-            <StatCard
-              icon={Bed}
-              label="Available Beds"
-              value={analytics.availableBeds}
-              delay={450}
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <OccupancyIndicator
-            occupancyRate={analytics.occupancyRate}
-            occupiedBeds={analytics.occupiedBeds}
-            totalBeds={analytics.totalBeds}
-            delay={500}
-          />
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -255,25 +235,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 20,
-    gap: 32,
-  },
-  header: {
-    gap: 4,
-  },
-  greeting: {
-    fontSize: 32,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 16,
+    padding: 16,
+    paddingTop: 8,
+    paddingBottom: 100,
+    gap: 24,
   },
   section: {
     gap: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -291,35 +259,36 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyCard: {
-    padding: 40,
+    padding: 32,
     borderRadius: 20,
     borderWidth: 1,
     alignItems: 'center',
-    gap: 20,
+    gap: 16,
+    width: '100%',
     maxWidth: 400,
   },
   emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 30,
+    width: 100,
+    height: 100,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     textAlign: 'center',
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-    paddingHorizontal: 28,
+    height: 50,
+    paddingHorizontal: 24,
     borderRadius: 12,
     gap: 8,
     marginTop: 8,
