@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
+import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
 import { Building } from '@/types/property';
 import { Building2, Plus, Pencil, Trash2 } from 'lucide-react-native';
@@ -94,13 +95,14 @@ export default function BuildingsScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      <WizardTopHeader onBack={handleBack} title="Settings" />
       <WizardHeader
         currentStep={2}
         totalSteps={6}
         title="Buildings"
         onClose={handleClose}
-        showClose={false}
-        showSteps={false}
+        showClose
+        showSteps
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>

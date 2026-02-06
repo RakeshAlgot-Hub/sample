@@ -12,6 +12,7 @@ import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
 import WizardHeader from '@/components/WizardHeader';
+import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
 import ReviewSummary from '@/components/ReviewSummary';
 import TotalStatsCard from '@/components/TotalStatsCard';
@@ -134,13 +135,14 @@ export default function ReviewScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      <WizardTopHeader onBack={handleBack} title="Settings" />
       <WizardHeader
         currentStep={6}
         totalSteps={6}
         title="Review"
         onClose={handleClose}
-        showClose={false}
-        showSteps={false}
+        showClose
+        showSteps
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>

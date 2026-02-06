@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, StyleSheet, SafeAreaView } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import { Platform } from 'react-native';
 import { LayoutDashboard, Home, Users, User } from 'lucide-react-native';
 import { useTheme } from '@/theme/useTheme';
@@ -10,12 +10,16 @@ import MemberSearchModal from '@/components/MemberSearchModal';
 export default function TabLayout() {
   const theme = useTheme();
   const [searchVisible, setSearchVisible] = useState(false);
+  const pathname = usePathname();
+  const hideTopBar = pathname.includes('/member/') || pathname.includes('/property/') || pathname.includes('/wizard/');
 
   return (
     <>
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.card }]}>
-        <TopBar onSearchPress={() => setSearchVisible(true)} />
-      </SafeAreaView>
+      {!hideTopBar && (
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.card }]}>
+          <TopBar onSearchPress={() => setSearchVisible(true)} />
+        </SafeAreaView>
+      )}
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -83,18 +87,21 @@ export default function TabLayout() {
           name="wizard"
           options={{
             href: null,
+            tabBarStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
           name="member"
           options={{
             href: null,
+            tabBarStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
           name="property"
           options={{
             href: null,
+            tabBarStyle: { display: 'none' },
           }}
         />
       </Tabs>

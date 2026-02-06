@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
+import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
 import { Bed } from 'lucide-react-native';
 
@@ -80,13 +81,14 @@ export default function ShareTypesScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      <WizardTopHeader onBack={handleBack} title="Settings" />
       <WizardHeader
         currentStep={4}
         totalSteps={6}
         title="Share Types"
         onClose={handleClose}
-        showClose={false}
-        showSteps={false}
+        showClose
+        showSteps
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>

@@ -26,11 +26,6 @@ export default function WizardHeader({
       <View style={[styles.header, !showClose && styles.headerNoClose]}>
         <View style={styles.titleContainer}>
           <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
-          {showSteps && (
-            <Text style={[styles.stepText, { color: theme.textSecondary }]}>
-              Step {currentStep} of {totalSteps}
-            </Text>
-          )}
         </View>
         {showClose && (
           <TouchableOpacity
@@ -43,16 +38,29 @@ export default function WizardHeader({
         )}
       </View>
       {showSteps && (
-        <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                backgroundColor: theme.primary,
-                width: `${Math.max(0, Math.min(1, currentStep / totalSteps)) * 100}%`,
-              },
-            ]}
-          />
+        <View style={styles.progressWrapper}>
+          <View style={styles.progressMeta}>
+            <Text style={[styles.stepText, { color: theme.textSecondary }]}>Step {currentStep} of {totalSteps}</Text>
+            <Text style={[styles.stepPercent, { color: theme.textSecondary }]}>
+              {Math.round((currentStep / totalSteps) * 100)}%
+            </Text>
+          </View>
+          <View style={styles.segmentRow}>
+            {Array.from({ length: totalSteps }).map((_, index) => {
+              const isComplete = index + 1 <= currentStep;
+              return (
+                <View
+                  key={`step-${index}`}
+                  style={[
+                    styles.segment,
+                    {
+                      backgroundColor: isComplete ? theme.primary : theme.border,
+                    },
+                  ]}
+                />
+              );
+            })}
+          </View>
         </View>
       )}
     </View>
@@ -61,9 +69,9 @@ export default function WizardHeader({
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 6,
-    paddingBottom: 8,
-    gap: 8,
+    paddingTop: 16,
+    paddingBottom: 12,
+    gap: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'transparent',
   },
@@ -81,12 +89,16 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
   },
   stepText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  stepPercent: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   closeButton: {
     width: 30,
@@ -95,14 +107,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  progressTrack: {
-    height: 4,
-    marginHorizontal: 16,
-    borderRadius: 2,
-    overflow: 'hidden',
+  progressWrapper: {
+    gap: 8,
+    paddingHorizontal: 16,
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
+  progressMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  segmentRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  segment: {
+    flex: 1,
+    height: 6,
+    borderRadius: 999,
   },
 });

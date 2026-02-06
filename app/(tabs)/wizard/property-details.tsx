@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
+import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
 import { PropertyType } from '@/types/property';
 import { Home, MapPin } from 'lucide-react-native';
@@ -62,13 +63,14 @@ export default function PropertyDetailsScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      <WizardTopHeader onBack={handleClose} title="Settings" />
       <WizardHeader
         currentStep={1}
         totalSteps={6}
         title="Property Details"
         onClose={handleClose}
-        showClose={false}
-        showSteps={false}
+        showClose
+        showSteps
       />
 
       <KeyboardAvoidingView

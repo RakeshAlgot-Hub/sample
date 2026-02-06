@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
+import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
 import FloorCard from '@/components/FloorCard';
 import FloorSelector from '@/components/FloorSelector';
@@ -105,13 +106,14 @@ export default function FloorsScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      <WizardTopHeader onBack={handleBack} title="Settings" />
       <WizardHeader
         currentStep={3}
         totalSteps={6}
         title="Floors"
         onClose={handleClose}
-        showClose={false}
-        showSteps={false}
+        showClose
+        showSteps
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
