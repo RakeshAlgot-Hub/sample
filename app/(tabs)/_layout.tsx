@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, StyleSheet, SafeAreaView } from 'react-native';
 import { Tabs, usePathname } from 'expo-router';
 import { Platform } from 'react-native';
-import { LayoutDashboard, Users } from 'lucide-react-native';
+import { CreditCard, LayoutDashboard, Users } from 'lucide-react-native';
 import { useTheme } from '@/theme/useTheme';
 import TopBar from '@/components/TopBar';
 import MemberSearchModal from '@/components/MemberSearchModal';
@@ -62,6 +62,15 @@ export default function TabLayout() {
             title: 'Members',
             tabBarIcon: ({ size, color }) => (
               <Users size={size} color={color} strokeWidth={2} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="payments"
+          options={{
+            title: 'Payments',
+            tabBarIcon: ({ size, color }) => (
+              <CreditCard size={size} color={color} strokeWidth={2} />
             ),
           }}
         />

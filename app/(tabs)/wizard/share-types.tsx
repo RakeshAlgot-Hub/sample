@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -104,13 +105,28 @@ export default function ShareTypesScreen() {
   };
 
   const handleNext = () => {
+    if (!selectedCounts.length) {
+      return;
+    }
+
+    const invalidCount = selectedCounts.find((count) => {
+      const entry = pricingByCount[count];
+      const parsed = Number(entry?.price ?? '');
+      return !entry?.price || !Number.isInteger(parsed) || parsed <= 0;
+    });
+
+    if (invalidCount) {
+      Alert.alert('Price required', `Enter a valid amount for ${invalidCount} beds.`);
+      return;
+    }
+
     updateAllowedBedCounts(selectedCounts);
     const pricing = selectedCounts.map((count) => {
       const entry = pricingByCount[count] ?? { price: '', period: 'monthly' as BillingPeriod };
       const parsed = Number(entry.price);
       return {
         bedCount: count,
-        price: Number.isFinite(parsed) ? parsed : 0,
+        price: parsed,
         period: entry.period,
       };
     });
@@ -119,7 +135,12 @@ export default function ShareTypesScreen() {
     router.push('/wizard/rooms');
   };
 
-  const canProceed = selectedCounts.length > 0;
+  const pricingComplete = selectedCounts.every((count) => {
+    const entry = pricingByCount[count];
+    const parsed = Number(entry?.price ?? '');
+    return entry?.price && Number.isInteger(parsed) && parsed > 0;
+  });
+  const canProceed = selectedCounts.length > 0 && pricingComplete;
 
   return (
     <SafeAreaView
@@ -193,17 +214,18 @@ export default function ShareTypesScreen() {
                           ]}
                           placeholder="e.g. 4500"
                           placeholderTextColor={theme.textSecondary}
-                          keyboardType="decimal-pad"
+                          keyboardType="number-pad"
                           value={pricing?.price ?? ''}
-                          onChangeText={(value) =>
+                          onChangeText={(value) => {
+                            const nextValue = value.replace(/\D+/g, '');
                             setPricingByCount((current) => ({
                               ...current,
                               [count]: {
-                                price: value,
+                                price: nextValue,
                                 period: current[count]?.period ?? 'monthly',
                               },
-                            }))
-                          }
+                            }));
+                          }}
                         />
                         <ScrollView
                           horizontal

@@ -45,7 +45,11 @@ export default function AddMemberScreen() {
     floorId: string;
     roomId: string;
     bedId: string;
+    bedCount: number;
+    price?: number;
+    period?: string;
   } | null>(null);
+  const [bedAmount, setBedAmount] = useState('');
 
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -138,6 +142,12 @@ export default function AddMemberScreen() {
       return;
     }
 
+    const parsedAmount = Number(bedAmount);
+    if (!bedAmount.trim() || !Number.isInteger(parsedAmount) || parsedAmount <= 0) {
+      setValidationError('Please enter a valid bed amount');
+      return;
+    }
+
     const newMember = {
       id: Date.now().toString(),
       name: name.trim(),
@@ -152,6 +162,8 @@ export default function AddMemberScreen() {
       floorId: selectedBed.floorId,
       roomId: selectedBed.roomId,
       bedId: selectedBed.bedId,
+      bedAmount: parsedAmount,
+      billingPeriod: selectedBed.period,
       createdAt: new Date().toISOString(),
     };
 
@@ -305,14 +317,41 @@ export default function AddMemberScreen() {
 
                 <AvailableBedsList
                   selectedBedId={selectedBed?.bedId || null}
-                  onBedSelect={(bed) => setSelectedBed({
-                    propertyId: bed.propertyId,
-                    buildingId: bed.buildingId,
-                    floorId: bed.floorId,
-                    roomId: bed.roomId,
-                    bedId: bed.bedId,
-                  })}
+                  onBedSelect={(bed) => {
+                    setSelectedBed({
+                      propertyId: bed.propertyId,
+                      buildingId: bed.buildingId,
+                      floorId: bed.floorId,
+                      roomId: bed.roomId,
+                      bedId: bed.bedId,
+                      bedCount: bed.bedCount,
+                      price: bed.price,
+                      period: bed.period,
+                    });
+                    setBedAmount(bed.price ? bed.price.toString() : '');
+                  }}
                 />
+
+                <View style={styles.section}>
+                  <Text style={[styles.label, { color: theme.text }]}
+                  >
+                    <CreditCard size={16} color={theme.textSecondary} /> Bed Amount *
+                  </Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+                    placeholder="Enter amount"
+                    placeholderTextColor={theme.textSecondary}
+                    value={bedAmount}
+                    onChangeText={(value) => setBedAmount(value.replace(/\D+/g, ''))}
+                    keyboardType="number-pad"
+                  />
+                  {selectedBed?.period && (
+                    <Text style={[styles.helperText, { color: theme.textSecondary }]}
+                    >
+                      Default: {selectedBed.price ?? '--'} / {selectedBed.period}
+                    </Text>
+                  )}
+                </View>
               </View>
             )}
           </View>
@@ -415,6 +454,11 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 14,
     flex: 1,
+  },
+  helperText: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '600',
   },
   section: {
     marginBottom: 10,

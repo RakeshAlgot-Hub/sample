@@ -15,6 +15,9 @@ interface AvailableBed {
   roomNumber: string;
   bedId: string;
   bedNumber: number;
+  bedCount: number;
+  price?: number;
+  period?: string;
 }
 
 interface BedSelectorProps {
@@ -49,6 +52,10 @@ export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSel
             floor.rooms.forEach((room) => {
               room.beds.forEach((bed, bedIndex) => {
                 if (!bed.occupied) {
+                  const bedCount = room.bedCount ?? room.beds.length;
+                  const pricing = property.bedPricing?.find(
+                    (entry) => entry.bedCount === bedCount
+                  );
                   beds.push({
                     propertyId: property.id,
                     propertyName: property.name,
@@ -60,6 +67,9 @@ export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSel
                     roomNumber: room.roomNumber,
                     bedId: bed.id,
                     bedNumber: bedIndex + 1,
+                    bedCount,
+                    price: pricing?.price,
+                    period: pricing?.period,
                   });
                 }
               });
@@ -86,7 +96,7 @@ export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSel
     Animated.timing(bedFade, {
       toValue: 1,
       duration: 220,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   }, [selectedPropertyId, selectedBuildingId, selectedFloorId, selectedRoomId, showSearch, bedFade]);
 
@@ -208,6 +218,12 @@ export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSel
                         <Text style={[styles.bedTitle, { color: theme.text }]}>
                           Bed {bed.bedNumber} • Room {bed.roomNumber}
                         </Text>
+                        {bed.price !== undefined && bed.period && (
+                          <Text style={[styles.bedPrice, { color: theme.textSecondary }]}
+                          >
+                            {bed.price} / {bed.period}
+                          </Text>
+                        )}
                         <View style={styles.breadcrumb}>
                           <Text style={[styles.breadcrumbText, { color: theme.textSecondary }]}>
                             {bed.propertyName} → {bed.buildingName} → {bed.floorLabel}
@@ -516,6 +532,10 @@ const styles = StyleSheet.create({
   bedInfo: {
     flex: 1,
     gap: 3,
+  },
+  bedPrice: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   bedTitle: {
     fontSize: 14,

@@ -12,5 +12,7 @@ export interface Member {
   floorId?: string;
   roomId?: string;
   bedId?: string;
+  bedAmount?: number;
+  billingPeriod?: string;
   createdAt: string;
 }
