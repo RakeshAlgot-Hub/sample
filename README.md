@@ -212,6 +212,20 @@ mockData/
    npm run build:web
    ```
 
+## Deploy to GitHub Pages (/docs)
+
+This project is configured to export static web files into the `docs/` folder for GitHub Pages.
+
+1. Ensure the base path matches your repo name:
+  - Update `expo.web.publicPath` and `expo.experiments.baseUrl` in `app.json` to `/<repo-name>/` and `/<repo-name>`.
+  - It is currently set to `/sample/`.
+2. Build the web export:
+  ```bash
+  npm run build:web
+  ```
+3. Commit and push the `docs/` folder to `main`.
+4. In GitHub repo settings, set Pages Source to the `/docs` folder on the `main` branch.
+
 ## Theme System
 
 The app supports Light and Dark themes with the following colors:
