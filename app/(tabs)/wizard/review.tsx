@@ -179,13 +179,13 @@ export default function ReviewScreen() {
 
       if (editingPropertyId) {
         router.replace({
-          pathname: '/property/[id]',
+          pathname: '/settings/property-details/[id]',
           params: { id: editingPropertyId },
         });
         return;
       }
 
-      router.replace('/(tabs)/properties');
+      router.replace('/settings/property-details' as '/settings/property-details/index');
     }, 800);
   };
 

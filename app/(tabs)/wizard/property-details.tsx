@@ -19,7 +19,7 @@ import WizardFooter from '@/components/WizardFooter';
 import { PropertyType } from '@/types/property';
 import { Home, MapPin } from 'lucide-react-native';
 
-const PROPERTY_TYPES: PropertyType[] = ['Hostel/PG', 'Apartment'];
+const PROPERTY_TYPES: PropertyType[] = ['Hostel/PG'];
 
 export default function PropertyDetailsScreen() {
   const theme = useTheme();

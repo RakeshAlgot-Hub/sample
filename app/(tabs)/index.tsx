@@ -14,7 +14,6 @@ import { useStore } from '@/store/useStore';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
 import { useMembersStore } from '@/store/useMembersStore';
 import StatCard from '@/components/StatCard';
-import OccupancyIndicator from '@/components/OccupancyIndicator';
 import {
   Home,
   Building2,
@@ -112,7 +111,6 @@ export default function DashboardScreen() {
     );
 
     const availableBeds = totalBeds - occupiedBeds;
-    const occupancyRate = totalBeds > 0 ? (occupiedBeds / totalBeds) * 100 : 0;
 
     return {
       totalProperties,
@@ -120,9 +118,8 @@ export default function DashboardScreen() {
       totalFloors,
       totalRooms,
       totalBeds,
-      occupiedBeds,
       availableBeds,
-      occupancyRate,
+      activePropertyId: activeProperty?.id,
     };
   }, [properties, activePropertyId]);
 
@@ -178,56 +175,91 @@ export default function DashboardScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
           <View style={styles.bedsGrid}>
-            <StatCard
-              icon={Bed}
-              label="Total Beds"
-              value={analytics.totalBeds}
-              delay={0}
-            />
-            <StatCard
-              icon={Bed}
-              label="Available Beds"
-              value={analytics.availableBeds}
-              delay={50}
-            />
+            <TouchableOpacity
+              style={styles.bedCardWrap}
+              onPress={() => router.push('/beds/total')}
+              activeOpacity={0.7}
+            >
+              <StatCard
+                icon={Bed}
+                label="Total Beds"
+                value={analytics.totalBeds}
+                delay={0}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.bedCardWrap}
+              onPress={() => router.push('/beds/available')}
+              activeOpacity={0.7}
+            >
+              <StatCard
+                icon={Bed}
+                label="Available Beds"
+                value={analytics.availableBeds}
+                delay={50}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.section}>
-          <OccupancyIndicator
-            occupancyRate={analytics.occupancyRate}
-            occupiedBeds={analytics.occupiedBeds}
-            totalBeds={analytics.totalBeds}
-            delay={100}
-          />
-        </View>
-
-        <View style={styles.section}>
           <View style={styles.statsGrid}>
-            <StatCard
-              icon={Home}
-              label="Properties"
-              value={analytics.totalProperties}
-              delay={150}
-            />
-            <StatCard
-              icon={Building2}
-              label="Buildings"
-              value={analytics.totalBuildings}
-              delay={200}
-            />
-            <StatCard
-              icon={Layers}
-              label="Floors"
-              value={analytics.totalFloors}
-              delay={250}
-            />
-            <StatCard
-              icon={DoorOpen}
-              label="Rooms"
-              value={analytics.totalRooms}
-              delay={300}
-            />
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() =>
+                router.push('/properties')
+              }
+              activeOpacity={0.7}
+            >
+              <StatCard
+                icon={Home}
+                label="Properties"
+                value={analytics.totalProperties}
+                delay={150}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() =>
+                router.push('/buildings')
+              }
+              activeOpacity={0.7}
+            >
+              <StatCard
+                icon={Building2}
+                label="Buildings"
+                value={analytics.totalBuildings}
+                delay={200}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() =>
+                router.push('/floors')
+              }
+              activeOpacity={0.7}
+            >
+              <StatCard
+                icon={Layers}
+                label="Floors"
+                value={analytics.totalFloors}
+                delay={250}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() =>
+                router.push('/rooms')
+              }
+              activeOpacity={0.7}
+            >
+              <StatCard
+                icon={DoorOpen}
+                label="Rooms"
+                value={analytics.totalRooms}
+                delay={300}
+              />
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -256,6 +288,13 @@ const styles = StyleSheet.create({
   bedsGrid: {
     flexDirection: 'row',
     gap: 12,
+  },
+  bedCardWrap: {
+    flex: 1,
+  },
+  statCardWrap: {
+    flexBasis: '48%',
+    maxWidth: '48%',
   },
   emptyContent: {
     flex: 1,

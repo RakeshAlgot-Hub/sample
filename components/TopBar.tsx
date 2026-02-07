@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
-import { Search, MoreVertical, User, Settings } from 'lucide-react-native';
+import { Search, MoreVertical, Settings } from 'lucide-react-native';
 
 interface TopBarProps {
     onSearchPress?: () => void;
@@ -20,14 +20,9 @@ export default function TopBar({ onSearchPress }: TopBarProps) {
     const router = useRouter();
     const [menuVisible, setMenuVisible] = useState(false);
 
-    const handleProfilePress = () => {
-        setMenuVisible(false);
-        router.push('/(tabs)/profile');
-    };
-
     const handleSettingsPress = () => {
         setMenuVisible(false);
-        router.push('/(tabs)/properties');
+        router.push('/(tabs)/settings');
     };
 
     return (
@@ -62,23 +57,13 @@ export default function TopBar({ onSearchPress }: TopBarProps) {
                     <View style={[styles.menu, { backgroundColor: theme.card, borderColor: theme.border }]}>
                         <TouchableOpacity
                             style={styles.menuItem}
-                            onPress={handleProfilePress}
-                            activeOpacity={0.7}
-                        >
-                            <User size={20} color={theme.text} strokeWidth={2} />
-                            <Text style={[styles.menuText, { color: theme.text }]}>Profile</Text>
-                        </TouchableOpacity>
-
-                        <View style={[styles.menuDivider, { backgroundColor: theme.border }]} />
-
-                        <TouchableOpacity
-                            style={styles.menuItem}
                             onPress={handleSettingsPress}
                             activeOpacity={0.7}
                         >
                             <Settings size={20} color={theme.text} strokeWidth={2} />
-                            <Text style={[styles.menuText, { color: theme.text }]}>Properties</Text>
+                            <Text style={[styles.menuText, { color: theme.text }]}>Settings</Text>
                         </TouchableOpacity>
+
                     </View>
                 </Pressable>
             </Modal>
