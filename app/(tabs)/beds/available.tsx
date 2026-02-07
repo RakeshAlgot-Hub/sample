@@ -5,6 +5,7 @@ import {
     StyleSheet,
     SafeAreaView,
     ScrollView,
+    TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -66,10 +67,27 @@ export default function AvailableBedsScreen() {
                                             <Text style={[styles.roomTitle, { color: theme.text }]}>Room {room.roomNumber}</Text>
                                             <View style={styles.bedList}>
                                                 {availableBeds.map((bed, index) => (
-                                                    <View key={bed.id} style={[styles.bedRow, { borderColor: theme.border }]}>
+                                                    <TouchableOpacity
+                                                        key={bed.id}
+                                                        style={[styles.bedRow, { borderColor: theme.border }]}
+                                                        onPress={() =>
+                                                            router.push({
+                                                                pathname: '/member/add',
+                                                                params: {
+                                                                    propertyId: activeProperty.id,
+                                                                    buildingId: building.id,
+                                                                    floorId: floor.id,
+                                                                    roomId: room.id,
+                                                                    bedId: bed.id,
+                                                                    from: 'available',
+                                                                },
+                                                            })
+                                                        }
+                                                        activeOpacity={0.7}
+                                                    >
                                                         <Text style={[styles.bedLabel, { color: theme.text }]}>Bed {index + 1}</Text>
                                                         <Text style={[styles.bedValue, { color: theme.textSecondary }]}>Available</Text>
-                                                    </View>
+                                                    </TouchableOpacity>
                                                 ))}
                                             </View>
                                         </View>

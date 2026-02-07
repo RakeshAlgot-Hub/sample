@@ -2,9 +2,8 @@ export interface Member {
   id: string;
   name: string;
   phone: string;
-  address?: string;
-  city?: string;
-  pincode?: string;
+  villageName?: string;
+  joinedDate?: string;
   proofId?: string;
   profilePic?: string | null;
   propertyId?: string;
@@ -12,7 +11,5 @@ export interface Member {
   floorId?: string;
   roomId?: string;
   bedId?: string;
-  bedAmount?: number;
-  billingPeriod?: string;
   createdAt: string;
 }

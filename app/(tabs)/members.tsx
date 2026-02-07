@@ -26,7 +26,7 @@ export default function MembersScreen() {
   }, []);
 
   const handleAddMember = () => {
-    router.push('/member/add');
+    router.push('/beds/available');
   };
 
   const handleRemoveMember = async (id: string) => {

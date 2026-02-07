@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,54 +7,124 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useMembersStore } from '@/store/useMembersStore';
-import AvailableBedsList from '@/components/AvailableBedsList';
+import { usePropertiesStore } from '@/store/usePropertiesStore';
 import WizardTopHeader from '@/components/WizardTopHeader';
-import { CheckCircle, User, Phone, MapPin, CreditCard, Camera, AlertCircle } from 'lucide-react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { AlertCircle, Camera } from 'lucide-react-native';
 import { Image } from 'react-native';
+
+type SelectedBed = {
+  propertyId: string;
+  buildingId: string;
+  floorId: string;
+  roomId: string;
+  bedId: string;
+  bedNumber?: number;
+};
 
 export default function AddMemberScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    propertyId?: string;
+    buildingId?: string;
+    floorId?: string;
+    roomId?: string;
+    bedId?: string;
+    from?: string;
+  }>();
   const { addMember } = useMembersStore();
+  const { properties, loadProperties } = usePropertiesStore();
 
-  const [step, setStep] = useState<1 | 2>(1);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const getParam = (value?: string | string[]) =>
+    Array.isArray(value) ? value[0] : value;
 
-  // Step 1: Member Details
+  const paramPropertyId = getParam(params.propertyId);
+  const paramBuildingId = getParam(params.buildingId);
+  const paramFloorId = getParam(params.floorId);
+  const paramRoomId = getParam(params.roomId);
+  const paramBedId = getParam(params.bedId);
+  const paramFrom = getParam(params.from);
+
+  const [selectedBed, setSelectedBed] = useState<SelectedBed | null>(
+    paramPropertyId && paramBuildingId && paramFloorId && paramRoomId && paramBedId
+      ? {
+        propertyId: paramPropertyId,
+        buildingId: paramBuildingId,
+        floorId: paramFloorId,
+        roomId: paramRoomId,
+        bedId: paramBedId,
+      }
+      : null
+  );
+
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [pincode, setPincode] = useState('');
+  const [villageName, setVillageName] = useState('');
+  const [joinedDate, setJoinedDate] = useState('');
   const [proofId, setProofId] = useState('');
   const [profilePic, setProfilePic] = useState<string | null>(null);
-
-  // Step 2: Bed Assignment
-  const [selectedBed, setSelectedBed] = useState<{
-    propertyId: string;
-    buildingId: string;
-    floorId: string;
-    roomId: string;
-    bedId: string;
-    bedCount: number;
-    price?: number;
-    period?: string;
-  } | null>(null);
-  const [bedAmount, setBedAmount] = useState('');
-
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  useEffect(() => {
+    loadProperties();
+  }, []);
+
+  useEffect(() => {
+    if (paramPropertyId && paramBuildingId && paramFloorId && paramRoomId && paramBedId) {
+      setSelectedBed({
+        propertyId: paramPropertyId,
+        buildingId: paramBuildingId,
+        floorId: paramFloorId,
+        roomId: paramRoomId,
+        bedId: paramBedId,
+      });
+    }
+  }, [paramPropertyId, paramBuildingId, paramFloorId, paramRoomId, paramBedId]);
+
+  const hasBedParams =
+    Boolean(paramPropertyId) &&
+    Boolean(paramBuildingId) &&
+    Boolean(paramFloorId) &&
+    Boolean(paramRoomId) &&
+    Boolean(paramBedId);
+
+  useEffect(() => {
+    if (!selectedBed && !hasBedParams) {
+      router.replace('/beds/available');
+    }
+  }, [selectedBed, hasBedParams, router]);
+
+  const bedSummary = useMemo(() => {
+    if (!selectedBed) {
+      return null;
+    }
+
+    const property = properties.find((p) => p.id === selectedBed.propertyId);
+    const building = property?.buildings.find((b) => b.id === selectedBed.buildingId);
+    const floor = building?.floors.find((f) => f.id === selectedBed.floorId);
+    const room = floor?.rooms.find((r) => r.id === selectedBed.roomId);
+    const bedIndex = room?.beds.findIndex((b) => b.id === selectedBed.bedId) ?? -1;
+    const bedNumber = selectedBed.bedNumber ?? (bedIndex >= 0 ? bedIndex + 1 : undefined);
+
+    return {
+      propertyName: property?.name ?? 'Property',
+      buildingName: building?.name ?? 'Building',
+      floorLabel: floor?.label ?? 'Floor',
+      roomNumber: room?.roomNumber ?? 'Room',
+      bedNumber: bedNumber ?? 0,
+    };
+  }, [selectedBed, properties]);
+
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
@@ -67,13 +137,13 @@ export default function AddMemberScreen() {
   };
 
   const takePhoto = async () => {
-    let cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
     if (cameraPermission.status !== 'granted') {
       Alert.alert('Permission Required', 'Please grant camera access to take a photo.');
       return;
     }
 
-    let result = await ImagePicker.launchCameraAsync({
+    const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
@@ -87,74 +157,56 @@ export default function AddMemberScreen() {
 
   const showImagePickerOptions = () => {
     Alert.alert(
-      "Select Profile Picture",
-      "Choose an option",
+      'Select Profile Picture',
+      'Choose an option',
       [
-        { text: "Choose from Gallery", onPress: pickImage },
-        { text: "Take Photo", onPress: takePhoto },
-        { text: "Cancel", style: "cancel" },
+        { text: 'Choose from Gallery', onPress: pickImage },
+        { text: 'Take Photo', onPress: takePhoto },
+        { text: 'Cancel', style: 'cancel' },
       ],
       { cancelable: true }
     );
-  };
-
-  const handleNextStep = () => {
-    setValidationError(null);
-
-    if (!name.trim()) {
-      setValidationError('Please enter a name');
-      return;
-    }
-
-    if (!phone.trim()) {
-      setValidationError('Please enter a phone number');
-      return;
-    }
-
-    if (!address.trim()) {
-      setValidationError('Please enter an address');
-      return;
-    }
-
-    if (!city.trim()) {
-      setValidationError('Please enter a city');
-      return;
-    }
-
-    if (!pincode.trim()) {
-      setValidationError('Please enter a pincode');
-      return;
-    }
-
-    if (!proofId.trim()) {
-      setValidationError('Please enter a proof ID');
-      return;
-    }
-
-    setStep(2);
   };
 
   const handleSubmit = async () => {
     setValidationError(null);
 
     if (!selectedBed) {
-      setValidationError('Please select a bed');
+      setValidationError('Please select a bed.');
       return;
     }
 
-    const parsedAmount = Number(bedAmount);
-    if (!bedAmount.trim() || !Number.isInteger(parsedAmount) || parsedAmount <= 0) {
-      setValidationError('Please enter a valid bed amount');
+    if (!name.trim()) {
+      setValidationError('Please enter a full name.');
       return;
     }
 
-    const newMember = {
+    if (!phone.trim()) {
+      setValidationError('Please enter a mobile number.');
+      return;
+    }
+
+    if (!villageName.trim()) {
+      setValidationError('Please enter a village name.');
+      return;
+    }
+
+    if (!joinedDate.trim()) {
+      setValidationError('Please enter a joined date.');
+      return;
+    }
+
+    if (!proofId.trim()) {
+      setValidationError('Please enter a proof ID.');
+      return;
+    }
+
+    await addMember({
       id: Date.now().toString(),
       name: name.trim(),
       phone: phone.trim(),
-      address: address.trim(),
-      city: city.trim(),
-      pincode: pincode.trim(),
+      villageName: villageName.trim(),
+      joinedDate: joinedDate.trim(),
       proofId: proofId.trim(),
       profilePic,
       propertyId: selectedBed.propertyId,
@@ -162,230 +214,207 @@ export default function AddMemberScreen() {
       floorId: selectedBed.floorId,
       roomId: selectedBed.roomId,
       bedId: selectedBed.bedId,
-      bedAmount: parsedAmount,
-      billingPeriod: selectedBed.period,
       createdAt: new Date().toISOString(),
-    };
+    });
 
-    await addMember(newMember);
-
-    setShowSuccess(true);
-    setTimeout(() => {
-      router.back();
-    }, 800);
-  };
-
-  const handleCancel = () => {
-    router.back();
+    router.replace('/members');
   };
 
   const handleBack = () => {
-    if (step === 2) {
-      setStep(1);
-    } else {
-      router.back();
+    if (paramFrom === 'total') {
+      router.replace('/beds/total');
+      return;
     }
+
+    if (paramFrom === 'available') {
+      router.replace('/beds/available');
+      return;
+    }
+
+    router.back();
   };
+
+  if (!selectedBed && !hasBedParams) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <WizardTopHeader onBack={handleBack} title="Add Member" />
+        <View style={styles.redirectContent}>
+          <Text style={[styles.redirectText, { color: theme.textSecondary }]}>Redirecting...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <WizardTopHeader onBack={handleBack} title="Member" />
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
-        <View style={styles.page}>
-          <View style={styles.content}>
-            {step === 1 && (
-              <View style={styles.stepContainer}>
-                {validationError && (
-                  <View style={[styles.errorBanner, { backgroundColor: theme.error + '20' }]}>
-                    <AlertCircle size={18} color={theme.error} />
-                    <Text style={[styles.errorText, { color: theme.error }]}>{validationError}</Text>
-                  </View>
-                )}
-
-                {/* Profile Picture */}
-                <View style={styles.section}>
-                  <TouchableOpacity
-                    style={[styles.profilePicContainer, { borderColor: theme.border }]}
-                    onPress={showImagePickerOptions}
-                  >
-                    {profilePic ? (
-                      <Image source={{ uri: profilePic }} style={styles.profilePic} />
-                    ) : (
-                      <View style={styles.profilePicPlaceholder}>
-                        <Camera size={40} color={theme.textSecondary} />
-                        <Text style={[styles.profilePicText, { color: theme.textSecondary }]}>
-                          Add Photo
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Name */}
-                <View style={styles.section}>
-                  <Text style={[styles.label, { color: theme.text }]}>
-                    <User size={16} color={theme.textSecondary} /> Name *
-                  </Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                    placeholder="Full Name"
-                    placeholderTextColor={theme.textSecondary}
-                    value={name}
-                    onChangeText={setName}
-                  />
-                </View>
-
-                {/* Phone */}
-                <View style={styles.section}>
-                  <Text style={[styles.label, { color: theme.text }]}>
-                    <Phone size={16} color={theme.textSecondary} /> Phone Number *
-                  </Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                    placeholder="Phone"
-                    placeholderTextColor={theme.textSecondary}
-                    value={phone}
-                    onChangeText={setPhone}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-
-                {/* Address */}
-                <View style={styles.section}>
-                  <Text style={[styles.label, { color: theme.text }]}>
-                    <MapPin size={16} color={theme.textSecondary} /> Address *
-                  </Text>
-                  <TextInput
-                    style={[styles.textArea, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                    placeholder="Full address (House/Flat, Street, Area, etc.)"
-                    placeholderTextColor={theme.textSecondary}
-                    value={address}
-                    onChangeText={setAddress}
-                    multiline
-                    numberOfLines={3}
-                    textAlignVertical="top"
-                  />
-                  <View style={styles.row}>
-                    <TextInput
-                      style={[styles.input, styles.flexInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                      placeholder="City"
-                      placeholderTextColor={theme.textSecondary}
-                      value={city}
-                      onChangeText={setCity}
-                    />
-                    <TextInput
-                      style={[styles.input, styles.pincodeInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                      placeholder="Pincode"
-                      placeholderTextColor={theme.textSecondary}
-                      value={pincode}
-                      onChangeText={setPincode}
-                      keyboardType="number-pad"
-                    />
-                  </View>
-                </View>
-
-                {/* Proof ID */}
-                <View style={styles.section}>
-                  <Text style={[styles.label, { color: theme.text }]}>
-                    <CreditCard size={16} color={theme.textSecondary} /> ID Proof *
-                  </Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                    placeholder="Aadhar/PAN/etc."
-                    placeholderTextColor={theme.textSecondary}
-                    value={proofId}
-                    onChangeText={setProofId}
-                  />
-                </View>
-              </View>
-            )}
-
-            {step === 2 && (
-              <View style={styles.stepContainer}>
-                <Text style={[styles.stepTitle, { color: theme.text }]}>Bed Assignment</Text>
-
-                {validationError && (
-                  <View style={[styles.errorBanner, { backgroundColor: theme.error + '20' }]}>
-                    <AlertCircle size={18} color={theme.error} />
-                    <Text style={[styles.errorText, { color: theme.error }]}>{validationError}</Text>
-                  </View>
-                )}
-
-                <AvailableBedsList
-                  selectedBedId={selectedBed?.bedId || null}
-                  onBedSelect={(bed) => {
-                    setSelectedBed({
-                      propertyId: bed.propertyId,
-                      buildingId: bed.buildingId,
-                      floorId: bed.floorId,
-                      roomId: bed.roomId,
-                      bedId: bed.bedId,
-                      bedCount: bed.bedCount,
-                      price: bed.price,
-                      period: bed.period,
-                    });
-                    setBedAmount(bed.price ? bed.price.toString() : '');
-                  }}
-                />
-
-                <View style={styles.section}>
-                  <Text style={[styles.label, { color: theme.text }]}
-                  >
-                    <CreditCard size={16} color={theme.textSecondary} /> Bed Amount *
-                  </Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                    placeholder="Enter amount"
-                    placeholderTextColor={theme.textSecondary}
-                    value={bedAmount}
-                    onChangeText={(value) => setBedAmount(value.replace(/\D+/g, ''))}
-                    keyboardType="number-pad"
-                  />
-                  {selectedBed?.period && (
-                    <Text style={[styles.helperText, { color: theme.textSecondary }]}
-                    >
-                      Default: {selectedBed.price ?? '--'} / {selectedBed.period}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            )}
-          </View>
-          {/* Footer Buttons */}
-          <View style={[styles.footer, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
-            {step === 1 ? (
-              <TouchableOpacity
-                style={[styles.nextButton, { backgroundColor: theme.primary }]}
-                onPress={handleNextStep}
-              >
-                <Text style={styles.nextButtonText}>Next: Assign Bed</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.nextButton, { backgroundColor: theme.primary }]}
-                onPress={handleSubmit}
-              >
-                <Text style={styles.nextButtonText}>Add Member</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-
-      {showSuccess && (
-        <Animated.View
-          entering={FadeIn}
-          exiting={FadeOut}
-          style={[styles.successOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.8)' }]}
+      <WizardTopHeader onBack={handleBack} title="Add Member" />
+      {selectedBed ? (
+        <KeyboardAvoidingView
+          style={styles.content}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <CheckCircle size={60} color="#10b981" />
-          <Text style={styles.successText}>Member added successfully!</Text>
-        </Animated.View>
-      )}
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={styles.stepHeaderRow}>
+              <Text style={[styles.stepTitle, { color: theme.text }]}>Member Details</Text>
+              <TouchableOpacity onPress={() => router.replace('/beds/available')} activeOpacity={0.7}>
+                <Text style={[styles.linkText, { color: theme.accent }]}>Change Bed</Text>
+              </TouchableOpacity>
+            </View>
+
+            {bedSummary && (
+              <View
+                style={[
+                  styles.summaryCard,
+                  { backgroundColor: theme.card, borderColor: theme.cardBorder },
+                ]}
+              >
+                <Text style={[styles.summaryTitle, { color: theme.text }]}>Selected Bed</Text>
+                <Text style={[styles.summaryText, { color: theme.textSecondary }]}
+                >
+                  {bedSummary.propertyName} • {bedSummary.buildingName}
+                </Text>
+                <Text style={[styles.summaryText, { color: theme.textSecondary }]}
+                >
+                  Floor {bedSummary.floorLabel} • Room {bedSummary.roomNumber} • Bed {bedSummary.bedNumber}
+                </Text>
+              </View>
+            )}
+
+            {validationError && (
+              <View
+                style={[
+                  styles.errorCard,
+                  { backgroundColor: theme.error + '15', borderColor: theme.error },
+                ]}
+              >
+                <AlertCircle size={18} color={theme.error} />
+                <Text style={[styles.errorText, { color: theme.error }]}>{validationError}</Text>
+              </View>
+            )}
+
+            <View style={styles.section}>
+              <Text style={[styles.label, { color: theme.text }]}>Full Name *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
+                placeholder="Enter full name"
+                placeholderTextColor={theme.textSecondary}
+                value={name}
+                onChangeText={setName}
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.label, { color: theme.text }]}>Mobile Number *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
+                placeholder="Enter mobile number"
+                placeholderTextColor={theme.textSecondary}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.label, { color: theme.text }]}>Village Name *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
+                placeholder="Enter village name"
+                placeholderTextColor={theme.textSecondary}
+                value={villageName}
+                onChangeText={setVillageName}
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.label, { color: theme.text }]}>Joined Date *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={theme.textSecondary}
+                value={joinedDate}
+                onChangeText={setJoinedDate}
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.label, { color: theme.text }]}>Proof ID *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
+                placeholder="Enter proof ID"
+                placeholderTextColor={theme.textSecondary}
+                value={proofId}
+                onChangeText={setProofId}
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.label, { color: theme.text }]}>Profile Picture</Text>
+              <TouchableOpacity
+                style={[
+                  styles.imagePicker,
+                  { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder },
+                ]}
+                onPress={showImagePickerOptions}
+                activeOpacity={0.7}
+              >
+                {profilePic ? (
+                  <Image source={{ uri: profilePic }} style={styles.profileImage} />
+                ) : (
+                  <Camera size={28} color={theme.textSecondary} />
+                )}
+                <Text style={[styles.imagePickerText, { color: theme.textSecondary }]}
+                >
+                  {profilePic ? 'Change Picture' : 'Upload Picture'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, { backgroundColor: theme.accent }]}
+              onPress={handleSubmit}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.submitButtonText}>Confirm & Submit</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -394,159 +423,103 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  keyboardView: {
-    flex: 1,
-  },
-  page: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-  },
   content: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerCenter: {
+  redirectContent: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
   },
-  title: {
+  redirectText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  scrollContent: {
+    padding: 20,
+    gap: 16,
+  },
+  stepTitle: {
     fontSize: 18,
     fontWeight: '700',
   },
-  stepIndicator: {
-    fontSize: 12,
-    marginTop: 2,
+  stepHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  stepContainer: {
-    paddingTop: 10,
-    gap: 10,
-  },
-  stepTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  stepDescription: {
+  linkText: {
     fontSize: 13,
-    marginBottom: 20,
+    fontWeight: '600',
   },
-  errorBanner: {
+  summaryCard: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  summaryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  summaryText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  errorCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
     gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
   },
   errorText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  helperText: {
-    marginTop: 6,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   section: {
-    marginBottom: 10,
+    gap: 10,
   },
   label: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 4,
-  },
-  profilePicContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2,
-    overflow: 'hidden',
-    alignSelf: 'center',
-  },
-  profilePic: {
-    width: '100%',
-    height: '100%',
-  },
-  profilePicPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  profilePicText: {
-    fontSize: 12,
   },
   input: {
-    height: 40,
-    borderRadius: 8,
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 10,
     paddingHorizontal: 12,
     fontSize: 14,
-    borderWidth: 1,
   },
-  textArea: {
-    minHeight: 56,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
+  imagePicker: {
+    height: 120,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 6,
-  },
-  row: {
-    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: 8,
   },
-  flexInput: {
-    flex: 2,
+  profileImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
-  pincodeInput: {
-    flex: 1,
-    minWidth: 100,
+  imagePickerText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
-  footer: {
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    borderTopWidth: 1,
-  },
-  nextButton: {
-    height: 46,
-    borderRadius: 25,
+  submitButton: {
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 6,
   },
-  nextButtonText: {
-    color: '#fff',
-    fontSize: 15,
+  submitButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '700',
-  },
-  successOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  successText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    marginTop: 16,
   },
 });

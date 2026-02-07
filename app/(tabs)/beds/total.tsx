@@ -5,6 +5,7 @@ import {
     StyleSheet,
     SafeAreaView,
     ScrollView,
+    TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -74,19 +75,49 @@ export default function TotalBedsScreen() {
                                             {room.beds.map((bed, index) => {
                                                 const key = `${activeProperty.id}:${building.id}:${floor.id}:${room.id}:${bed.id}`;
                                                 const occupant = memberMap.get(key);
-                                                return (
-                                                    <View
-                                                        key={bed.id}
-                                                        style={[
-                                                            styles.bedRow,
-                                                            { borderColor: bed.occupied ? theme.primary : theme.border },
-                                                        ]}
-                                                    >
+                                                const isAvailable = !bed.occupied;
+                                                const rowStyles = [
+                                                    styles.bedRow,
+                                                    { borderColor: bed.occupied ? theme.primary : theme.border },
+                                                ];
+                                                const content = (
+                                                    <>
                                                         <Text style={[styles.bedLabel, { color: theme.text }]}>Bed {index + 1}</Text>
                                                         <Text style={[styles.bedValue, { color: bed.occupied ? theme.text : theme.textSecondary }]}>
                                                             {bed.occupied ? occupant ?? 'Occupied' : 'Available'}
                                                         </Text>
-                                                    </View>
+                                                    </>
+                                                );
+
+                                                if (!isAvailable) {
+                                                    return (
+                                                        <View key={bed.id} style={rowStyles}>
+                                                            {content}
+                                                        </View>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={bed.id}
+                                                        style={rowStyles}
+                                                        onPress={() =>
+                                                            router.push({
+                                                                pathname: '/member/add',
+                                                                params: {
+                                                                    propertyId: activeProperty.id,
+                                                                    buildingId: building.id,
+                                                                    floorId: floor.id,
+                                                                    roomId: room.id,
+                                                                    bedId: bed.id,
+                                                                    from: 'total',
+                                                                },
+                                                            })
+                                                        }
+                                                        activeOpacity={0.7}
+                                                    >
+                                                        {content}
+                                                    </TouchableOpacity>
                                                 );
                                             })}
                                         </View>
