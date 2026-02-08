@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,9 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
@@ -19,7 +20,10 @@ import WizardFooter from '@/components/WizardFooter';
 import { PropertyType } from '@/types/property';
 import { Home, MapPin } from 'lucide-react-native';
 
-const PROPERTY_TYPES: PropertyType[] = ['Hostel/PG'];
+const PROPERTY_TYPES: { type: PropertyType; disabled?: boolean; label?: string }[] = [
+  { type: 'Hostel/PG' },
+  { type: 'Apartments', disabled: true, label: 'Upcoming' },
+];
 
 export default function PropertyDetailsScreen() {
   const theme = useTheme();
@@ -35,8 +39,9 @@ export default function PropertyDetailsScreen() {
   } = useWizardStore();
 
   const [name, setName] = useState(propertyDetails.name);
-  const [type, setType] = useState<PropertyType | null>(propertyDetails.type);
+  const [type, setType] = useState<PropertyType | null>(propertyDetails.type || 'Hostel/PG');
   const [city, setCity] = useState(propertyDetails.city);
+  const [area, setArea] = useState(propertyDetails.area || '');
 
   const isEditing = mode === 'edit' || Boolean(editingPropertyId);
 
@@ -48,17 +53,41 @@ export default function PropertyDetailsScreen() {
 
   useEffect(() => {
     setName(propertyDetails.name);
-    setType(propertyDetails.type);
+    setType(propertyDetails.type || 'Hostel/PG');
     setCity(propertyDetails.city);
+    setArea(propertyDetails.area || '');
   }, [propertyDetails]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     resetWizard();
-    router.back();
-  };
+    if (editingPropertyId) {
+      router.replace({
+        pathname: '/settings/property-details/[id]',
+        params: { id: editingPropertyId },
+      });
+      return;
+    }
+    router.replace('/(tabs)');
+  }, [resetWizard, router, editingPropertyId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleClose();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleClose]),
+  );
 
   const handleNext = () => {
-    updatePropertyDetails({ name, type, city });
+    updatePropertyDetails({ name, type, city, area });
     nextStep();
     router.push('/wizard/buildings');
   };
@@ -69,14 +98,20 @@ export default function PropertyDetailsScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <WizardTopHeader onBack={handleClose} title="Settings" />
+      <WizardTopHeader
+        onBack={handleClose}
+        title="Property Details"
+        rightAction="close"
+        onClose={handleClose}
+      />
       <WizardHeader
         currentStep={1}
         totalSteps={6}
         title="Property Details"
         onClose={handleClose}
-        showClose
+        showClose={false}
         showSteps
+        showTitle={false}
       />
 
       <KeyboardAvoidingView
@@ -123,36 +158,43 @@ export default function PropertyDetailsScreen() {
               </Text>
             </View>
             <View style={styles.typeContainer}>
-              {PROPERTY_TYPES.map((propertyType) => (
+              {PROPERTY_TYPES.map((item) => (
                 <TouchableOpacity
-                  key={propertyType}
+                  key={item.type}
                   style={[
                     styles.typeButton,
                     {
                       backgroundColor:
-                        type === propertyType
+                        type === item.type
                           ? theme.primary + '15'
                           : theme.inputBackground,
                       borderColor:
-                        type === propertyType ? theme.primary : theme.inputBorder,
-                      opacity: isEditing ? 0.6 : 1,
+                        type === item.type ? theme.primary : theme.inputBorder,
+                      opacity: isEditing || item.disabled ? 0.6 : 1,
                     },
                   ]}
-                  onPress={() => setType(propertyType)}
-                  disabled={isEditing}
+                  onPress={() => !item.disabled && setType(item.type)}
+                  disabled={isEditing || item.disabled}
                   activeOpacity={0.7}
                 >
-                  <Text
-                    style={[
-                      styles.typeText,
-                      {
-                        color: type === propertyType ? theme.primary : theme.text,
-                        fontWeight: type === propertyType ? '600' : '500',
-                      },
-                    ]}
-                  >
-                    {propertyType}
-                  </Text>
+                  <View style={styles.typeButtonContent}>
+                    {item.label && (
+                      <Text style={[styles.upcomingLabel, { color: theme.textSecondary }]}>
+                        {item.label}
+                      </Text>
+                    )}
+                    <Text
+                      style={[
+                        styles.typeText,
+                        {
+                          color: type === item.type ? theme.primary : theme.text,
+                          fontWeight: type === item.type ? '600' : '500',
+                        },
+                      ]}
+                    >
+                      {item.type}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -182,6 +224,28 @@ export default function PropertyDetailsScreen() {
               placeholderTextColor={theme.textSecondary}
               value={city}
               onChangeText={setCity}
+              autoCapitalize="words"
+            />
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.labelContainer}>
+              <MapPin size={18} color={theme.textSecondary} strokeWidth={2} />
+              <Text style={[styles.label, { color: theme.text }]}>Area</Text>
+            </View>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.inputBackground,
+                  borderColor: theme.inputBorder,
+                  color: theme.text,
+                },
+              ]}
+              placeholder="Enter area"
+              placeholderTextColor={theme.textSecondary}
+              value={area}
+              onChangeText={setArea}
               autoCapitalize="words"
             />
           </View>
@@ -237,11 +301,21 @@ const styles = StyleSheet.create({
   },
   typeButton: {
     flex: 1,
-    height: 48,
+    height: 58,
     borderRadius: 12,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  typeButtonContent: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  upcomingLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   typeText: {
     fontSize: 15,

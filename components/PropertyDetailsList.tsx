@@ -6,6 +6,7 @@ import { useTheme } from '@/theme/useTheme';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
 import { Home, Plus, ChevronRight, Check } from 'lucide-react-native';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 export default function PropertyDetailsList() {
     const theme = useTheme();
@@ -69,26 +70,27 @@ export default function PropertyDetailsList() {
                             { backgroundColor: theme.card, borderColor: theme.cardBorder },
                         ]}
                     >
-                        <View
+                        <Animated.View
+                            entering={FadeInDown.springify()}
                             style={[
                                 styles.iconContainer,
                                 { backgroundColor: theme.primary + '15' },
                             ]}
                         >
-                            <Home size={48} color={theme.primary} strokeWidth={2} />
-                        </View>
+                            <Home size={56} color={theme.primary} strokeWidth={2.5} />
+                        </Animated.View>
                         <Text style={[styles.emptyTitle, { color: theme.text }]}>No Properties Yet</Text>
                         <Text style={[styles.emptyText, { color: theme.textSecondary }]}
                         >
-                            Get started by creating your first property
+                            Get started by creating your first property to manage your buildings, floors, rooms, and beds
                         </Text>
                         <TouchableOpacity
-                            style={[styles.createButton, { backgroundColor: theme.accent }]}
+                            style={[styles.createButton, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
                             onPress={handleCreateProperty}
                             activeOpacity={0.8}
                         >
-                            <Plus size={20} color="#ffffff" strokeWidth={2} />
-                            <Text style={styles.createButtonText}>Create Property</Text>
+                            <Plus size={22} color={theme.text} strokeWidth={2.5} />
+                            <Text style={[styles.createButtonText, { color: theme.text }]}>Create Property</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -98,82 +100,90 @@ export default function PropertyDetailsList() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-            <WizardTopHeader title="Property Details" onBack={handleBack} showMenu={false} />
-            <ScrollView contentContainerStyle={styles.content}>
-                <View style={styles.switcherSection}>
-                    <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Active Property</Text>
+            <WizardTopHeader title="Properties" onBack={handleBack} showMenu={false} />
+            <ScrollView 
+                contentContainerStyle={styles.content}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Property Switcher */}
+                <Animated.View entering={FadeInDown.duration(300)} style={styles.switcherSection}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Select Property</Text>
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.switcherRow}
                     >
-                        {properties.map((property) => {
+                        {properties.map((property, index) => {
                             const isActive = property.id === activeProperty?.id;
                             return (
-                                <TouchableOpacity
+                                <Animated.View
                                     key={property.id}
-                                    style={[
-                                        styles.pill,
-                                        {
-                                            backgroundColor: isActive ? theme.primary : theme.card,
-                                            borderColor: isActive ? theme.primary : theme.cardBorder,
-                                        },
-                                    ]}
-                                    onPress={() => handleSelectProperty(property.id)}
-                                    activeOpacity={0.8}
+                                    entering={FadeIn.delay(index * 50)}
                                 >
-                                    <Text
+                                    <TouchableOpacity
                                         style={[
-                                            styles.pillText,
-                                            { color: isActive ? theme.background : theme.text },
+                                            styles.pill,
+                                            {
+                                                backgroundColor: theme.card,
+                                                borderColor: isActive ? theme.primary : theme.cardBorder,
+                                            },
                                         ]}
+                                        onPress={() => handleSelectProperty(property.id)}
+                                        activeOpacity={0.7}
                                     >
-                                        {property.name}
-                                    </Text>
-                                    {isActive && <Check size={14} color={theme.background} strokeWidth={2} />}
-                                </TouchableOpacity>
+                                        <Home size={16} color={isActive ? theme.primary : theme.textSecondary} strokeWidth={2.5} />
+                                        <Text style={[styles.pillText, { color: theme.text }]}>
+                                            {property.name}
+                                        </Text>
+                                        {isActive && <Check size={16} color={theme.primary} strokeWidth={2.5} />}
+                                    </TouchableOpacity>
+                                </Animated.View>
                             );
                         })}
                     </ScrollView>
-                </View>
+                </Animated.View>
 
                 {activeProperty && (
-                    <View style={[styles.activeCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
-                    >
-                        <View style={styles.activeHeader}
+                    <>
+                        {/* Property Info Card */}
+                        <Animated.View 
+                            entering={FadeInDown.delay(100).springify()}
+                            style={[styles.activeCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
                         >
-                            <View style={[styles.iconWrap, { backgroundColor: theme.primary + '15' }]}
+                            <View style={[styles.propertyHeader, { backgroundColor: theme.card, borderBottomColor: theme.cardBorder }]}>
+                                <View style={[styles.headerIconContainer, { backgroundColor: theme.primary + '12' }]}>
+                                    <Home size={28} color={theme.primary} strokeWidth={2.5} />
+                                </View>
+                                <View style={styles.headerTextContainer}>
+                                    <Text style={[styles.propertyName, { color: theme.text }]}>{activeProperty.name}</Text>
+                                    <Text style={[styles.propertyType, { color: theme.textSecondary }]}>{activeProperty.type}</Text>
+                                </View>
+                            </View>
+
+                            {/* View Details Button */}
+                            <TouchableOpacity
+                                style={[styles.detailsButton, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
+                                onPress={() => handleOpenDetails(activeProperty.id)}
+                                activeOpacity={0.8}
                             >
-                                <Home size={20} color={theme.primary} strokeWidth={2} />
-                            </View>
-                            <View style={styles.textWrap}>
-                                <Text style={[styles.rowLabel, { color: theme.text }]}>{activeProperty.name}</Text>
-                                <Text style={[styles.rowHint, { color: theme.textSecondary }]}
-                                >
-                                    {activeProperty.type}
-                                    {activeProperty.city ? ` • ${activeProperty.city}` : ''}
-                                </Text>
-                            </View>
-                        </View>
-                        <TouchableOpacity
-                            style={[styles.detailsButton, { borderColor: theme.border }]}
-                            onPress={() => handleOpenDetails(activeProperty.id)}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={[styles.detailsText, { color: theme.text }]}>View details</Text>
-                            <ChevronRight size={16} color={theme.textSecondary} strokeWidth={2} />
-                        </TouchableOpacity>
-                    </View>
+                                <Text style={[styles.detailsText, { color: theme.text }]}>View Full Details</Text>
+                                <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2.5} />
+                            </TouchableOpacity>
+                        </Animated.View>
+                    </>
                 )}
 
-                <TouchableOpacity
-                    style={[styles.createButton, { backgroundColor: theme.accent }]}
-                    onPress={handleCreateProperty}
-                    activeOpacity={0.8}
-                >
-                    <Plus size={20} color="#ffffff" strokeWidth={2} />
-                    <Text style={styles.createButtonText}>Create Property</Text>
-                </TouchableOpacity>
+                {/* Create Property Button */}
+                <Animated.View entering={FadeInDown.delay(200)}>
+                    <TouchableOpacity
+                        style={[styles.createButton, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
+                        onPress={handleCreateProperty}
+                        activeOpacity={0.8}
+                    >
+                        <Plus size={22} color={theme.text} strokeWidth={2.5} />
+                        <Text style={[styles.createButtonText, { color: theme.text }]}>Create New Property</Text>
+                    </TouchableOpacity>
+                </Animated.View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -184,35 +194,39 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     content: {
-        padding: 16,
+        padding: 20,
         paddingBottom: 100,
-        gap: 18,
+        gap: 24,
     },
     switcherSection: {
-        gap: 10,
+        gap: 12,
     },
     sectionTitle: {
-        fontSize: 12,
+        fontSize: 18,
         fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: 0.6,
+        marginBottom: 4,
     },
     switcherRow: {
-        gap: 10,
+        gap: 12,
         paddingVertical: 4,
     },
     pill: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 999,
-        borderWidth: 1,
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        borderRadius: 14,
+        borderWidth: 1.5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
     },
     pillText: {
-        fontSize: 13,
-        fontWeight: '600',
+        fontSize: 14,
+        fontWeight: '700',
     },
     emptyContent: {
         flex: 1,
@@ -221,96 +235,112 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     emptyCard: {
-        padding: 28,
-        borderRadius: 16,
+        padding: 32,
+        borderRadius: 20,
         borderWidth: 1,
         alignItems: 'center',
-        gap: 14,
+        gap: 16,
         width: '100%',
         maxWidth: 400,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 4,
     },
     iconContainer: {
-        width: 90,
-        height: 90,
-        borderRadius: 22,
+        width: 100,
+        height: 100,
+        borderRadius: 24,
         justifyContent: 'center',
         alignItems: 'center',
     },
     emptyTitle: {
-        fontSize: 22,
-        fontWeight: '700',
+        fontSize: 24,
+        fontWeight: '800',
         textAlign: 'center',
     },
     emptyText: {
-        fontSize: 14,
+        fontSize: 15,
         textAlign: 'center',
-        lineHeight: 20,
-        marginBottom: 6,
+        lineHeight: 22,
+        marginBottom: 8,
     },
     createButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        height: 46,
-        paddingHorizontal: 22,
-        borderRadius: 12,
-        gap: 8,
-        alignSelf: 'center',
+        justifyContent: 'center',
+        height: 54,
+        paddingHorizontal: 28,
+        borderRadius: 14,
+        gap: 10,
+        alignSelf: 'stretch',
+        borderWidth: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 4,
     },
     createButtonText: {
         color: '#ffffff',
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 16,
+        fontWeight: '700',
     },
     activeCard: {
-        padding: 16,
-        borderRadius: 16,
+        borderRadius: 18,
         borderWidth: 1,
-        gap: 14,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 4,
     },
-    activeHeader: {
+    propertyHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        padding: 20,
+        gap: 16,
+        borderBottomWidth: 1,
     },
-    rowLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    iconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
+    headerIconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    textWrap: {
-        gap: 2,
+    headerTextContainer: {
+        flex: 1,
+        gap: 6,
     },
-    rowLabel: {
-        fontSize: 15,
+    propertyName: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#ffffff',
+    },
+    propertyType: {
+        fontSize: 13,
         fontWeight: '600',
-    },
-    rowHint: {
-        fontSize: 12,
-        fontWeight: '500',
-    },
-    rowRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
+        color: '#ffffff',
+        opacity: 0.9,
     },
     detailsButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        borderRadius: 12,
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 16,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderRadius: 14,
         borderWidth: 1,
     },
     detailsText: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#ffffff',
     },
 });

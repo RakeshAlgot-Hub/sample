@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useCallback } from 'react';
 import { useTheme } from '@/theme/useTheme';
 import { useStore } from '@/store/useStore';
 import WizardTopHeader from '@/components/WizardTopHeader';
@@ -17,6 +18,10 @@ export default function AccountScreen() {
     const theme = useTheme();
     const { user, logout } = useStore();
 
+    const handleBack = useCallback(() => {
+        router.back();
+    }, [router]);
+
     const handleLogout = async () => {
         await logout();
         router.replace('/(auth)/login');
@@ -24,7 +29,7 @@ export default function AccountScreen() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-            <WizardTopHeader title="Account" onBack={() => router.push('/(tabs)/settings')} showMenu={false} />
+            <WizardTopHeader title="Account" onBack={handleBack} showMenu={false} />
             <ScrollView contentContainerStyle={styles.content}>
                 <View
                     style={[

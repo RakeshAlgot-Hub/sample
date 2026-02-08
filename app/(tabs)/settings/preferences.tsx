@@ -1,18 +1,56 @@
-import { View, Text, StyleSheet, SafeAreaView, Switch } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, Switch, BackHandler } from 'react-native';
+import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import { useStore } from '@/store/useStore';
 import { Moon, Sun } from 'lucide-react-native';
+import { useWebBackHandler } from '@/hooks/useWebBackHandler';
 
 export default function PreferencesScreen() {
     const theme = useTheme();
     const router = useRouter();
+    const navigation = useNavigation();
     const { themeMode, toggleTheme } = useStore();
+    const isHandlingBack = useRef(false);
+
+    const handleBack = useCallback(() => {
+        isHandlingBack.current = true;
+        router.back();
+    }, [router]);
+
+    useFocusEffect(
+        useCallback(() => {
+            const onBackPress = () => {
+                handleBack();
+                return true;
+            };
+
+            const subscription = BackHandler.addEventListener(
+                'hardwareBackPress',
+                onBackPress,
+            );
+
+            const beforeRemove = navigation.addListener('beforeRemove', (event) => {
+                if (isHandlingBack.current) {
+                    return;
+                }
+                event.preventDefault();
+                handleBack();
+            });
+
+            return () => {
+                subscription.remove();
+                beforeRemove();
+            };
+        }, [handleBack, navigation]),
+    );
+
+    useWebBackHandler(handleBack);
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-            <WizardTopHeader title="App Preferences" onBack={() => router.push('/(tabs)/settings')} showMenu={false} />
+            <WizardTopHeader title="App Preferences" onBack={handleBack} showMenu={false} />
             <View style={styles.content}>
                 <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
                     <View style={styles.settingRow}>

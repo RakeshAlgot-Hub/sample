@@ -4,13 +4,10 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
-import { useStore } from '@/store/useStore';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
 import { useMembersStore } from '@/store/useMembersStore';
 import StatCard from '@/components/StatCard';
@@ -21,13 +18,13 @@ import {
   DoorOpen,
   Bed,
   Plus,
+  ChevronRight,
 } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function DashboardScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const user = useStore((state) => state.user);
   const { properties, activePropertyId, loadProperties, syncBedOccupancyWithMembers } =
     usePropertiesStore();
   const { members, loadMembers } = useMembersStore();
@@ -41,11 +38,11 @@ export default function DashboardScreen() {
     initializeData();
   }, []);
 
-  const analytics = useMemo(() => {
-    const activeProperty =
-      properties.find((property) => property.id === activePropertyId) ??
-      properties[0];
+  const activeProperty = useMemo(() => {
+    return properties.find((property) => property.id === activePropertyId) ?? properties[0];
+  }, [properties, activePropertyId]);
 
+  const analytics = useMemo(() => {
     const activeProperties = activeProperty ? [activeProperty] : [];
     const totalProperties = activeProperties.length;
     const totalBuildings = activeProperties.reduce(
@@ -121,7 +118,7 @@ export default function DashboardScreen() {
       availableBeds,
       activePropertyId: activeProperty?.id,
     };
-  }, [properties, activePropertyId]);
+  }, [activeProperty]);
 
   const handleCreateProperty = () => {
     router.push('/wizard/property-details');
@@ -172,50 +169,45 @@ export default function DashboardScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.section}>
-          <View style={styles.bedsGrid}>
+      <View style={styles.content}>
+        {/* Header Section */}
+        <Animated.View 
+          entering={FadeInDown.duration(400)}
+          style={[styles.header, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
+        >
+          <View style={styles.headerContent}>
             <TouchableOpacity
-              style={styles.bedCardWrap}
+              onPress={() => router.push('/properties')}
+              activeOpacity={0.7}
+              style={[styles.propertyButton, { borderColor: theme.cardBorder }]}
+            >
+              <View style={styles.propertyButtonContent}>
+                <View>
+                  <Text style={[styles.propertyLabel, { color: theme.textSecondary }]}>Property</Text>
+                  <Text style={[styles.propertyName, { color: theme.text }]}>
+                    {activeProperty?.name || 'No Property'}
+                  </Text>
+                </View>
+                <ChevronRight size={20} color={theme.textSecondary} strokeWidth={2.5} />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {/* Main Stats Grid */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Overview</Text>
+          <View style={styles.statsGrid}>
+            <TouchableOpacity
+              style={styles.statCardWrap}
               onPress={() => router.push('/beds/total')}
               activeOpacity={0.7}
             >
               <StatCard
                 icon={Bed}
-                label="Total Beds"
+                label="Beds"
                 value={analytics.totalBeds}
                 delay={0}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.bedCardWrap}
-              onPress={() => router.push('/beds/available')}
-              activeOpacity={0.7}
-            >
-              <StatCard
-                icon={Bed}
-                label="Available Beds"
-                value={analytics.availableBeds}
-                delay={50}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.statsGrid}>
-            <TouchableOpacity
-              style={styles.statCardWrap}
-              onPress={() =>
-                router.push('/properties')
-              }
-              activeOpacity={0.7}
-            >
-              <StatCard
-                icon={Home}
-                label="Properties"
-                value={analytics.totalProperties}
-                delay={150}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -229,7 +221,7 @@ export default function DashboardScreen() {
                 icon={Building2}
                 label="Buildings"
                 value={analytics.totalBuildings}
-                delay={200}
+                delay={50}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -243,7 +235,7 @@ export default function DashboardScreen() {
                 icon={Layers}
                 label="Floors"
                 value={analytics.totalFloors}
-                delay={250}
+                delay={100}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -257,12 +249,12 @@ export default function DashboardScreen() {
                 icon={DoorOpen}
                 label="Rooms"
                 value={analytics.totalRooms}
-                delay={300}
+                delay={150}
               />
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -272,25 +264,59 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 16,
+    flex: 1,
+    paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 100,
-    gap: 24,
+    paddingBottom: 112,
+    gap: 12,
+  },
+  header: {
+    marginTop: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  headerContent: {
+    gap: 8,
+  },
+  propertyButton: {
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+  },
+  propertyButtonContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  propertyLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  propertyName: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   section: {
-    gap: 16,
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-  },
-  bedsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  bedCardWrap: {
-    flex: 1,
+    gap: 10,
   },
   statCardWrap: {
     flexBasis: '48%',

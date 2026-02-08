@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
     Alert,
     Platform,
@@ -9,11 +9,13 @@ import {
     ScrollView,
     TouchableOpacity,
     TextInput,
+    BackHandler,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
+import { useWebBackHandler } from '@/hooks/useWebBackHandler';
 import {
     Bed,
     Building2,
@@ -29,11 +31,13 @@ import {
 export default function PropertyDetailsScreen() {
     const theme = useTheme();
     const router = useRouter();
+    const navigation = useNavigation();
     const { id, source } = useLocalSearchParams<{ id?: string; source?: string }>();
     const { properties, loadProperties, removeProperty, updateProperty } = usePropertiesStore();
     const [isEditing, setIsEditing] = useState(false);
     const [draftName, setDraftName] = useState('');
     const [draftCity, setDraftCity] = useState('');
+    const isHandlingBack = useRef(false);
 
     useEffect(() => {
         loadProperties();
@@ -73,13 +77,43 @@ export default function PropertyDetailsScreen() {
 
     const isDashboardFlow = source === 'dashboard';
 
-    const handleBack = () => {
+    const handleBack = useCallback(() => {
+        isHandlingBack.current = true;
         if (isDashboardFlow) {
             router.back();
             return;
         }
         router.replace('/settings/property-details' as '/settings/property-details/index');
-    };
+    }, [isDashboardFlow, router]);
+
+    useFocusEffect(
+        useCallback(() => {
+            const onBackPress = () => {
+                handleBack();
+                return true;
+            };
+
+            const subscription = BackHandler.addEventListener(
+                'hardwareBackPress',
+                onBackPress,
+            );
+
+            const beforeRemove = navigation.addListener('beforeRemove', (event) => {
+                if (isHandlingBack.current) {
+                    return;
+                }
+                event.preventDefault();
+                handleBack();
+            });
+
+            return () => {
+                subscription.remove();
+                beforeRemove();
+            };
+        }, [handleBack, navigation]),
+    );
+
+    useWebBackHandler(handleBack);
 
     const handleEditProperty = () => {
         if (!selectedProperty) {

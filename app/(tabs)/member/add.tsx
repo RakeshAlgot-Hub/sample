@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -217,10 +217,20 @@ export default function AddMemberScreen() {
       createdAt: new Date().toISOString(),
     });
 
+    // Clear form state
+    setName('');
+    setPhone('');
+    setVillageName('');
+    setJoinedDate('');
+    setProofId('');
+    setProfilePic(null);
+    setSelectedBed(null);
+    setValidationError(null);
+
     router.replace('/members');
   };
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (paramFrom === 'total') {
       router.replace('/beds/total');
       return;
@@ -232,7 +242,7 @@ export default function AddMemberScreen() {
     }
 
     router.back();
-  };
+  }, [paramFrom, router]);
 
   if (!selectedBed && !hasBedParams) {
     return (

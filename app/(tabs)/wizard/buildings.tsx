@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,7 @@ export default function BuildingsScreen() {
     nextStep,
     previousStep,
     resetWizard,
+    editingPropertyId,
   } = useWizardStore();
 
   const [newBuildingName, setNewBuildingName] = useState('');
@@ -41,15 +42,22 @@ export default function BuildingsScreen() {
   const [editingName, setEditingName] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     resetWizard();
-    router.back();
-  };
+    if (editingPropertyId) {
+      router.replace({
+        pathname: '/settings/property-details/[id]',
+        params: { id: editingPropertyId },
+      });
+      return;
+    }
+    router.replace('/(tabs)');
+  }, [resetWizard, router, editingPropertyId]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     previousStep();
     router.back();
-  };
+  }, [previousStep, router]);
 
   const handleAddBuilding = () => {
     if (newBuildingName.trim()) {
@@ -96,14 +104,20 @@ export default function BuildingsScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <WizardTopHeader onBack={handleBack} title="Settings" />
+      <WizardTopHeader
+        onBack={handleBack}
+        title="Buildings"
+        rightAction="close"
+        onClose={handleClose}
+      />
       <WizardHeader
         currentStep={2}
         totalSteps={6}
         title="Buildings"
         onClose={handleClose}
-        showClose
+        showClose={false}
         showSteps
+        showTitle={false}
       />
 
       <ScrollView
@@ -112,14 +126,11 @@ export default function BuildingsScreen() {
       >
         <View style={styles.section}>
           <View style={styles.labelContainer}>
-            <Building2 size={18} color={theme.textSecondary} strokeWidth={2} />
+            <Building2 size={16} color={theme.textSecondary} strokeWidth={2} />
             <Text style={[styles.label, { color: theme.text }]}>
               Add Buildings
             </Text>
           </View>
-          <Text style={[styles.description, { color: theme.textSecondary }]}>
-            Add at least one building to continue
-          </Text>
 
           <View style={styles.inputRow}>
             <TextInput
@@ -131,7 +142,7 @@ export default function BuildingsScreen() {
                   color: theme.text,
                 },
               ]}
-              placeholder="Building name (e.g., Block A)"
+              placeholder="Building name"
               placeholderTextColor={theme.textSecondary}
               value={newBuildingName}
               onChangeText={setNewBuildingName}
@@ -151,7 +162,7 @@ export default function BuildingsScreen() {
               disabled={!newBuildingName.trim()}
               activeOpacity={0.7}
             >
-              <Plus size={20} color="#ffffff" strokeWidth={2} />
+              <Plus size={18} color="#ffffff" strokeWidth={2} />
             </TouchableOpacity>
           </View>
         </View>
@@ -293,7 +304,7 @@ export default function BuildingsScreen() {
         onNext={handleNext}
         nextLabel="Next"
         nextDisabled={!canProceed}
-        showBack={true}
+        showBack={false}
       />
       <ConfirmModal
         visible={pendingDeleteId !== null}
@@ -316,19 +327,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    gap: 24,
+    padding: 16,
+    paddingBottom: 100,
+    gap: 14,
   },
   section: {
-    gap: 12,
+    gap: 8,
   },
   labelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   description: {
@@ -337,35 +349,35 @@ const styles = StyleSheet.create({
   },
   inputRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   input: {
     flex: 1,
-    height: 52,
+    height: 44,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
   },
   addButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
   },
   buildingsList: {
-    gap: 12,
+    gap: 8,
   },
   buildingCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
   },
@@ -373,40 +385,40 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   buildingIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buildingName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buildingActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
     width: 36,
     height: 36,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  buildingName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  buildingActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  actionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   editContainer: {
     flex: 1,
-    gap: 12,
+    gap: 10,
   },
   editInput: {
-    height: 44,
+    height: 40,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
-    fontSize: 16,
+    fontSize: 14,
   },
   editActions: {
     flexDirection: 'row',
@@ -414,18 +426,18 @@ const styles = StyleSheet.create({
   },
   editButton: {
     flex: 1,
-    height: 36,
+    height: 34,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   editButtonText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   cancelText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   emptyCard: {

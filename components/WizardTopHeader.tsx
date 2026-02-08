@@ -1,23 +1,29 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, MoreVertical, Settings } from 'lucide-react-native';
+import { ChevronLeft, MoreVertical, Settings, X } from 'lucide-react-native';
 import { useTheme } from '@/theme/useTheme';
 
 interface WizardTopHeaderProps {
     title?: string;
     onBack: () => void;
     showMenu?: boolean;
+    rightAction?: 'menu' | 'close' | 'none';
+    onClose?: () => void;
 }
 
 export default function WizardTopHeader({
     title = 'Settings',
     onBack,
     showMenu = true,
+    rightAction,
+    onClose,
 }: WizardTopHeaderProps) {
     const theme = useTheme();
     const router = useRouter();
     const [menuVisible, setMenuVisible] = useState(false);
+
+    const resolvedAction = rightAction ?? (showMenu ? 'menu' : 'none');
 
     const handleSettingsPress = () => {
         setMenuVisible(false);
@@ -34,7 +40,7 @@ export default function WizardTopHeader({
                 <ChevronLeft size={18} color={theme.text} strokeWidth={2} />
             </TouchableOpacity>
             <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
-            {showMenu ? (
+            {resolvedAction === 'menu' ? (
                 <TouchableOpacity
                     style={styles.menuButton}
                     onPress={() => setMenuVisible(true)}
@@ -42,11 +48,19 @@ export default function WizardTopHeader({
                 >
                     <MoreVertical size={20} color={theme.text} strokeWidth={2} />
                 </TouchableOpacity>
+            ) : resolvedAction === 'close' ? (
+                <TouchableOpacity
+                    style={[styles.menuButton, { backgroundColor: theme.inputBackground }]}
+                    onPress={onClose}
+                    activeOpacity={0.7}
+                >
+                    <X size={18} color={theme.text} strokeWidth={2} />
+                </TouchableOpacity>
             ) : (
                 <View style={styles.menuButton} />
             )}
 
-            {showMenu && (
+            {resolvedAction === 'menu' && (
                 <Modal
                     visible={menuVisible}
                     transparent
@@ -113,10 +127,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         borderWidth: 1,
         minWidth: 180,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
+        boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.25)',
         elevation: 5,
     },
     menuItem: {

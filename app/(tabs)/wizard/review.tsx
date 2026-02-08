@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  BackHandler,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
@@ -109,15 +110,50 @@ export default function ReviewScreen() {
 
   const isValid = validationErrors.length === 0 && allowedBedCounts.length > 0;
 
-  const handleClose = () => {
-    resetWizard();
-    router.back();
-  };
+  const getEmptyFloors = useMemo(() => {
+    const empty = [];
+    for (const building of buildings) {
+      for (const floor of building.floors) {
+        if (!floor.rooms || floor.rooms.length === 0) {
+          empty.push({ buildingName: building.name, floorLabel: floor.label });
+        }
+      }
+    }
+    return empty;
+  }, [buildings]);
 
-  const handleBack = () => {
+  const handleClose = useCallback(() => {
+    resetWizard();
+    if (editingPropertyId) {
+      router.replace({
+        pathname: '/settings/property-details/[id]',
+        params: { id: editingPropertyId },
+      });
+      return;
+    }
+    router.replace('/(tabs)');
+  }, [resetWizard, router, editingPropertyId]);
+
+  const handleBack = useCallback(() => {
     previousStep();
     router.back();
-  };
+  }, [previousStep, router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
 
   const isEditing = Boolean(editingPropertyId);
 
@@ -126,6 +162,14 @@ export default function ReviewScreen() {
 
     setIsSaving(true);
 
+    // Remove empty floors and buildings before saving
+    const cleanedBuildings = buildings
+      .map(b => ({
+        ...b,
+        floors: b.floors.filter(f => f.rooms && f.rooms.length > 0),
+      }))
+      .filter(b => b.floors.length > 0);
+
     if (isEditing && editingPropertyId) {
       const existing = properties.find((p) => p.id === editingPropertyId);
 
@@ -133,7 +177,8 @@ export default function ReviewScreen() {
         name: propertyDetails.name,
         type: propertyDetails.type,
         city: propertyDetails.city,
-        buildings: buildings,
+        area: propertyDetails.area,
+        buildings: cleanedBuildings,
         bedPricing,
         totalRooms: totals.totalRooms,
         totalBeds: totals.totalBeds,
@@ -145,7 +190,8 @@ export default function ReviewScreen() {
         name: propertyDetails.name,
         type: propertyDetails.type,
         city: propertyDetails.city,
-        buildings: buildings,
+        area: propertyDetails.area,
+        buildings: cleanedBuildings,
         bedPricing,
         totalRooms: totals.totalRooms,
         totalBeds: totals.totalBeds,
@@ -193,14 +239,20 @@ export default function ReviewScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <WizardTopHeader onBack={handleBack} title="Settings" />
+      <WizardTopHeader
+        onBack={handleBack}
+        title="Review"
+        rightAction="close"
+        onClose={handleClose}
+      />
       <WizardHeader
         currentStep={6}
         totalSteps={6}
         title="Review"
         onClose={handleClose}
-        showClose
+        showClose={false}
         showSteps
+        showTitle={false}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -227,6 +279,35 @@ export default function ReviewScreen() {
                 </Text>
               ))}
             </View>
+          </View>
+        )}
+
+        {getEmptyFloors.length > 0 && (
+          <View
+            style={[
+              styles.validationCard,
+              { backgroundColor: theme.warning + '15', borderColor: theme.warning || theme.accent },
+            ]}
+          >
+            <View style={styles.validationHeader}>
+              <AlertCircle size={20} color={theme.warning || theme.accent} strokeWidth={2} />
+              <Text style={[styles.validationTitle, { color: theme.warning || theme.accent }]}>
+                Empty Floors to Remove
+              </Text>
+            </View>
+            <View style={styles.validationList}>
+              {getEmptyFloors.map((item, index) => (
+                <Text
+                  key={index}
+                  style={[styles.validationError, { color: theme.textSecondary }]}
+                >
+                  • Floor {item.floorLabel} in {item.buildingName} (no rooms created)
+                </Text>
+              ))}
+            </View>
+            <Text style={[styles.validationNote, { color: theme.textSecondary }]}>
+              These floors will be automatically removed when you save.
+            </Text>
           </View>
         )}
 
@@ -292,7 +373,7 @@ export default function ReviewScreen() {
         onNext={isSaving ? undefined : handleFinish}
         nextLabel={isSaving ? 'Saving...' : isEditing ? 'Save Changes' : 'Confirm & Save'}
         nextDisabled={!isValid || isSaving}
-        showBack={!isSaving}
+        showBack={false}
       />
     </SafeAreaView>
   );
@@ -328,6 +409,11 @@ const styles = StyleSheet.create({
   validationError: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  validationNote: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontStyle: 'italic',
   },
   sectionTitle: {
     fontSize: 18,

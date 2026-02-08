@@ -106,7 +106,7 @@ export default function EditableRoomCard({
               {getShareTypeLabel(shareType, resolvedBedCount)}
             </Text>
             <View style={styles.bedPreview}>
-              {Array.from({ length: resolvedBedCount }).map((_, index) => (
+              {Array.from({ length: Math.min(resolvedBedCount, 3) }).map((_, index) => (
                 <Bed
                   key={index}
                   size={14}
@@ -114,6 +114,11 @@ export default function EditableRoomCard({
                   strokeWidth={2}
                 />
               ))}
+              {resolvedBedCount > 3 && (
+                <View style={[styles.bedBadge, { backgroundColor: theme.primary + '20' }]}>
+                  <Text style={[styles.bedBadgeText, { color: theme.primary }]}>+{resolvedBedCount - 3}</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -164,7 +169,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
   },
@@ -172,7 +177,8 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    minWidth: 0,
   },
   roomIcon: {
     width: 40,
@@ -180,42 +186,56 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   roomDetails: {
     flex: 1,
     gap: 4,
+    minWidth: 0,
   },
   roomNumber: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   editInput: {
-    height: 40,
+    height: 36,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
-    fontSize: 16,
+    fontSize: 15,
   },
   shareTypeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flexWrap: 'wrap',
   },
   shareType: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   bedPreview: {
     flexDirection: 'row',
-    gap: 4,
+    alignItems: 'center',
+    gap: 3,
+  },
+  bedBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  bedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   actions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
+    flexShrink: 0,
   },
   actionButton: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,9 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  BackHandler,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
@@ -30,6 +31,7 @@ export default function FloorsScreen() {
     nextStep,
     previousStep,
     resetWizard,
+    editingPropertyId,
   } = useWizardStore();
 
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>(
@@ -71,15 +73,38 @@ export default function FloorsScreen() {
     : [];
   const existingFloorLabels = floors.map((f) => f.label);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     resetWizard();
-    router.back();
-  };
+    if (editingPropertyId) {
+      router.replace({
+        pathname: '/settings/property-details/[id]',
+        params: { id: editingPropertyId },
+      });
+      return;
+    }
+    router.replace('/(tabs)');
+  }, [resetWizard, router, editingPropertyId]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     previousStep();
     router.back();
-  };
+  }, [previousStep, router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
 
   const handleSelectFloors = (floors: string[]) => {
     if (!selectedBuildingId) {
@@ -158,14 +183,20 @@ export default function FloorsScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <WizardTopHeader onBack={handleBack} title="Settings" />
+      <WizardTopHeader
+        onBack={handleBack}
+        title="Floors"
+        rightAction="close"
+        onClose={handleClose}
+      />
       <WizardHeader
         currentStep={3}
         totalSteps={6}
         title="Floors"
         onClose={handleClose}
-        showClose
+        showClose={false}
         showSteps
+        showTitle={false}
       />
 
       <ScrollView
@@ -173,9 +204,7 @@ export default function FloorsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Select Building
-          </Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Building</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -241,9 +270,9 @@ export default function FloorsScreen() {
         {selectedBuilding && (
           <View style={styles.section}>
             <View style={styles.labelContainer}>
-              <Layers size={18} color={theme.textSecondary} strokeWidth={2} />
+              <Layers size={16} color={theme.textSecondary} strokeWidth={2} />
               <Text style={[styles.label, { color: theme.text }]}>
-                Select Floors for {selectedBuilding.name}
+                Floors for {selectedBuilding.name}
               </Text>
             </View>
 
@@ -298,7 +327,7 @@ export default function FloorsScreen() {
         onNext={handleNext}
         nextLabel="Next"
         nextDisabled={!canProceed}
-        showBack={true}
+          showBack={false}
       />
       <ConfirmModal
         visible={pendingDelete !== null}
@@ -321,65 +350,66 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    gap: 24,
+    padding: 16,
+    paddingBottom: 100,
+    gap: 14,
   },
   section: {
-    gap: 12,
+    gap: 8,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
   },
   buildingTabs: {
-    gap: 12,
+    gap: 8,
     paddingVertical: 4,
   },
   buildingTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 2,
-    gap: 8,
+    gap: 6,
   },
   buildingTabText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   floorCount: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     justifyContent: 'center',
     alignItems: 'center',
   },
   floorCountText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   labelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   floorsList: {
-    gap: 12,
+    gap: 8,
   },
   addSelectedButton: {
-    height: 44,
-    borderRadius: 12,
+    height: 40,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   addSelectedText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
 });

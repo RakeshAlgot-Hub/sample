@@ -9,6 +9,7 @@ interface WizardHeaderProps {
   onClose: () => void;
   showClose?: boolean;
   showSteps?: boolean;
+  showTitle?: boolean;
 }
 
 export default function WizardHeader({
@@ -18,6 +19,7 @@ export default function WizardHeader({
   onClose,
   showClose = true,
   showSteps = true,
+  showTitle = true,
 }: WizardHeaderProps) {
   const theme = useTheme();
 
@@ -25,7 +27,9 @@ export default function WizardHeader({
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, !showClose && styles.headerNoClose]}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+          {showTitle && (
+            <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+          )}
         </View>
         {showClose && (
           <TouchableOpacity

@@ -5,8 +5,10 @@ import {
     SafeAreaView,
     ScrollView,
     TouchableOpacity,
+    BackHandler,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { useTheme } from '@/theme/useTheme';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import {
@@ -37,6 +39,26 @@ type SettingsSection = {
 export default function SettingsScreen() {
     const theme = useTheme();
     const router = useRouter();
+
+    const handleBack = useCallback(() => {
+        router.back();
+    }, [router]);
+
+    useFocusEffect(
+        useCallback(() => {
+            const onBackPress = () => {
+                handleBack();
+                return true;
+            };
+
+            const subscription = BackHandler.addEventListener(
+                'hardwareBackPress',
+                onBackPress,
+            );
+
+            return () => subscription.remove();
+        }, [handleBack]),
+    );
     const sections: SettingsSection[] = [
         {
             title: 'Settings',
@@ -90,7 +112,7 @@ export default function SettingsScreen() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-            <WizardTopHeader title="Settings" onBack={() => router.back()} showMenu={false} />
+            <WizardTopHeader title="Settings" onBack={handleBack} showMenu={false} />
             <ScrollView contentContainerStyle={styles.content}>
                 {sections.map((section) => (
                     <View key={section.title} style={styles.section}>

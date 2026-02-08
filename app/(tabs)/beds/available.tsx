@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import {
     View,
     Text,
@@ -19,6 +19,10 @@ export default function AvailableBedsScreen() {
     const { properties, activePropertyId, loadProperties, syncBedOccupancyWithMembers } = usePropertiesStore();
     const { members, loadMembers } = useMembersStore();
 
+    const handleBack = useCallback(() => {
+        router.back();
+    }, [router]);
+
     useEffect(() => {
         const loadData = async () => {
             await loadProperties();
@@ -38,7 +42,7 @@ export default function AvailableBedsScreen() {
     if (!activeProperty) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-                <WizardTopHeader title="Available Beds" onBack={() => router.back()} showMenu={false} />
+                <WizardTopHeader title="Available Beds" onBack={handleBack} showMenu={false} />
                 <View style={styles.emptyState}>
                     <Text style={[styles.emptyTitle, { color: theme.text }]}>No properties</Text>
                     <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Create a property first.</Text>
@@ -49,7 +53,7 @@ export default function AvailableBedsScreen() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-            <WizardTopHeader title="Available Beds" onBack={() => router.back()} showMenu={false} />
+            <WizardTopHeader title="Available Beds" onBack={handleBack} showMenu={false} />
             <ScrollView contentContainerStyle={styles.content}>
                 {activeProperty.buildings.map((building) => (
                     <View key={building.id} style={styles.section}>

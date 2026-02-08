@@ -28,6 +28,7 @@ const initialPropertyDetails: PropertyDetails = {
   name: '',
   type: null,
   city: '',
+  area: '',
 };
 
 const initialState: WizardState = {
@@ -197,6 +198,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
         name: property.name,
         type: property.type,
         city: property.city,
+        area: property.area,
       },
       buildings: property.buildings,
       allowedBedCounts: Array.from(bedCounts).sort((a, b) => a - b),

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   Alert,
   View,
@@ -8,8 +8,9 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  BackHandler,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
@@ -32,6 +33,7 @@ export default function ShareTypesScreen() {
     nextStep,
     previousStep,
     resetWizard,
+    editingPropertyId,
   } = useWizardStore();
 
   const [selectedCounts, setSelectedCounts] = useState<number[]>(allowedBedCounts);
@@ -60,15 +62,38 @@ export default function ShareTypesScreen() {
     setPricingByCount(mapped);
   }, [allowedBedCounts, bedPricing]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     resetWizard();
-    router.back();
-  };
+    if (editingPropertyId) {
+      router.replace({
+        pathname: '/settings/property-details/[id]',
+        params: { id: editingPropertyId },
+      });
+      return;
+    }
+    router.replace('/(tabs)');
+  }, [resetWizard, router, editingPropertyId]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     previousStep();
     router.back();
-  };
+  }, [previousStep, router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
 
   const handleToggleBedCount = (count: number) => {
     setSelectedCounts((prev) => {
@@ -146,27 +171,32 @@ export default function ShareTypesScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <WizardTopHeader onBack={handleBack} title="Settings" />
+      <WizardTopHeader
+        onBack={handleBack}
+        title="Share Types"
+        rightAction="close"
+        onClose={handleClose}
+      />
       <WizardHeader
         currentStep={4}
         totalSteps={6}
         title="Share Types"
         onClose={handleClose}
-        showClose
+        showClose={false}
         showSteps
+        showTitle={false}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
           <View style={styles.labelContainer}>
-            <Bed size={18} color={theme.textSecondary} strokeWidth={2} />
-            <Text style={[styles.label, { color: theme.text }]}>
-              Select Allowed Bed Counts per Room
+            <Bed size={16} color={theme.textSecondary} strokeWidth={2} />
+            <Text style={[styles.label, { color: theme.text }]}
+            >
+              Room Types & Pricing
+              <Text style={[styles.required, { color: theme.accent }]}> *</Text>
             </Text>
           </View>
-          <Text style={[styles.description, { color: theme.textSecondary }]}>
-            These represent the different room configurations your property supports.
-          </Text>
 
           <View style={styles.bedCountContainer}>
             {mergedCounts.map((count) => {
@@ -312,7 +342,7 @@ export default function ShareTypesScreen() {
         onNext={handleNext}
         nextLabel="Next"
         nextDisabled={!canProceed}
-        showBack={true}
+        showBack={false}
       />
     </SafeAreaView>
   );
@@ -324,47 +354,51 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    gap: 24,
+    paddingBottom: 100,
+    gap: 14,
   },
   section: {
-    gap: 12,
+    gap: 10,
   },
   labelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
+  },
+  required: {
+    fontSize: 14,
   },
   description: {
     fontSize: 14,
     lineHeight: 20,
   },
   bedCountContainer: {
-    gap: 12,
-  },
-  bedCountCard: {
     gap: 10,
   },
+  bedCountCard: {
+    gap: 8,
+  },
   cardHeader: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     padding: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
   bedCountButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     borderWidth: 1,
   },
   bedCountText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
   },
   inlinePricing: {
@@ -372,31 +406,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 8,
+    gap: 6,
   },
   inlinePriceInput: {
-    height: 36,
-    minWidth: 80,
-    paddingHorizontal: 10,
-    borderRadius: 10,
+    height: 32,
+    minWidth: 70,
+    paddingHorizontal: 8,
+    borderRadius: 8,
     borderWidth: 1,
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'right',
   },
   periodRow: {
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   periodOption: {
-    height: 32,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    height: 28,
+    paddingHorizontal: 10,
+    borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   periodOptionText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'capitalize',
   },
@@ -405,32 +439,32 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   customLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
   customRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   customInput: {
     flex: 1,
-    height: 46,
+    height: 40,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    fontSize: 15,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
   },
   customButton: {
-    height: 46,
-    paddingHorizontal: 18,
-    borderRadius: 12,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   customButtonText: {
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
   },
 });

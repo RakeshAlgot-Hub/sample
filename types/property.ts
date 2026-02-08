@@ -1,4 +1,4 @@
-export type PropertyType = 'Hostel/PG' | 'Apartment';
+export type PropertyType = 'Hostel/PG' | 'Apartments';
 export type ShareType = 'single' | 'double' | 'triple';
 export type BillingPeriod = 'monthly' | 'weekly' | 'hourly' | 'yearly';
 
@@ -37,6 +37,7 @@ export interface PropertyDetails {
   name: string;
   type: PropertyType | null;
   city: string;
+  area?: string;
 }
 
 export interface Property {
@@ -44,6 +45,7 @@ export interface Property {
   name: string;
   type: PropertyType;
   city: string;
+  area?: string;
   buildings: Building[];
   bedPricing: BedPricing[];
   totalRooms: number;
