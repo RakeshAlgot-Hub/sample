@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ export default function MembersScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { members, loadMembers, removeMember } = useMembersStore();
-  const { activePropertyId, loadProperties } = usePropertiesStore();
+  const { activePropertyId, loadProperties, properties } = usePropertiesStore();
 
   useEffect(() => {
     loadMembers();
@@ -36,6 +36,10 @@ export default function MembersScreen() {
   const visibleMembers = activePropertyId
     ? members.filter((member) => member.propertyId === activePropertyId)
     : members;
+
+  const activeProperty = useMemo(() => {
+    return properties.find((property) => property.id === activePropertyId) ?? null;
+  }, [properties, activePropertyId]);
 
   if (visibleMembers.length === 0) {
     return (
@@ -95,7 +99,7 @@ export default function MembersScreen() {
         onPress={handleAddMember}
         activeOpacity={0.8}
       >
-        <Plus size={24} color="#ffffff" strokeWidth={2} />
+        <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -156,6 +160,18 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
     gap: 14,
   },
+  sectionHeader: {
+    gap: 4,
+    marginBottom: 4,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   fab: {
     position: 'absolute',
     right: 20,
@@ -167,5 +183,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.3)',
     elevation: 8,
+  },
+  fabText: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '700',
+    lineHeight: 30,
   },
 });

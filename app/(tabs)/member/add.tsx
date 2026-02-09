@@ -12,12 +12,13 @@ import {
   Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/theme/useTheme';
 import { useMembersStore } from '@/store/useMembersStore';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
 import WizardTopHeader from '@/components/WizardTopHeader';
-import { AlertCircle, Camera } from 'lucide-react-native';
+import { AlertCircle, Camera, User, Phone, MapPin, BadgeCheck } from 'lucide-react-native';
 import { Image } from 'react-native';
 
 type SelectedBed = {
@@ -69,9 +70,22 @@ export default function AddMemberScreen() {
   const [phone, setPhone] = useState('');
   const [villageName, setVillageName] = useState('');
   const [joinedDate, setJoinedDate] = useState('');
+  const [joinedDateValue, setJoinedDateValue] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [proofId, setProofId] = useState('');
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const today = useMemo(() => new Date(), []);
+  const minJoinedDate = useMemo(() => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 2);
+    return date;
+  }, []);
+  const maxJoinedDate = useMemo(() => {
+    const date = new Date();
+    date.setMonth(date.getMonth() + 1);
+    return date;
+  }, []);
 
   useEffect(() => {
     loadProperties();
@@ -168,6 +182,19 @@ export default function AddMemberScreen() {
     );
   };
 
+  const formatDate = (value: Date) => value.toISOString().slice(0, 10);
+
+  const handleDateChange = (_event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+
+    if (selectedDate) {
+      setJoinedDateValue(selectedDate);
+      setJoinedDate(formatDate(selectedDate));
+    }
+  };
+
   const handleSubmit = async () => {
     setValidationError(null);
 
@@ -181,8 +208,19 @@ export default function AddMemberScreen() {
       return;
     }
 
+    if (name.trim().length > 20) {
+      setValidationError('Name must be 20 characters or less.');
+      return;
+    }
+
     if (!phone.trim()) {
       setValidationError('Please enter a mobile number.');
+      return;
+    }
+
+    const normalizedPhone = phone.trim();
+    if (!/^[0-9]{8,15}$/.test(normalizedPhone)) {
+      setValidationError('Mobile number must be 8 to 15 digits.');
       return;
     }
 
@@ -191,8 +229,13 @@ export default function AddMemberScreen() {
       return;
     }
 
-    if (!joinedDate.trim()) {
+    if (!joinedDate.trim() || !joinedDateValue) {
       setValidationError('Please enter a joined date.');
+      return;
+    }
+
+    if (joinedDateValue < minJoinedDate || joinedDateValue > maxJoinedDate) {
+      setValidationError('Joined date must be within the last 2 years and up to 1 month ahead.');
       return;
     }
 
@@ -201,10 +244,15 @@ export default function AddMemberScreen() {
       return;
     }
 
+    if (proofId.trim().length > 20) {
+      setValidationError('Proof ID must be 20 characters or less.');
+      return;
+    }
+
     await addMember({
       id: Date.now().toString(),
       name: name.trim(),
-      phone: phone.trim(),
+      phone: normalizedPhone,
       villageName: villageName.trim(),
       joinedDate: joinedDate.trim(),
       proofId: proofId.trim(),
@@ -222,6 +270,7 @@ export default function AddMemberScreen() {
     setPhone('');
     setVillageName('');
     setJoinedDate('');
+    setJoinedDateValue(null);
     setProofId('');
     setProfilePic(null);
     setSelectedBed(null);
@@ -231,13 +280,8 @@ export default function AddMemberScreen() {
   };
 
   const handleBack = useCallback(() => {
-    if (paramFrom === 'total') {
-      router.replace('/beds/total');
-      return;
-    }
-
-    if (paramFrom === 'available') {
-      router.replace('/beds/available');
+    if (paramFrom === 'total' || paramFrom === 'available') {
+      router.replace('/members');
       return;
     }
 
@@ -265,7 +309,10 @@ export default function AddMemberScreen() {
         >
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={styles.stepHeaderRow}>
-              <Text style={[styles.stepTitle, { color: theme.text }]}>Member Details</Text>
+              <View>
+                <Text style={[styles.stepTitle, { color: theme.text }]}>Member Details</Text>
+                <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>Add profile information</Text>
+              </View>
               <TouchableOpacity onPress={() => router.replace('/beds/available')} activeOpacity={0.7}>
                 <Text style={[styles.linkText, { color: theme.accent }]}>Change Bed</Text>
               </TouchableOpacity>
@@ -279,12 +326,10 @@ export default function AddMemberScreen() {
                 ]}
               >
                 <Text style={[styles.summaryTitle, { color: theme.text }]}>Selected Bed</Text>
-                <Text style={[styles.summaryText, { color: theme.textSecondary }]}
-                >
+                <Text style={[styles.summaryText, { color: theme.textSecondary }]}>
                   {bedSummary.propertyName} • {bedSummary.buildingName}
                 </Text>
-                <Text style={[styles.summaryText, { color: theme.textSecondary }]}
-                >
+                <Text style={[styles.summaryText, { color: theme.textSecondary }]}>
                   Floor {bedSummary.floorLabel} • Room {bedSummary.roomNumber} • Bed {bedSummary.bedNumber}
                 </Text>
               </View>
@@ -302,99 +347,16 @@ export default function AddMemberScreen() {
               </View>
             )}
 
-            <View style={styles.section}>
-              <Text style={[styles.label, { color: theme.text }]}>Full Name *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.inputBackground,
-                    borderColor: theme.inputBorder,
-                    color: theme.text,
-                  },
-                ]}
-                placeholder="Enter full name"
-                placeholderTextColor={theme.textSecondary}
-                value={name}
-                onChangeText={setName}
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.label, { color: theme.text }]}>Mobile Number *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.inputBackground,
-                    borderColor: theme.inputBorder,
-                    color: theme.text,
-                  },
-                ]}
-                placeholder="Enter mobile number"
-                placeholderTextColor={theme.textSecondary}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.label, { color: theme.text }]}>Village Name *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.inputBackground,
-                    borderColor: theme.inputBorder,
-                    color: theme.text,
-                  },
-                ]}
-                placeholder="Enter village name"
-                placeholderTextColor={theme.textSecondary}
-                value={villageName}
-                onChangeText={setVillageName}
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.label, { color: theme.text }]}>Joined Date *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.inputBackground,
-                    borderColor: theme.inputBorder,
-                    color: theme.text,
-                  },
-                ]}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={theme.textSecondary}
-                value={joinedDate}
-                onChangeText={setJoinedDate}
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.label, { color: theme.text }]}>Proof ID *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.inputBackground,
-                    borderColor: theme.inputBorder,
-                    color: theme.text,
-                  },
-                ]}
-                placeholder="Enter proof ID"
-                placeholderTextColor={theme.textSecondary}
-                value={proofId}
-                onChangeText={setProofId}
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.label, { color: theme.text }]}>Profile Picture</Text>
+            <View
+              style={[
+                styles.formCard,
+                { backgroundColor: theme.card, borderColor: theme.cardBorder },
+              ]}
+            >
+              <View style={styles.cardHeader}>
+                <User size={18} color={theme.textSecondary} />
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Profile</Text>
+              </View>
               <TouchableOpacity
                 style={[
                   styles.imagePicker,
@@ -408,11 +370,138 @@ export default function AddMemberScreen() {
                 ) : (
                   <Camera size={28} color={theme.textSecondary} />
                 )}
-                <Text style={[styles.imagePickerText, { color: theme.textSecondary }]}
-                >
+                <Text style={[styles.imagePickerText, { color: theme.textSecondary }]}>
                   {profilePic ? 'Change Picture' : 'Upload Picture'}
                 </Text>
               </TouchableOpacity>
+            </View>
+
+            <View
+              style={[
+                styles.formCard,
+                { backgroundColor: theme.card, borderColor: theme.cardBorder },
+              ]}
+            >
+              <View style={styles.cardHeader}>
+                <Phone size={18} color={theme.textSecondary} />
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Contact</Text>
+              </View>
+              <View style={styles.fieldGroup}>
+                <Text style={[styles.label, { color: theme.text }]}>Full Name *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.inputBackground,
+                      borderColor: theme.inputBorder,
+                      color: theme.text,
+                    },
+                  ]}
+                  placeholder="Enter full name"
+                  placeholderTextColor={theme.textSecondary}
+                  value={name}
+                  onChangeText={setName}
+                  maxLength={20}
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={[styles.label, { color: theme.text }]}>Mobile Number *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.inputBackground,
+                      borderColor: theme.inputBorder,
+                      color: theme.text,
+                    },
+                  ]}
+                  placeholder="Enter mobile number"
+                  placeholderTextColor={theme.textSecondary}
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                  maxLength={15}
+                />
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.formCard,
+                { backgroundColor: theme.card, borderColor: theme.cardBorder },
+              ]}
+            >
+              <View style={styles.cardHeader}>
+                <MapPin size={18} color={theme.textSecondary} />
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Additional</Text>
+              </View>
+              <View style={styles.fieldGroup}>
+                <Text style={[styles.label, { color: theme.text }]}>Village Name *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.inputBackground,
+                      borderColor: theme.inputBorder,
+                      color: theme.text,
+                    },
+                  ]}
+                  placeholder="Enter village name"
+                  placeholderTextColor={theme.textSecondary}
+                  value={villageName}
+                  onChangeText={setVillageName}
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={[styles.label, { color: theme.text }]}>Joined Date *</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.dateInput,
+                    {
+                      backgroundColor: theme.inputBackground,
+                      borderColor: theme.inputBorder,
+                    },
+                  ]}
+                  onPress={() => setShowDatePicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.dateText, { color: joinedDate ? theme.text : theme.textSecondary }]}
+                  >
+                    {joinedDate || 'Select date'}
+                  </Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={joinedDateValue ?? today}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                    minimumDate={minJoinedDate}
+                    maximumDate={maxJoinedDate}
+                    onChange={handleDateChange}
+                  />
+                )}
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={[styles.label, { color: theme.text }]}>Proof ID *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.inputBackground,
+                      borderColor: theme.inputBorder,
+                      color: theme.text,
+                    },
+                  ]}
+                  placeholder="Enter proof ID"
+                  placeholderTextColor={theme.textSecondary}
+                  value={proofId}
+                  onChangeText={setProofId}
+                  maxLength={20}
+                />
+              </View>
             </View>
 
             <TouchableOpacity
@@ -420,6 +509,7 @@ export default function AddMemberScreen() {
               onPress={handleSubmit}
               activeOpacity={0.8}
             >
+              <BadgeCheck size={18} color="#ffffff" />
               <Text style={styles.submitButtonText}>Confirm & Submit</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -451,8 +541,12 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   stepTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
+  },
+  stepSubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   stepHeaderRow: {
     flexDirection: 'row',
@@ -465,7 +559,7 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     padding: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     gap: 6,
   },
@@ -489,23 +583,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  section: {
-    gap: 10,
+  formCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 14,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  fieldGroup: {
+    gap: 8,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   input: {
     height: 48,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
     fontSize: 14,
   },
+  dateInput: {
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  dateText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   imagePicker: {
     height: 120,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -525,6 +645,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
     marginTop: 6,
   },
   submitButtonText: {

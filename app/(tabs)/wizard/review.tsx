@@ -170,6 +170,8 @@ export default function ReviewScreen() {
       }))
       .filter(b => b.floors.length > 0);
 
+    let nextPropertyId = editingPropertyId ?? null;
+
     if (isEditing && editingPropertyId) {
       const existing = properties.find((p) => p.id === editingPropertyId);
 
@@ -199,6 +201,7 @@ export default function ReviewScreen() {
       };
 
       await addProperty(newProperty);
+      nextPropertyId = newProperty.id;
 
       if (activePropertyId && activePropertyId !== newProperty.id) {
         Alert.alert(
@@ -231,7 +234,15 @@ export default function ReviewScreen() {
         return;
       }
 
-      router.replace('/settings/property-details' as '/settings/property-details/index');
+      if (nextPropertyId) {
+        router.replace({
+          pathname: '/settings/property-details/[id]',
+          params: { id: nextPropertyId, source: 'dashboard' },
+        });
+        return;
+      }
+
+      router.replace('/(tabs)');
     }, 800);
   };
 

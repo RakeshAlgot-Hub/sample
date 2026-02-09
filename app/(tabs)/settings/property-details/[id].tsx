@@ -80,7 +80,7 @@ export default function PropertyDetailsScreen() {
     const handleBack = useCallback(() => {
         isHandlingBack.current = true;
         if (isDashboardFlow) {
-            router.back();
+            router.replace('/(tabs)');
             return;
         }
         router.replace('/settings/property-details' as '/settings/property-details/index');

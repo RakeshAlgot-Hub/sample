@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Member } from '@/types/member';
 import { useTheme } from '@/theme/useTheme';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
@@ -14,6 +15,7 @@ interface MemberCardProps {
 
 export default function MemberCard({ member, onRemove }: MemberCardProps) {
   const theme = useTheme();
+  const router = useRouter();
   const { properties } = usePropertiesStore();
   const [confirmVisible, setConfirmVisible] = useState(false);
 
@@ -26,6 +28,10 @@ export default function MemberCard({ member, onRemove }: MemberCardProps) {
     setConfirmVisible(true);
   };
 
+  const handleOpenDetails = () => {
+    router.push({ pathname: '/member/[id]', params: { id: member.id } });
+  };
+
   return (
     <Animated.View
       entering={FadeIn}
@@ -36,7 +42,11 @@ export default function MemberCard({ member, onRemove }: MemberCardProps) {
         { backgroundColor: theme.card, borderColor: theme.cardBorder },
       ]}
     >
-      <View style={styles.memberInfo}>
+      <TouchableOpacity
+        style={styles.memberInfo}
+        onPress={handleOpenDetails}
+        activeOpacity={0.7}
+      >
         <View style={[styles.avatar, { backgroundColor: theme.primary + '15' }]}>
           <User size={24} color={theme.primary} strokeWidth={2} />
         </View>
@@ -73,7 +83,7 @@ export default function MemberCard({ member, onRemove }: MemberCardProps) {
             </View>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
       <TouchableOpacity
         onPress={handleRemove}
         style={[styles.removeButton, { backgroundColor: theme.error + '15' }]}
