@@ -162,88 +162,93 @@ export default function ReviewScreen() {
 
     setIsSaving(true);
 
-    // Remove empty floors and buildings before saving
-    const cleanedBuildings = buildings
-      .map(b => ({
-        ...b,
-        floors: b.floors.filter(f => f.rooms && f.rooms.length > 0),
-      }))
-      .filter(b => b.floors.length > 0);
+    try {
+      // Remove empty floors and buildings before saving
+      const cleanedBuildings = buildings
+        .map(b => ({
+          ...b,
+          floors: b.floors.filter(f => f.rooms && f.rooms.length > 0),
+        }))
+        .filter(b => b.floors.length > 0);
 
-    let nextPropertyId = editingPropertyId ?? null;
+      let nextPropertyId = editingPropertyId ?? null;
 
-    if (isEditing && editingPropertyId) {
-      const existing = properties.find((p) => p.id === editingPropertyId);
+      if (isEditing && editingPropertyId) {
+        const existing = properties.find((p) => p.id === editingPropertyId);
 
-      await updateProperty(editingPropertyId, {
-        name: propertyDetails.name,
-        type: propertyDetails.type,
-        city: propertyDetails.city,
-        area: propertyDetails.area,
-        buildings: cleanedBuildings,
-        bedPricing,
-        totalRooms: totals.totalRooms,
-        totalBeds: totals.totalBeds,
-        createdAt: existing?.createdAt ?? new Date().toISOString(),
-      });
-    } else {
-      const newProperty = {
-        id: Date.now().toString(),
-        name: propertyDetails.name,
-        type: propertyDetails.type,
-        city: propertyDetails.city,
-        area: propertyDetails.area,
-        buildings: cleanedBuildings,
-        bedPricing,
-        totalRooms: totals.totalRooms,
-        totalBeds: totals.totalBeds,
-        createdAt: new Date().toISOString(),
-      };
+        await updateProperty(editingPropertyId, {
+          name: propertyDetails.name,
+          type: propertyDetails.type,
+          city: propertyDetails.city,
+          area: propertyDetails.area,
+          buildings: cleanedBuildings,
+          bedPricing,
+          totalRooms: totals.totalRooms,
+          totalBeds: totals.totalBeds,
+          createdAt: existing?.createdAt ?? new Date().toISOString(),
+        });
+      } else {
+        const newProperty = {
+          name: propertyDetails.name,
+          type: propertyDetails.type,
+          city: propertyDetails.city,
+          area: propertyDetails.area,
+          buildings: cleanedBuildings,
+          bedPricing,
+          totalRooms: totals.totalRooms,
+          totalBeds: totals.totalBeds,
+          createdAt: new Date().toISOString(),
+        };
 
-      await addProperty(newProperty);
-      nextPropertyId = newProperty.id;
+        const created = await addProperty(newProperty);
+        nextPropertyId = created.id;
 
-      if (activePropertyId && activePropertyId !== newProperty.id) {
-        Alert.alert(
-          'Switch Property',
-          `Do you want to switch to "${newProperty.name}"?`,
-          [
-            { text: 'No', style: 'cancel' },
-            {
-              text: 'Yes',
-              onPress: () => {
-                void setActiveProperty(newProperty.id);
+        if (activePropertyId && activePropertyId !== created.id) {
+          Alert.alert(
+            'Switch Property',
+            `Do you want to switch to "${created.name}"?`,
+            [
+              { text: 'No', style: 'cancel' },
+              {
+                text: 'Yes',
+                onPress: () => {
+                  void setActiveProperty(created.id);
+                },
               },
-            },
-          ]
-        );
+            ]
+          );
+        }
       }
+
+      setIsSaving(false);
+      setShowSuccess(true);
+
+      setTimeout(() => {
+        resetWizard();
+
+        if (editingPropertyId) {
+          router.replace({
+            pathname: '/settings/property-details/[id]',
+            params: { id: editingPropertyId },
+          });
+          return;
+        }
+
+        if (nextPropertyId) {
+          router.replace({
+            pathname: '/settings/property-details/[id]',
+            params: { id: nextPropertyId, source: 'dashboard' },
+          });
+          return;
+        }
+
+        router.replace('/(tabs)');
+      }, 800);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to save property.';
+      setIsSaving(false);
+      Alert.alert('Save failed', message);
     }
-
-    setIsSaving(false);
-    setShowSuccess(true);
-
-    setTimeout(() => {
-      resetWizard();
-
-      if (editingPropertyId) {
-        router.replace({
-          pathname: '/settings/property-details/[id]',
-          params: { id: editingPropertyId },
-        });
-        return;
-      }
-
-      if (nextPropertyId) {
-        router.replace({
-          pathname: '/settings/property-details/[id]',
-          params: { id: nextPropertyId, source: 'dashboard' },
-        });
-        return;
-      }
-
-      router.replace('/(tabs)');
-    }, 800);
   };
 
   return (

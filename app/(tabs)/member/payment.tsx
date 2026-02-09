@@ -127,26 +127,30 @@ export default function MemberPaymentScreen() {
 
         const nextDue = nextDueDate || formatDateToISO(joinedDateValue);
 
-        await addMember({
-            id: Date.now().toString(),
-            name,
-            phone,
-            villageName,
-            joinedDate,
-            payDate: joinedDate,
-            paymentCycle,
-            nextDueDate: nextDue,
-            proofId,
-            profilePic: profilePic || null,
-            propertyId,
-            buildingId,
-            floorId,
-            roomId,
-            bedId,
-            createdAt: new Date().toISOString(),
-        });
+        try {
+            await addMember({
+                name,
+                phone,
+                villageName,
+                joinedDate,
+                payDate: joinedDate,
+                paymentCycle,
+                nextDueDate: nextDue,
+                proofId,
+                profilePic: profilePic || null,
+                propertyId,
+                buildingId,
+                floorId,
+                roomId,
+                bedId,
+                createdAt: new Date().toISOString(),
+            });
 
-        router.replace('/(tabs)/members');
+            router.replace('/(tabs)/members');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to save member.';
+            Alert.alert('Save failed', message);
+        }
     }, [
         addMember,
         bedId,

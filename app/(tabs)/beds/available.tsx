@@ -17,7 +17,7 @@ export default function AvailableBedsScreen() {
     const theme = useTheme();
     const router = useRouter();
     const { properties, activePropertyId, loadProperties, syncBedOccupancyWithMembers } = usePropertiesStore();
-    const { members, loadMembers } = useMembersStore();
+    const { loadMembers } = useMembersStore();
 
     const handleBack = useCallback(() => {
         router.back();
@@ -26,8 +26,8 @@ export default function AvailableBedsScreen() {
     useEffect(() => {
         const loadData = async () => {
             await loadProperties();
-            await loadMembers();
-            await syncBedOccupancyWithMembers(members);
+            const loadedMembers = await loadMembers();
+            await syncBedOccupancyWithMembers(loadedMembers);
         };
         loadData();
     }, []);

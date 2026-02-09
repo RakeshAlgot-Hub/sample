@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Property } from '@/types/property';
+import { Member } from '@/types/member';
+import { propertiesApi, CreatePropertyInput } from '@/services/propertiesApi';
 
 interface PropertiesStore {
   properties: Property[];
   activePropertyId: string | null;
-  addProperty: (property: Property) => Promise<void>;
+  addProperty: (property: CreatePropertyInput) => Promise<Property>;
   removeProperty: (id: string) => Promise<void>;
   updateProperty: (id: string, updates: Partial<Property>) => Promise<void>;
   setActiveProperty: (id: string | null) => Promise<void>;
@@ -17,33 +18,49 @@ interface PropertiesStore {
     bedId: string,
     occupied: boolean
   ) => Promise<void>;
-  syncBedOccupancyWithMembers: (members: any[]) => Promise<void>;
-  loadProperties: () => Promise<void>;
-  saveProperties: () => Promise<void>;
+  syncBedOccupancyWithMembers: (members: Member[]) => Promise<void>;
+  loadProperties: () => Promise<Property[]>;
   reset: () => void;
 }
+
+const normalizeBedPricing = (property: Property): Property => {
+  const normalizedPricing = (property.bedPricing ?? []).map((entry: any) => ({
+    bedCount: entry.bedCount,
+    dailyPrice: Number(entry.dailyPrice ?? entry.price ?? 0),
+    monthlyPrice: Number(entry.monthlyPrice ?? entry.price ?? 0),
+  }));
+
+  return {
+    ...property,
+    bedPricing: normalizedPricing,
+  };
+};
 
 export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
   properties: [],
   activePropertyId: null,
 
-  addProperty: async (property: Property) => {
+  addProperty: async (property: CreatePropertyInput) => {
+    const created = normalizeBedPricing(await propertiesApi.create(property));
+
     set((state) => ({
-      properties: [...state.properties, property],
+      properties: [...state.properties, created],
     }));
-    await get().saveProperties();
 
     const { activePropertyId } = get();
     if (!activePropertyId) {
-      await get().setActiveProperty(property.id);
+      await get().setActiveProperty(created.id);
     }
+
+    return created;
   },
 
   removeProperty: async (id: string) => {
+    await propertiesApi.remove(id);
+
     set((state) => ({
       properties: state.properties.filter((p) => p.id !== id),
     }));
-    await get().saveProperties();
 
     const { activePropertyId, properties } = get();
     if (activePropertyId === id) {
@@ -53,21 +70,17 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
   },
 
   updateProperty: async (id: string, updates: Partial<Property>) => {
+    const updated = normalizeBedPricing(await propertiesApi.update(id, updates));
+
     set((state) => ({
       properties: state.properties.map((p) =>
-        p.id === id ? { ...p, ...updates } : p
+        p.id === id ? updated : p
       ),
     }));
-    await get().saveProperties();
   },
 
   setActiveProperty: async (id: string | null) => {
     set({ activePropertyId: id });
-    if (id) {
-      await AsyncStorage.setItem('activePropertyId', id);
-    } else {
-      await AsyncStorage.removeItem('activePropertyId');
-    }
   },
 
   updateBedOccupancy: async (
@@ -113,10 +126,9 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
           : property
       ),
     }));
-    await get().saveProperties();
   },
 
-  syncBedOccupancyWithMembers: async (members: any[]) => {
+  syncBedOccupancyWithMembers: async (members: Member[]) => {
     const occupiedBeds = new Set<string>();
     members.forEach((member) => {
       if (
@@ -153,52 +165,31 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
       })),
     }));
 
-    await get().saveProperties();
   },
 
   loadProperties: async () => {
     try {
-      const savedProperties = await AsyncStorage.getItem('properties');
-      const activeId = await AsyncStorage.getItem('activePropertyId');
-      if (savedProperties) {
-        const properties: Property[] = JSON.parse(savedProperties).map((property: Property) => {
-          const normalizedPricing = (property.bedPricing ?? []).map((entry: any) => ({
-            bedCount: entry.bedCount,
-            dailyPrice: Number(entry.dailyPrice ?? entry.price ?? 0),
-            monthlyPrice: Number(entry.monthlyPrice ?? entry.price ?? 0),
-          }));
+      const properties = (await propertiesApi.getAll()).map(normalizeBedPricing);
+      set({ properties });
 
-          return {
-            ...property,
-            bedPricing: normalizedPricing,
-          };
-        });
-        set({ properties, activePropertyId: activeId });
-
-        if (!activeId && properties.length > 0) {
-          await get().setActiveProperty(properties[0].id);
-        }
-        if (activeId && !properties.some((p) => p.id === activeId)) {
-          const fallbackId = properties.length > 0 ? properties[0].id : null;
-          await get().setActiveProperty(fallbackId);
-        }
+      const { activePropertyId } = get();
+      if (!activePropertyId && properties.length > 0) {
+        await get().setActiveProperty(properties[0].id);
       }
+      if (activePropertyId && !properties.some((p) => p.id === activePropertyId)) {
+        const fallbackId = properties.length > 0 ? properties[0].id : null;
+        await get().setActiveProperty(fallbackId);
+      }
+
+      return properties;
     } catch (error) {
       console.error('Failed to load properties:', error);
-    }
-  },
-
-  saveProperties: async () => {
-    try {
-      const { properties } = get();
-      await AsyncStorage.setItem('properties', JSON.stringify(properties));
-    } catch (error) {
-      console.error('Failed to save properties:', error);
+      set({ properties: [], activePropertyId: null });
+      return [];
     }
   },
 
   reset: () => {
     set({ properties: [], activePropertyId: null });
-    AsyncStorage.removeItem('activePropertyId').catch(console.error);
   },
 }));

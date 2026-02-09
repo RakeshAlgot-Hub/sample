@@ -27,8 +27,8 @@ export default function TotalBedsScreen() {
     useEffect(() => {
         const loadData = async () => {
             await loadProperties();
-            await loadMembers();
-            await syncBedOccupancyWithMembers(members);
+            const loadedMembers = await loadMembers();
+            await syncBedOccupancyWithMembers(loadedMembers);
         };
         loadData();
     }, []);

@@ -1,11 +1,8 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-}
+import { authApi } from '@/services/authApi';
+import { tokenStorage } from '@/services/tokenStorage';
+import { User } from '@/types/user';
 
 interface AppState {
   isAuthenticated: boolean;
@@ -13,8 +10,8 @@ interface AppState {
   themeMode: 'light' | 'dark';
   isLoading: boolean;
 
-  login: (user: User) => Promise<void>;
-  signup: (user: User) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   toggleTheme: () => Promise<void>;
   initializeAuth: () => Promise<void>;
@@ -27,32 +24,33 @@ export const useStore = create<AppState>((set) => ({
   themeMode: 'dark',
   isLoading: true,
 
-  login: async (user: User) => {
+  login: async (email: string, password: string) => {
     try {
-      await AsyncStorage.setItem('isAuthenticated', 'true');
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      set({ isAuthenticated: true, user });
+      const response = await authApi.login(email, password);
+      await tokenStorage.setTokens(response.accessToken, response.refreshToken);
+      set({ isAuthenticated: true, user: response.user });
     } catch (error) {
-      console.error('Failed to save auth state:', error);
+      console.error('Failed to login:', error);
+      throw error;
     }
   },
 
-  signup: async (user: User) => {
+  signup: async (name: string, email: string, password: string) => {
     try {
-      await AsyncStorage.setItem('isAuthenticated', 'true');
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      set({ isAuthenticated: true, user });
+      const response = await authApi.signup(name, email, password);
+      await tokenStorage.setTokens(response.accessToken, response.refreshToken);
+      set({ isAuthenticated: true, user: response.user });
     } catch (error) {
-      console.error('Failed to save auth state:', error);
+      console.error('Failed to signup:', error);
+      throw error;
     }
   },
 
   logout: async () => {
     try {
-      // Clear all AsyncStorage data (properties, members, wizard data, etc.)
-      await AsyncStorage.clear();
+      await authApi.logout().catch(() => undefined);
+      await tokenStorage.clearTokens();
 
-      // Reset all store states to initial values
       const { usePropertiesStore } = await import('./usePropertiesStore');
       const { useMembersStore } = await import('./useMembersStore');
       const { useWizardStore } = await import('./useWizardStore');
@@ -77,18 +75,18 @@ export const useStore = create<AppState>((set) => ({
 
   initializeAuth: async () => {
     try {
-      const isAuthenticated = await AsyncStorage.getItem('isAuthenticated');
-      const userString = await AsyncStorage.getItem('user');
-
-      if (isAuthenticated === 'true' && userString) {
-        const user = JSON.parse(userString);
-        set({ isAuthenticated: true, user, isLoading: false });
-      } else {
-        set({ isLoading: false });
+      const accessToken = await tokenStorage.getAccessToken();
+      if (!accessToken) {
+        set({ isLoading: false, isAuthenticated: false, user: null });
+        return;
       }
+
+      const user = await authApi.getProfile();
+      set({ isAuthenticated: true, user, isLoading: false });
     } catch (error) {
       console.error('Failed to initialize auth:', error);
-      set({ isLoading: false });
+      await tokenStorage.clearTokens();
+      set({ isLoading: false, isAuthenticated: false, user: null });
     }
   },
 

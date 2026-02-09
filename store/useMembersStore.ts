@@ -1,45 +1,48 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Member } from '@/types/member';
 import { usePropertiesStore } from './usePropertiesStore';
 import { normalizeMemberPaymentFields } from '@/utils/memberPayments';
+import { membersApi, CreateMemberInput } from '@/services/membersApi';
 
 interface MembersStore {
   members: Member[];
-  addMember: (member: Member) => Promise<void>;
+  addMember: (member: CreateMemberInput) => Promise<Member>;
   removeMember: (id: string) => Promise<void>;
   updateMember: (id: string, updates: Partial<Member>) => Promise<void>;
-  loadMembers: () => Promise<void>;
-  saveMembers: () => Promise<void>;
+  loadMembers: () => Promise<Member[]>;
   reset: () => void;
 }
 
 export const useMembersStore = create<MembersStore>((set, get) => ({
   members: [],
 
-  addMember: async (member: Member) => {
+  addMember: async (member: CreateMemberInput) => {
+    const created = await membersApi.create(member);
+    const normalized = normalizeMemberPaymentFields(created);
+
     if (
-      member.propertyId &&
-      member.buildingId &&
-      member.floorId &&
-      member.roomId &&
-      member.bedId
+      normalized.propertyId &&
+      normalized.buildingId &&
+      normalized.floorId &&
+      normalized.roomId &&
+      normalized.bedId
     ) {
       const { updateBedOccupancy } = usePropertiesStore.getState();
       await updateBedOccupancy(
-        member.propertyId,
-        member.buildingId,
-        member.floorId,
-        member.roomId,
-        member.bedId,
+        normalized.propertyId,
+        normalized.buildingId,
+        normalized.floorId,
+        normalized.roomId,
+        normalized.bedId,
         true
       );
     }
 
     set((state) => ({
-      members: [...state.members, member],
+      members: [...state.members, normalized],
     }));
-    await get().saveMembers();
+
+    return normalized;
   },
 
   removeMember: async (id: string) => {
@@ -64,39 +67,33 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
       );
     }
 
+    await membersApi.remove(id);
+
     set((state) => ({
       members: state.members.filter((m) => m.id !== id),
     }));
-    await get().saveMembers();
   },
 
   updateMember: async (id: string, updates: Partial<Member>) => {
+    const updated = await membersApi.update(id, updates);
+
     set((state) => ({
       members: state.members.map((m) =>
-        m.id === id ? normalizeMemberPaymentFields({ ...m, ...updates }) : m
+        m.id === id ? normalizeMemberPaymentFields(updated) : m
       ),
     }));
-    await get().saveMembers();
   },
 
   loadMembers: async () => {
     try {
-      const savedMembers = await AsyncStorage.getItem('members');
-      if (savedMembers) {
-        const members: Member[] = JSON.parse(savedMembers);
-        set({ members: members.map(normalizeMemberPaymentFields) });
-      }
+      const members = await membersApi.getAll();
+      const normalized = members.map(normalizeMemberPaymentFields);
+      set({ members: normalized });
+      return normalized;
     } catch (error) {
       console.error('Failed to load members:', error);
-    }
-  },
-
-  saveMembers: async () => {
-    try {
-      const { members } = get();
-      await AsyncStorage.setItem('members', JSON.stringify(members));
-    } catch (error) {
-      console.error('Failed to save members:', error);
+      set({ members: [] });
+      return [];
     }
   },
 

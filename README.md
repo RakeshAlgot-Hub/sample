@@ -128,16 +128,23 @@ A mobile-first Expo React Native application for smart property management.
 app/
 ├── (auth)/
 │   ├── _layout.tsx
-│   ├── login.tsx
-│   └── signup.tsx
-├── (tabs)/
 │   ├── _layout.tsx
-│   ├── index.tsx (Dashboard)
-│   ├── properties.tsx
-│   ├── members.tsx
-│   └── profile.tsx
-├── property/
+
+services/
+├── apiClient.ts
+├── authApi.ts
+├── membersApi.ts
+├── propertiesApi.ts
+└── tokenStorage.ts
 │   ├── _layout.tsx
+
+## API Configuration
+
+Set `EXPO_PUBLIC_API_BASE_URL` to your backend base URL. Example:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=https://api.example.com
+```
 │   └── [id].tsx (Property Details)
 ├── member/
 │   ├── _layout.tsx
@@ -184,16 +191,9 @@ theme/
 
 types/
 ├── property.ts
-└── member.ts
-
-mockData/
-└── users.ts
+├── member.ts
+└── user.ts
 ```
-
-## Demo Credentials
-
-- Email: demo@propertypal.com
-- Password: demo123
 
 ## Getting Started
 

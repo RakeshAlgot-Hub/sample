@@ -8,12 +8,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useStore } from '@/store/useStore';
 import { useTheme } from '@/theme/useTheme';
-import { validateCredentials } from '@/mockData/users';
 import { Home, Mail, Lock } from 'lucide-react-native';
 
 export default function LoginScreen() {
@@ -24,6 +22,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async () => {
     setError('');
@@ -33,13 +32,15 @@ export default function LoginScreen() {
       return;
     }
 
-    const user = validateCredentials(email, password);
-
-    if (user) {
-      await login(user);
+    try {
+      setIsSubmitting(true);
+      await login(email.trim(), password);
       router.replace('/(tabs)');
-    } else {
-      setError('Invalid email or password');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Login failed.';
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -132,9 +133,12 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[styles.button, { backgroundColor: theme.accent }]}
             onPress={handleLogin}
+            disabled={isSubmitting}
             activeOpacity={0.8}
           >
-            <Text style={styles.buttonText}>Login</Text>
+            <Text style={styles.buttonText}>
+              {isSubmitting ? 'Logging in...' : 'Login'}
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
@@ -148,11 +152,6 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.demoInfo}>
-            <Text style={[styles.demoText, { color: theme.textSecondary }]}>
-              Demo: demo@propertypal.com / demo123
-            </Text>
-          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -243,12 +242,5 @@ const styles = StyleSheet.create({
   link: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  demoInfo: {
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  demoText: {
-    fontSize: 12,
   },
 });

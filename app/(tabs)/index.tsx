@@ -31,8 +31,8 @@ export default function DashboardScreen() {
   useEffect(() => {
     const initializeData = async () => {
       await loadProperties();
-      await loadMembers();
-      await syncBedOccupancyWithMembers(members);
+      const loadedMembers = await loadMembers();
+      await syncBedOccupancyWithMembers(loadedMembers);
     };
     initializeData();
   }, []);

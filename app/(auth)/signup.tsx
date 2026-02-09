@@ -12,7 +12,6 @@ import {
 import { useRouter } from 'expo-router';
 import { useStore } from '@/store/useStore';
 import { useTheme } from '@/theme/useTheme';
-import { createMockUser } from '@/mockData/users';
 import { Home, User, Mail, Lock } from 'lucide-react-native';
 
 export default function SignupScreen() {
@@ -25,6 +24,7 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSignup = async () => {
     setError('');
@@ -44,9 +44,16 @@ export default function SignupScreen() {
       return;
     }
 
-    const user = createMockUser(name, email, password);
-    await signup(user);
-    router.replace('/(tabs)');
+    try {
+      setIsSubmitting(true);
+      await signup(name.trim(), email.trim(), password);
+      router.replace('/(tabs)');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Signup failed.';
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -188,9 +195,12 @@ export default function SignupScreen() {
           <TouchableOpacity
             style={[styles.button, { backgroundColor: theme.accent }]}
             onPress={handleSignup}
+            disabled={isSubmitting}
             activeOpacity={0.8}
           >
-            <Text style={styles.buttonText}>Sign Up</Text>
+            <Text style={styles.buttonText}>
+              {isSubmitting ? 'Creating account...' : 'Sign Up'}
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
