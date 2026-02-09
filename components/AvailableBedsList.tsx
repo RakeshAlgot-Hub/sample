@@ -16,8 +16,8 @@ interface AvailableBed {
   bedId: string;
   bedNumber: number;
   bedCount: number;
-  price?: number;
-  period?: string;
+  dailyPrice?: number;
+  monthlyPrice?: number;
 }
 
 interface BedSelectorProps {
@@ -68,8 +68,8 @@ export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSel
                     bedId: bed.id,
                     bedNumber: bedIndex + 1,
                     bedCount,
-                    price: pricing?.price,
-                    period: pricing?.period,
+                    dailyPrice: pricing?.dailyPrice,
+                    monthlyPrice: pricing?.monthlyPrice,
                   });
                 }
               });
@@ -218,10 +218,13 @@ export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSel
                         <Text style={[styles.bedTitle, { color: theme.text }]}>
                           Bed {bed.bedNumber} • Room {bed.roomNumber}
                         </Text>
-                        {bed.price !== undefined && bed.period && (
-                          <Text style={[styles.bedPrice, { color: theme.textSecondary }]}
-                          >
-                            {bed.price} / {bed.period}
+                        {(bed.dailyPrice !== undefined || bed.monthlyPrice !== undefined) && (
+                          <Text style={[styles.bedPrice, { color: theme.textSecondary }]}>
+                            {bed.dailyPrice !== undefined ? `Day Rs ${bed.dailyPrice}` : 'Day -'}
+                            {'  •  '}
+                            {bed.monthlyPrice !== undefined
+                              ? `Month Rs ${bed.monthlyPrice}`
+                              : 'Month -'}
                           </Text>
                         )}
                         <View style={styles.breadcrumb}>

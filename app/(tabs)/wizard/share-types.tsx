@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   TextInput,
   BackHandler,
+  Modal,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -16,11 +17,9 @@ import { useWizardStore } from '@/store/useWizardStore';
 import WizardHeader from '@/components/WizardHeader';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
-import { Bed } from 'lucide-react-native';
-import { BillingPeriod } from '@/types/property';
+import { Bed, X } from 'lucide-react-native';
 
 const AVAILABLE_BED_COUNTS = [2, 3, 4, 5];
-const PERIODS: BillingPeriod[] = ['monthly', 'weekly', 'hourly', 'yearly'];
 
 export default function ShareTypesScreen() {
   const theme = useTheme();
@@ -39,7 +38,13 @@ export default function ShareTypesScreen() {
   const [selectedCounts, setSelectedCounts] = useState<number[]>(allowedBedCounts);
   const [customCount, setCustomCount] = useState('');
   const [customCounts, setCustomCounts] = useState<number[]>([]);
-  const [pricingByCount, setPricingByCount] = useState<Record<number, { price: string; period: BillingPeriod }>>({});
+  const [pricingByCount, setPricingByCount] = useState<
+    Record<number, { dailyPrice: string; monthlyPrice: string }>
+  >({});
+  const [pricingModalVisible, setPricingModalVisible] = useState(false);
+  const [activePricingCount, setActivePricingCount] = useState<number | null>(null);
+  const [dailyPriceInput, setDailyPriceInput] = useState('');
+  const [monthlyPriceInput, setMonthlyPriceInput] = useState('');
 
   const mergedCounts = useMemo(() => {
     const merged = [...AVAILABLE_BED_COUNTS, ...customCounts];
@@ -50,12 +55,12 @@ export default function ShareTypesScreen() {
     setSelectedCounts(allowedBedCounts);
     const custom = allowedBedCounts.filter((count) => count > 6);
     setCustomCounts(custom);
-    const mapped: Record<number, { price: string; period: BillingPeriod }> = {};
+    const mapped: Record<number, { dailyPrice: string; monthlyPrice: string }> = {};
 
     bedPricing.forEach((pricing) => {
       mapped[pricing.bedCount] = {
-        price: pricing.price.toString(),
-        period: pricing.period,
+        dailyPrice: pricing.dailyPrice?.toString() ?? '',
+        monthlyPrice: pricing.monthlyPrice?.toString() ?? '',
       };
     });
 
@@ -95,23 +100,16 @@ export default function ShareTypesScreen() {
     }, [handleBack]),
   );
 
+  const openPricingModal = (count: number) => {
+    const existing = pricingByCount[count];
+    setActivePricingCount(count);
+    setDailyPriceInput(existing?.dailyPrice ?? '');
+    setMonthlyPriceInput(existing?.monthlyPrice ?? '');
+    setPricingModalVisible(true);
+  };
+
   const handleToggleBedCount = (count: number) => {
-    setSelectedCounts((prev) => {
-      if (prev.includes(count)) {
-        setPricingByCount((current) => {
-          const next = { ...current };
-          delete next[count];
-          return next;
-        });
-        return prev.filter((c) => c !== count);
-      } else {
-        setPricingByCount((current) => ({
-          ...current,
-          [count]: current[count] ?? { price: '', period: 'monthly' },
-        }));
-        return [...prev, count].sort((a, b) => a - b);
-      }
-    });
+    openPricingModal(count);
   };
 
   const handleAddCustom = () => {
@@ -121,12 +119,8 @@ export default function ShareTypesScreen() {
     }
 
     setCustomCounts((prev) => Array.from(new Set([...prev, parsed])).sort((a, b) => a - b));
-    setSelectedCounts((prev) => Array.from(new Set([...prev, parsed])).sort((a, b) => a - b));
-    setPricingByCount((current) => ({
-      ...current,
-      [parsed]: current[parsed] ?? { price: '', period: 'monthly' },
-    }));
     setCustomCount('');
+    openPricingModal(parsed);
   };
 
   const handleNext = () => {
@@ -136,8 +130,16 @@ export default function ShareTypesScreen() {
 
     const invalidCount = selectedCounts.find((count) => {
       const entry = pricingByCount[count];
-      const parsed = Number(entry?.price ?? '');
-      return !entry?.price || !Number.isInteger(parsed) || parsed <= 0;
+      const parsedDaily = Number(entry?.dailyPrice ?? '');
+      const parsedMonthly = Number(entry?.monthlyPrice ?? '');
+      return (
+        !entry?.dailyPrice ||
+        !entry?.monthlyPrice ||
+        !Number.isInteger(parsedDaily) ||
+        !Number.isInteger(parsedMonthly) ||
+        parsedDaily <= 0 ||
+        parsedMonthly <= 0
+      );
     });
 
     if (invalidCount) {
@@ -147,12 +149,13 @@ export default function ShareTypesScreen() {
 
     updateAllowedBedCounts(selectedCounts);
     const pricing = selectedCounts.map((count) => {
-      const entry = pricingByCount[count] ?? { price: '', period: 'monthly' as BillingPeriod };
-      const parsed = Number(entry.price);
+      const entry = pricingByCount[count] ?? { dailyPrice: '', monthlyPrice: '' };
+      const parsedDaily = Number(entry.dailyPrice);
+      const parsedMonthly = Number(entry.monthlyPrice);
       return {
         bedCount: count,
-        price: parsed,
-        period: entry.period,
+        dailyPrice: parsedDaily,
+        monthlyPrice: parsedMonthly,
       };
     });
     updateBedPricing(pricing);
@@ -162,8 +165,16 @@ export default function ShareTypesScreen() {
 
   const pricingComplete = selectedCounts.every((count) => {
     const entry = pricingByCount[count];
-    const parsed = Number(entry?.price ?? '');
-    return entry?.price && Number.isInteger(parsed) && parsed > 0;
+    const parsedDaily = Number(entry?.dailyPrice ?? '');
+    const parsedMonthly = Number(entry?.monthlyPrice ?? '');
+    return (
+      entry?.dailyPrice &&
+      entry?.monthlyPrice &&
+      Number.isInteger(parsedDaily) &&
+      Number.isInteger(parsedMonthly) &&
+      parsedDaily > 0 &&
+      parsedMonthly > 0
+    );
   });
   const canProceed = selectedCounts.length > 0 && pricingComplete;
 
@@ -197,11 +208,15 @@ export default function ShareTypesScreen() {
               <Text style={[styles.required, { color: theme.accent }]}> *</Text>
             </Text>
           </View>
+          <Text style={[styles.helperText, { color: theme.textSecondary }]}>
+            Tap a bed count to set daily and monthly pricing.
+          </Text>
 
           <View style={styles.bedCountContainer}>
             {mergedCounts.map((count) => {
               const isSelected = selectedCounts.includes(count);
               const pricing = pricingByCount[count];
+              const hasPricing = Boolean(pricing?.dailyPrice && pricing?.monthlyPrice);
               return (
                 <View key={count} style={styles.bedCountCard}>
                   <View
@@ -235,72 +250,33 @@ export default function ShareTypesScreen() {
                         {count} {count === 1 ? 'Bed' : 'Beds'}
                       </Text>
                     </TouchableOpacity>
-                    {isSelected && (
-                      <View style={styles.inlinePricing}>
-                        <TextInput
-                          style={[
-                            styles.inlinePriceInput,
-                            { color: theme.text, backgroundColor: theme.inputBackground, borderColor: theme.inputBorder },
-                          ]}
-                          placeholder="e.g. 4500"
-                          placeholderTextColor={theme.textSecondary}
-                          keyboardType="number-pad"
-                          value={pricing?.price ?? ''}
-                          onChangeText={(value) => {
-                            const nextValue = value.replace(/\D+/g, '');
-                            setPricingByCount((current) => ({
-                              ...current,
-                              [count]: {
-                                price: nextValue,
-                                period: current[count]?.period ?? 'monthly',
-                              },
-                            }));
-                          }}
-                        />
-                        <ScrollView
-                          horizontal
-                          showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={styles.periodRow}
+                    <View style={styles.inlinePricing}>
+                      {hasPricing ? (
+                        <View style={styles.priceStack}>
+                          <View style={[styles.pricePill, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}
+                          >
+                            <Text style={[styles.priceLabel, { color: theme.textSecondary }]}>Day</Text>
+                            <Text style={[styles.priceValue, { color: theme.text }]}>Rs {pricing?.dailyPrice}</Text>
+                          </View>
+                          <View style={[styles.pricePill, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}
+                          >
+                            <Text style={[styles.priceLabel, { color: theme.textSecondary }]}>Month</Text>
+                            <Text style={[styles.priceValue, { color: theme.text }]}>Rs {pricing?.monthlyPrice}</Text>
+                          </View>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.setPricingButton, { borderColor: theme.inputBorder }]}
+                          onPress={() => handleToggleBedCount(count)}
+                          activeOpacity={0.8}
                         >
-                          {PERIODS.map((period) => {
-                            const isSelected = (pricing?.period ?? 'monthly') === period;
-                            return (
-                              <TouchableOpacity
-                                key={period}
-                                style={[
-                                  styles.periodOption,
-                                  {
-                                    backgroundColor: isSelected
-                                      ? theme.primary
-                                      : theme.inputBackground,
-                                    borderColor: isSelected ? theme.primary : theme.inputBorder,
-                                  },
-                                ]}
-                                onPress={() =>
-                                  setPricingByCount((current) => ({
-                                    ...current,
-                                    [count]: {
-                                      price: current[count]?.price ?? '',
-                                      period,
-                                    },
-                                  }))
-                                }
-                                activeOpacity={0.8}
-                              >
-                                <Text
-                                  style={[
-                                    styles.periodOptionText,
-                                    { color: isSelected ? '#ffffff' : theme.text },
-                                  ]}
-                                >
-                                  {period}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </ScrollView>
-                      </View>
-                    )}
+                          <Text style={[styles.setPricingText, { color: theme.textSecondary }]}
+                          >
+                            Set pricing
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 </View>
               );
@@ -344,6 +320,118 @@ export default function ShareTypesScreen() {
         nextDisabled={!canProceed}
         showBack={false}
       />
+      <Modal
+        transparent
+        animationType="fade"
+        visible={pricingModalVisible}
+        onRequestClose={() => {
+          setPricingModalVisible(false);
+          setActivePricingCount(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Set Pricing</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setPricingModalVisible(false);
+                  setActivePricingCount(null);
+                }}
+                activeOpacity={0.7}
+              >
+                <X size={18} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}
+            >
+              Enter daily and monthly pricing. Both are required.
+            </Text>
+            <View style={styles.modalInputs}>
+              <View style={styles.modalField}>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Daily Price</Text>
+                <TextInput
+                  style={[
+                    styles.modalInput,
+                    { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text },
+                  ]}
+                  placeholder="e.g. 150"
+                  placeholderTextColor={theme.textSecondary}
+                  keyboardType="number-pad"
+                  value={dailyPriceInput}
+                  onChangeText={(value) => setDailyPriceInput(value.replace(/\D+/g, ''))}
+                />
+              </View>
+              <View style={styles.modalField}>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Monthly Price</Text>
+                <TextInput
+                  style={[
+                    styles.modalInput,
+                    { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text },
+                  ]}
+                  placeholder="e.g. 4500"
+                  placeholderTextColor={theme.textSecondary}
+                  keyboardType="number-pad"
+                  value={monthlyPriceInput}
+                  onChangeText={(value) => setMonthlyPriceInput(value.replace(/\D+/g, ''))}
+                />
+              </View>
+            </View>
+            <View style={styles.modalActions}>
+              {activePricingCount !== null && selectedCounts.includes(activePricingCount) && (
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.removeButton, { borderColor: theme.error }]}
+                  onPress={() => {
+                    setSelectedCounts((prev) => prev.filter((count) => count !== activePricingCount));
+                    setPricingByCount((current) => {
+                      const next = { ...current };
+                      delete next[activePricingCount];
+                      return next;
+                    });
+                    setPricingModalVisible(false);
+                    setActivePricingCount(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.modalButtonText, { color: theme.error }]}>Remove</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: theme.accent }]}
+                onPress={() => {
+                  const parsedDaily = Number(dailyPriceInput);
+                  const parsedMonthly = Number(monthlyPriceInput);
+                  if (!parsedDaily || !parsedMonthly) {
+                    Alert.alert('Pricing required', 'Enter valid daily and monthly amounts.');
+                    return;
+                  }
+
+                  if (activePricingCount === null) {
+                    return;
+                  }
+
+                  setPricingByCount((current) => ({
+                    ...current,
+                    [activePricingCount]: {
+                      dailyPrice: dailyPriceInput,
+                      monthlyPrice: monthlyPriceInput,
+                    },
+                  }));
+                  setSelectedCounts((prev) =>
+                    Array.from(new Set([...prev, activePricingCount])).sort((a, b) => a - b)
+                  );
+                  setPricingModalVisible(false);
+                  setActivePricingCount(null);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalButtonPrimaryText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -368,6 +456,10 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  helperText: {
+    fontSize: 12,
+    lineHeight: 18,
   },
   required: {
     fontSize: 14,
@@ -408,31 +500,39 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 6,
   },
-  inlinePriceInput: {
-    height: 32,
-    minWidth: 70,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+  priceStack: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  pricePill: {
+    borderRadius: 10,
     borderWidth: 1,
-    fontSize: 13,
-    textAlign: 'right',
-  },
-  periodRow: {
-    alignItems: 'center',
-    gap: 5,
-  },
-  periodOption: {
-    height: 28,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingVertical: 6,
+    gap: 2,
+    alignItems: 'flex-end',
+  },
+  priceLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  priceValue: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  setPricingButton: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  periodOptionText: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'capitalize',
+  setPricingText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   customSection: {
     gap: 8,
@@ -466,5 +566,75 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  modalInputs: {
+    gap: 10,
+  },
+  modalField: {
+    gap: 6,
+  },
+  modalLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modalInput: {
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  modalButton: {
+    minWidth: 88,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  modalButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalButtonPrimaryText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  removeButton: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
   },
 });

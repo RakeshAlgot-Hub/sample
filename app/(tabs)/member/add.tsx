@@ -15,10 +15,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/theme/useTheme';
-import { useMembersStore } from '@/store/useMembersStore';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
 import WizardTopHeader from '@/components/WizardTopHeader';
-import { AlertCircle, Camera, User, Phone, MapPin, BadgeCheck } from 'lucide-react-native';
+import { AlertCircle, Camera, User, Phone, MapPin, ArrowRight } from 'lucide-react-native';
 import { Image } from 'react-native';
 
 type SelectedBed = {
@@ -29,6 +28,8 @@ type SelectedBed = {
   bedId: string;
   bedNumber?: number;
 };
+
+const formatDate = (value: Date) => value.toISOString().slice(0, 10);
 
 export default function AddMemberScreen() {
   const theme = useTheme();
@@ -41,7 +42,6 @@ export default function AddMemberScreen() {
     bedId?: string;
     from?: string;
   }>();
-  const { addMember } = useMembersStore();
   const { properties, loadProperties } = usePropertiesStore();
 
   const getParam = (value?: string | string[]) =>
@@ -69,8 +69,8 @@ export default function AddMemberScreen() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [villageName, setVillageName] = useState('');
-  const [joinedDate, setJoinedDate] = useState('');
-  const [joinedDateValue, setJoinedDateValue] = useState<Date | null>(null);
+  const [joinedDate, setJoinedDate] = useState(formatDate(new Date()));
+  const [joinedDateValue, setJoinedDateValue] = useState<Date | null>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [proofId, setProofId] = useState('');
   const [profilePic, setProfilePic] = useState<string | null>(null);
@@ -182,8 +182,6 @@ export default function AddMemberScreen() {
     );
   };
 
-  const formatDate = (value: Date) => value.toISOString().slice(0, 10);
-
   const handleDateChange = (_event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
@@ -249,39 +247,28 @@ export default function AddMemberScreen() {
       return;
     }
 
-    await addMember({
-      id: Date.now().toString(),
-      name: name.trim(),
-      phone: normalizedPhone,
-      villageName: villageName.trim(),
-      joinedDate: joinedDate.trim(),
-      proofId: proofId.trim(),
-      profilePic,
-      propertyId: selectedBed.propertyId,
-      buildingId: selectedBed.buildingId,
-      floorId: selectedBed.floorId,
-      roomId: selectedBed.roomId,
-      bedId: selectedBed.bedId,
-      createdAt: new Date().toISOString(),
+    router.push({
+      pathname: '/member/payment',
+      params: {
+        name: name.trim(),
+        phone: normalizedPhone,
+        villageName: villageName.trim(),
+        joinedDate: joinedDate.trim(),
+        proofId: proofId.trim(),
+        profilePic: profilePic ?? '',
+        propertyId: selectedBed.propertyId,
+        buildingId: selectedBed.buildingId,
+        floorId: selectedBed.floorId,
+        roomId: selectedBed.roomId,
+        bedId: selectedBed.bedId,
+        from: paramFrom ?? '',
+      },
     });
-
-    // Clear form state
-    setName('');
-    setPhone('');
-    setVillageName('');
-    setJoinedDate('');
-    setJoinedDateValue(null);
-    setProofId('');
-    setProfilePic(null);
-    setSelectedBed(null);
-    setValidationError(null);
-
-    router.replace('/members');
   };
 
   const handleBack = useCallback(() => {
     if (paramFrom === 'total' || paramFrom === 'available') {
-      router.replace('/members');
+      router.replace('/(tabs)/members');
       return;
     }
 
@@ -509,8 +496,8 @@ export default function AddMemberScreen() {
               onPress={handleSubmit}
               activeOpacity={0.8}
             >
-              <BadgeCheck size={18} color="#ffffff" />
-              <Text style={styles.submitButtonText}>Confirm & Submit</Text>
+              <ArrowRight size={18} color="#ffffff" />
+              <Text style={styles.submitButtonText}>Continue to Payment</Text>
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>

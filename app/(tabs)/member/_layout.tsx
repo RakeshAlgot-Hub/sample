@@ -9,6 +9,7 @@ export default function MemberLayout() {
       }}
     >
       <Stack.Screen name="add" />
+      <Stack.Screen name="payment" />
     </Stack>
   );
 }

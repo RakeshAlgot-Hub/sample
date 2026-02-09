@@ -4,8 +4,8 @@ export type BillingPeriod = 'monthly' | 'weekly' | 'hourly' | 'yearly';
 
 export interface BedPricing {
   bedCount: number;
-  price: number;
-  period: BillingPeriod;
+  dailyPrice: number;
+  monthlyPrice: number;
 }
 
 export interface Bed {

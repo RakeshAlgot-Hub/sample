@@ -161,10 +161,18 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
       const savedProperties = await AsyncStorage.getItem('properties');
       const activeId = await AsyncStorage.getItem('activePropertyId');
       if (savedProperties) {
-        const properties: Property[] = JSON.parse(savedProperties).map((property: Property) => ({
-          ...property,
-          bedPricing: property.bedPricing ?? [],
-        }));
+        const properties: Property[] = JSON.parse(savedProperties).map((property: Property) => {
+          const normalizedPricing = (property.bedPricing ?? []).map((entry: any) => ({
+            bedCount: entry.bedCount,
+            dailyPrice: Number(entry.dailyPrice ?? entry.price ?? 0),
+            monthlyPrice: Number(entry.monthlyPrice ?? entry.price ?? 0),
+          }));
+
+          return {
+            ...property,
+            bedPricing: normalizedPricing,
+          };
+        });
         set({ properties, activePropertyId: activeId });
 
         if (!activeId && properties.length > 0) {

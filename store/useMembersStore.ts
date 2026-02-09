@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Member } from '@/types/member';
 import { usePropertiesStore } from './usePropertiesStore';
+import { normalizeMemberPaymentFields } from '@/utils/memberPayments';
 
 interface MembersStore {
   members: Member[];
@@ -72,7 +73,7 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
   updateMember: async (id: string, updates: Partial<Member>) => {
     set((state) => ({
       members: state.members.map((m) =>
-        m.id === id ? { ...m, ...updates } : m
+        m.id === id ? normalizeMemberPaymentFields({ ...m, ...updates }) : m
       ),
     }));
     await get().saveMembers();
@@ -83,7 +84,7 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
       const savedMembers = await AsyncStorage.getItem('members');
       if (savedMembers) {
         const members: Member[] = JSON.parse(savedMembers);
-        set({ members });
+        set({ members: members.map(normalizeMemberPaymentFields) });
       }
     } catch (error) {
       console.error('Failed to load members:', error);
