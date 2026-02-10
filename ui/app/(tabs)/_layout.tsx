@@ -1,23 +1,44 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { View, StyleSheet, SafeAreaView } from 'react-native';
-import { Tabs, usePathname } from 'expo-router';
+import { Tabs, usePathname, useRouter } from 'expo-router';
 import { Platform } from 'react-native';
 import { CreditCard, LayoutDashboard, Users } from 'lucide-react-native';
 import { useTheme } from '@/theme/useTheme';
 import TopBar from '@/components/TopBar';
 import MemberSearchModal from '@/components/MemberSearchModal';
+import { useStore } from '@/store/useStore';
 
 export default function TabLayout() {
   const theme = useTheme();
   const [searchVisible, setSearchVisible] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useStore();
   const hideTopBar = pathname.includes('/member/') || pathname.includes('/wizard/') || pathname.includes('/settings') || pathname.includes('/beds/') || pathname.includes('/floors') || pathname.includes('/properties') || pathname.includes('/buildings') || pathname.includes('/rooms');
   const hideTabBar = pathname.includes('/settings') || pathname.includes('/beds/') || pathname.includes('/floors') || pathname.includes('/properties') || pathname.includes('/buildings') || pathname.includes('/rooms');
+
+  // Global auth guard: redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/(auth)/login');
+    }
+  }, [isAuthenticated, isLoading]);
+
+  // Block rendering of protected tabs until auth state is known
+  if (isLoading) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
+    // Optionally, render nothing or a fallback (should redirect above)
+    return null;
+  }
 
   return (
     <>
       {!hideTopBar && (
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.card }]}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.card }]}>\
           <TopBar onSearchPress={() => setSearchVisible(true)} />
         </SafeAreaView>
       )}

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -41,6 +41,17 @@ export default function BuildingsScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (__DEV__ && buildings.length === 0) {
+      const mockBuilding: Building = {
+        id: Date.now().toString() + Math.random(),
+        name: 'Building A',
+        floors: [],
+      };
+      addBuilding(mockBuilding);
+    }
+  }, []);
 
   const handleClose = useCallback(() => {
     resetWizard();

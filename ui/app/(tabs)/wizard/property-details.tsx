@@ -49,7 +49,14 @@ export default function PropertyDetailsScreen() {
     if (!isEditing) {
       loadWizardState();
     }
-  }, [isEditing, loadWizardState]);
+    // Only apply mock data if not editing AND propertyDetails are still default/empty
+    if (__DEV__ && !isEditing && propertyDetails.name === '' && propertyDetails.city === '' && propertyDetails.area === '') {
+      setName('Test Property');
+      setType('Hostel/PG');
+      setCity('Test City');
+      setArea('Test Area');
+    }
+  }, [isEditing, loadWizardState, propertyDetails]); // Added propertyDetails to dependencies
 
   useEffect(() => {
     setName(propertyDetails.name);

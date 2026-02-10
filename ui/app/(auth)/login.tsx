@@ -32,6 +32,10 @@ export default function LoginScreen() {
   } | null>(null);
 
   useEffect(() => {
+    if (__DEV__) {
+      setEmail('test@gmail.com');
+      setPassword('asdfgh');
+    }
     async function getDeviceData() {
       let deviceId: string | null = null;
       if (Platform.OS === 'ios') {

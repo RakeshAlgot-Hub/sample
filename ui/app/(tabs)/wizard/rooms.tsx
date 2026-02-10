@@ -73,6 +73,18 @@ export default function RoomsScreen() {
   const [duplicateRoomError, setDuplicateRoomError] = useState<string>('');
 
   useEffect(() => {
+    if (__DEV__ && buildings.length > 0 && buildings[0].floors.length > 0 && buildings[0].floors[0].rooms.length === 0) {
+      addRoom(buildings[0].id, buildings[0].floors[0].id, {
+        id: Date.now().toString() + Math.random(),
+        roomNumber: '101',
+        shareType: 'single',
+        bedCount: 1,
+        beds: [],
+      });
+    }
+  }, [buildings]);
+
+  useEffect(() => {
     if (buildings.length === 0) return;
 
     const selectedExists = buildings.some((b) => b.id === selectedBuildingId);

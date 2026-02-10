@@ -46,6 +46,16 @@ export default function ShareTypesScreen() {
   const [dailyPriceInput, setDailyPriceInput] = useState('');
   const [monthlyPriceInput, setMonthlyPriceInput] = useState('');
 
+  useEffect(() => {
+    if (__DEV__ && allowedBedCounts.length === 0) {
+      updateAllowedBedCounts([1, 2]);
+      updateBedPricing([
+        { bedCount: 1, dailyPrice: 1000, monthlyPrice: 10000 },
+        { bedCount: 2, dailyPrice: 800, monthlyPrice: 8000 },
+      ]);
+    }
+  }, []);
+
   const mergedCounts = useMemo(() => {
     const merged = [...AVAILABLE_BED_COUNTS, ...customCounts];
     return Array.from(new Set(merged)).sort((a, b) => a - b);

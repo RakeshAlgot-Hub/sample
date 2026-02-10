@@ -1,33 +1,29 @@
 from datetime import datetime, timezone
 from bson import ObjectId
 
+
 class PropertyModel:
     def __init__(
         self,
         name: str,
         propertyType: str,  # HOSTEL | APARTMENT
-        country: str,
-        state: str,
-        city: str,
-        area: str,
-        addressLine: str,
-        pincode: str,
-        phone: str,
-        ownerId: ObjectId,
+        city: str = None,
+        area: str = None,
+        ownerId: ObjectId = None,
         isActive: bool = True,
-        bedPricing: list = [], # Added bedPricing
+        bedPricing: list = [],
+        totalRooms: int = 0,
+        totalBeds: int = 0,
+        createdAt: datetime = None,
     ):
         self.name = name
         self.propertyType = propertyType
-        self.country = country
-        self.state = state
         self.city = city
         self.area = area
-        self.addressLine = addressLine
-        self.pincode = pincode
-        self.phone = phone
         self.ownerId = ownerId
         self.isActive = isActive
-        self.bedPricing = bedPricing # Store bedPricing
-        self.createdAt = datetime.now(timezone.utc)
+        self.bedPricing = bedPricing
+        self.totalRooms = totalRooms
+        self.totalBeds = totalBeds
+        self.createdAt = createdAt if createdAt is not None else datetime.now(timezone.utc)
         self.updatedAt = datetime.now(timezone.utc)

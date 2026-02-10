@@ -19,6 +19,10 @@ from services.propertyService import (
 router = APIRouter(prefix="/properties", tags=["Properties"])
 
 
+@router.post("", response_model=PropertyResponseSchema, status_code=status.HTTP_201_CREATED)
+async def createPropertyNoSlash(payload: UIPropertyCreateSchema, request: Request):
+    return await createPropertyService(payload, request)
+
 @router.post("/", response_model=PropertyResponseSchema, status_code=status.HTTP_201_CREATED)
 async def createProperty(payload: UIPropertyCreateSchema, request: Request):
     return await createPropertyService(payload, request)

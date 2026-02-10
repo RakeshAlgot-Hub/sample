@@ -44,6 +44,17 @@ export default function FloorsScreen() {
   } | null>(null);
 
   useEffect(() => {
+    if (__DEV__ && buildings.length > 0 && buildings[0].floors.length === 0) {
+      const mockFloor: Floor = {
+        id: Date.now().toString() + Math.random(),
+        label: '1',
+        rooms: [],
+      };
+      addFloor(buildings[0].id, mockFloor);
+    }
+  }, [buildings]);
+
+  useEffect(() => {
     if (buildings.length === 0) {
       return;
     }

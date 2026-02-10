@@ -34,6 +34,12 @@ export default function SignupScreen() {
   } | null>(null);
 
   useEffect(() => {
+    if (__DEV__) {
+      setFullName('Test User');
+      setEmail('testuser@gmail.com');
+      setPassword('asdfgh');
+      setConfirmPassword('asdfgh');
+    }
     async function getDeviceData() {
       // Ensure Application.getInstallationIdAsync() is called correctly
       let deviceId: string | null = null;

@@ -8,6 +8,7 @@ class FloorModel:
         property_id: ObjectId,
         ownerId: ObjectId,
         floor_number: int,
+        floor_label: str, # Added new field
         room_count: int,
         isActive: bool = True,
     ):
@@ -15,6 +16,7 @@ class FloorModel:
         self.property_id = property_id
         self.ownerId = ownerId
         self.floor_number = floor_number
+        self.floor_label = floor_label # Assign new field
         self.room_count = room_count
         self.isActive = isActive
         self.createdAt = datetime.now(timezone.utc)

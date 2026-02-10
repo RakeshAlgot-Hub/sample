@@ -30,7 +30,8 @@ export default function AvailableBedsScreen() {
             await syncBedOccupancyWithMembers(loadedMembers);
         };
         loadData();
-    }, []);
+    }, [properties, activePropertyId]);
+
 
     const activeProperty = useMemo(() => {
         if (properties.length === 0) {
