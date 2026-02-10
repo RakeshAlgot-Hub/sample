@@ -1,35 +1,62 @@
-# dependencies
-node_modules/
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
 
-# expo
-.expo/
+# Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Node / React
+node_modules/
+.npm/
+.yarn/
+.pnp.*
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.next/
+out/
+build/
 dist/
+
+# Expo / React Native
+.expo/
+.expo-shared/
 web-build/
 expo-env.d.ts
 
-# native
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
 
-# metro
-.metro-health-check*
+# FastAPI
+.uvicorn_cache/
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# Logs
+*.log
 
-# macos
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
+# Environment files
 .env
+.env.*
 
-# typescript
-*.tsbuildinfo
+# Ignore custom folders prefixed with ignore.
+**/ignore.*/
+
