@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as memberService from '@/services/memberService';
 import { Member } from '@/types/member';
 import { usePropertiesStore } from './usePropertiesStore';
 import { normalizeMemberPaymentFields } from '@/utils/memberPayments';
@@ -35,16 +36,14 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
         true
       );
     }
-
+    const created = await memberService.createMember(member);
     set((state) => ({
-      members: [...state.members, member],
+      members: [...state.members, created],
     }));
-    await get().saveMembers();
   },
 
   removeMember: async (id: string) => {
     const member = get().members.find((m) => m.id === id);
-
     if (
       member &&
       member.propertyId &&
@@ -63,41 +62,32 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
         false
       );
     }
-
+    await memberService.deleteMember(id);
     set((state) => ({
       members: state.members.filter((m) => m.id !== id),
     }));
-    await get().saveMembers();
   },
 
   updateMember: async (id: string, updates: Partial<Member>) => {
+    const updated = await memberService.updateMember(id, updates);
     set((state) => ({
       members: state.members.map((m) =>
-        m.id === id ? normalizeMemberPaymentFields({ ...m, ...updates }) : m
+        m.id === id ? normalizeMemberPaymentFields(updated) : m
       ),
     }));
-    await get().saveMembers();
   },
 
   loadMembers: async () => {
     try {
-      const savedMembers = await AsyncStorage.getItem('members');
-      if (savedMembers) {
-        const members: Member[] = JSON.parse(savedMembers);
-        set({ members: members.map(normalizeMemberPaymentFields) });
-      }
+      const members = await memberService.getMembers();
+      set({ members: members.map(normalizeMemberPaymentFields) });
     } catch (error) {
       console.error('Failed to load members:', error);
     }
   },
 
   saveMembers: async () => {
-    try {
-      const { members } = get();
-      await AsyncStorage.setItem('members', JSON.stringify(members));
-    } catch (error) {
-      console.error('Failed to save members:', error);
-    }
+    // No-op: persistence is now handled by backend
   },
 
   reset: () => {

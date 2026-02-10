@@ -12,7 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useStore } from '@/store/useStore';
 import { useTheme } from '@/theme/useTheme';
-import { createMockUser } from '@/mockData/users';
+import { signupUser } from '@/services/authService';
 import { Home, User, Mail, Lock } from 'lucide-react-native';
 
 export default function SignupScreen() {
@@ -44,9 +44,17 @@ export default function SignupScreen() {
       return;
     }
 
-    const user = createMockUser(name, email, password);
-    await signup(user);
-    router.replace('/(tabs)');
+    try {
+      const user = await signupUser(name, email, password);
+      await signup(user);
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Signup failed, please try again.'
+      );
+    }
   };
 
   return (

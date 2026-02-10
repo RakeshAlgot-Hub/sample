@@ -13,7 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useStore } from '@/store/useStore';
 import { useTheme } from '@/theme/useTheme';
-import { validateCredentials } from '@/mockData/users';
+import { loginUser } from '@/services/authService';
 import { Home, Mail, Lock } from 'lucide-react-native';
 
 export default function LoginScreen() {
@@ -27,19 +27,20 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     setError('');
-
     if (!email || !password) {
       setError('Please fill in all fields');
       return;
     }
-
-    const user = validateCredentials(email, password);
-
-    if (user) {
-      await login(user);
+    try {
+      const user = await loginUser(email, password);
+      await login(user as import('@/store/useStore').User);
       router.replace('/(tabs)');
-    } else {
-      setError('Invalid email or password');
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Invalid email or password'
+      );
     }
   };
 
@@ -141,7 +142,10 @@ export default function LoginScreen() {
             <Text style={[styles.footerText, { color: theme.textSecondary }]}>
               Don't have an account?{' '}
             </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+            <TouchableOpacity onPress={() => {
+              console.log('Signup button pressed');
+              router.push('/(auth)/signup');
+            }}>
               <Text style={[styles.link, { color: theme.primary }]}>
                 Sign up
               </Text>

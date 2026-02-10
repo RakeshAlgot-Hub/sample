@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as propertyService from '@/services/propertyService';
 import { PropertyDetails, Building, Floor, Room, WizardState, Property } from '@/types/property';
 import { generateBedsByShareType, generateBedsByCount, getBedCountByShareType } from '@/utils/bedHelpers';
 
@@ -127,13 +128,13 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
   },
 
   addRoom: (buildingId: string, floorId: string, room: Room) => {
+    // TODO: Integrate with backend service for room creation
     const bedCount = room.bedCount ?? getBedCountByShareType(room.shareType);
     const roomWithBeds = {
       ...room,
       bedCount,
       beds: bedCount > 0 ? generateBedsByCount(bedCount) : generateBedsByShareType(room.shareType),
     };
-
     set((state) => ({
       buildings: state.buildings.map((b) =>
         b.id === buildingId
@@ -152,6 +153,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
   },
 
   removeRoom: (buildingId: string, floorId: string, roomId: string) => {
+    // TODO: Integrate with backend service for room deletion
     set((state) => ({
       buildings: state.buildings.map((b) =>
         b.id === buildingId
@@ -210,19 +212,14 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
 
   resetWizard: () => {
     set(initialState);
-    AsyncStorage.removeItem('wizardState').catch(console.error);
+    // TODO: Optionally notify backend to reset wizard state if needed
   },
 
   loadWizardState: async () => {
     try {
-      const savedState = await AsyncStorage.getItem('wizardState');
-      if (savedState) {
-        const parsedState: WizardState = JSON.parse(savedState);
-        set({
-          ...parsedState,
-          bedPricing: parsedState.bedPricing ?? [],
-        });
-      }
+      // TODO: Replace with backend call to load wizard state
+      // const wizardState = await propertyService.getWizardState();
+      // set(wizardState);
     } catch (error) {
       console.error('Failed to load wizard state:', error);
     }
@@ -230,16 +227,8 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
 
   saveWizardState: async () => {
     try {
-      const state = get();
-      const stateToSave: WizardState = {
-        currentStep: state.currentStep,
-        propertyDetails: state.propertyDetails,
-        buildings: state.buildings,
-        allowedBedCounts: state.allowedBedCounts,
-        bedPricing: state.bedPricing,
-        editingPropertyId: state.editingPropertyId ?? null,
-      };
-      await AsyncStorage.setItem('wizardState', JSON.stringify(stateToSave));
+      // TODO: Replace with backend call to save wizard state
+      // await propertyService.saveWizardState(get());
     } catch (error) {
       console.error('Failed to save wizard state:', error);
     }

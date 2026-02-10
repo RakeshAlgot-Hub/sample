@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { saveSecureItem, getSecureItem, deleteSecureItem } from '@/services/secureStorage';
 
 export interface User {
   id: string;
@@ -29,8 +30,8 @@ export const useStore = create<AppState>((set) => ({
 
   login: async (user: User) => {
     try {
-      await AsyncStorage.setItem('isAuthenticated', 'true');
-      await AsyncStorage.setItem('user', JSON.stringify(user));
+      await saveSecureItem('isAuthenticated', 'true');
+      await saveSecureItem('user', JSON.stringify(user));
       set({ isAuthenticated: true, user });
     } catch (error) {
       console.error('Failed to save auth state:', error);
@@ -39,8 +40,8 @@ export const useStore = create<AppState>((set) => ({
 
   signup: async (user: User) => {
     try {
-      await AsyncStorage.setItem('isAuthenticated', 'true');
-      await AsyncStorage.setItem('user', JSON.stringify(user));
+      await saveSecureItem('isAuthenticated', 'true');
+      await saveSecureItem('user', JSON.stringify(user));
       set({ isAuthenticated: true, user });
     } catch (error) {
       console.error('Failed to save auth state:', error);
@@ -49,6 +50,10 @@ export const useStore = create<AppState>((set) => ({
 
   logout: async () => {
     try {
+      // Remove secure auth data
+      await deleteSecureItem('isAuthenticated');
+      await deleteSecureItem('user');
+
       // Clear all AsyncStorage data (properties, members, wizard data, etc.)
       await AsyncStorage.clear();
 
@@ -77,8 +82,8 @@ export const useStore = create<AppState>((set) => ({
 
   initializeAuth: async () => {
     try {
-      const isAuthenticated = await AsyncStorage.getItem('isAuthenticated');
-      const userString = await AsyncStorage.getItem('user');
+      const isAuthenticated = await getSecureItem('isAuthenticated');
+      const userString = await getSecureItem('user');
 
       if (isAuthenticated === 'true' && userString) {
         const user = JSON.parse(userString);

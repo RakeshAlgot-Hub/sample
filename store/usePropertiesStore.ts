@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as propertyService from '@/services/propertyService';
 import { Property } from '@/types/property';
 
 interface PropertiesStore {
@@ -28,23 +29,21 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
   activePropertyId: null,
 
   addProperty: async (property: Property) => {
+    const created = await propertyService.createProperty(property);
     set((state) => ({
-      properties: [...state.properties, property],
+      properties: [...state.properties, created],
     }));
-    await get().saveProperties();
-
     const { activePropertyId } = get();
     if (!activePropertyId) {
-      await get().setActiveProperty(property.id);
+      await get().setActiveProperty(created.id);
     }
   },
 
   removeProperty: async (id: string) => {
+    await propertyService.deleteProperty(id);
     set((state) => ({
       properties: state.properties.filter((p) => p.id !== id),
     }));
-    await get().saveProperties();
-
     const { activePropertyId, properties } = get();
     if (activePropertyId === id) {
       const nextActive = properties.length > 0 ? properties[0].id : null;
@@ -53,12 +52,12 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
   },
 
   updateProperty: async (id: string, updates: Partial<Property>) => {
+    const updated = await propertyService.updateProperty(id, updates);
     set((state) => ({
       properties: state.properties.map((p) =>
-        p.id === id ? { ...p, ...updates } : p
+        p.id === id ? { ...p, ...updated } : p
       ),
     }));
-    await get().saveProperties();
   },
 
   setActiveProperty: async (id: string | null) => {
@@ -158,30 +157,11 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
 
   loadProperties: async () => {
     try {
-      const savedProperties = await AsyncStorage.getItem('properties');
-      const activeId = await AsyncStorage.getItem('activePropertyId');
-      if (savedProperties) {
-        const properties: Property[] = JSON.parse(savedProperties).map((property: Property) => {
-          const normalizedPricing = (property.bedPricing ?? []).map((entry: any) => ({
-            bedCount: entry.bedCount,
-            dailyPrice: Number(entry.dailyPrice ?? entry.price ?? 0),
-            monthlyPrice: Number(entry.monthlyPrice ?? entry.price ?? 0),
-          }));
-
-          return {
-            ...property,
-            bedPricing: normalizedPricing,
-          };
-        });
-        set({ properties, activePropertyId: activeId });
-
-        if (!activeId && properties.length > 0) {
-          await get().setActiveProperty(properties[0].id);
-        }
-        if (activeId && !properties.some((p) => p.id === activeId)) {
-          const fallbackId = properties.length > 0 ? properties[0].id : null;
-          await get().setActiveProperty(fallbackId);
-        }
+      const properties = await propertyService.getProperties();
+      set({ properties });
+      // Optionally, set activePropertyId if needed
+      if (properties.length > 0) {
+        await get().setActiveProperty(properties[0].id);
       }
     } catch (error) {
       console.error('Failed to load properties:', error);
@@ -189,12 +169,7 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
   },
 
   saveProperties: async () => {
-    try {
-      const { properties } = get();
-      await AsyncStorage.setItem('properties', JSON.stringify(properties));
-    } catch (error) {
-      console.error('Failed to save properties:', error);
-    }
+    // No-op: persistence is now handled by backend
   },
 
   reset: () => {
