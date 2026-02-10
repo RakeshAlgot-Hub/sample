@@ -1,62 +1,83 @@
-# OS
+##################################
+# General
+##################################
+.env
+.env.*
+!.env.example
+*.log
+logs/
+tmp/
+temp/
 .DS_Store
-.AppleDouble
-.LSOverride
 Thumbs.db
 
-# Editors
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-
-# Node / React
+##################################
+# Node / React Native / Expo
+##################################
 node_modules/
-.npm/
-.yarn/
-.pnp.*
-*.tsbuildinfo
 npm-debug.log*
+yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-.next/
-out/
-build/
-dist/
 
-# Expo / React Native
 .expo/
 .expo-shared/
 web-build/
-expo-env.d.ts
+dist/
+build/
 
-# Python
+# Expo native builds
+android/
+ios/
+!.expo/README.md
+
+# Metro / Babel cache
+.metro-cache/
+.cache/
+
+##################################
+# FastAPI / Python
+##################################
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyo
+*.pyd
 *.so
-.Python
+
+# Virtual environments
 .venv/
-env/
 venv/
-ENV/
-env.bak/
-venv.bak/
+env/
+
+# Python tools
+.mypy_cache/
 .pytest_cache/
 .coverage
-coverage.xml
 htmlcov/
+ruff_cache/
 
-# FastAPI
-.uvicorn_cache/
+##################################
+# FastAPI runtime
+##################################
+uvicorn.log
+gunicorn.log
 
-# Logs
-*.log
+##################################
+# MongoDB
+##################################
+data/db/
+mongo-data/
+dump/
 
-# Environment files
-.env
-.env.*
+##################################
+# IDE / Editor
+##################################
+.vscode/
+.idea/
+*.iml
 
-# Ignore custom folders prefixed with ignore.
-**/ignore.*/
-
+##################################
+# OS
+##################################
+.DS_Store
+Thumbs.db

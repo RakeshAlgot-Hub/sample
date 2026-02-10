@@ -9,7 +9,7 @@ from core.memberDb import (
     deleteMember,
     findMemberByBedId,
 )
-from core.propertyDb import findPropertyById
+from core.propertyDb import findPropertyById, findAllProperties # Added findAllProperties
 from core.bedDb import findBedById
 import logging
 
@@ -47,16 +47,25 @@ async def createMemberService(payload, user):
     new_member = createMember(memberObj.__dict__)
     return new_member
 
-# READ ALL BY PROPERTY
-async def getAllMembersByPropertyService(propertyId: str, user):
-    property = findPropertyById(propertyId)
-    if not property:
-        raise HTTPException(status_code=404, detail="Property not found")
-    if property["ownerId"] != user["id"]:
-        raise HTTPException(status_code=403, detail="Not authorized to view these members")
-    
-    members = findAllMembersByProperty(propertyId)
-    return members
+# READ ALL BY PROPERTY (OR ALL FOR USER IF propertyId IS NONE)
+async def getAllMembersByPropertyService(propertyId: str | None, user):
+    if propertyId is None:
+        # Get all properties for the user
+        user_properties = findAllProperties({"ownerId": user["id"]})
+        all_members = []
+        for prop in user_properties:
+            members_in_property = findAllMembersByProperty(prop["id"])
+            all_members.extend(members_in_property)
+        return all_members
+    else:
+        property = findPropertyById(propertyId)
+        if not property:
+            raise HTTPException(status_code=404, detail="Property not found")
+        if property["ownerId"] != user["id"]:
+            raise HTTPException(status_code=403, detail="Not authorized to view these members")
+        
+        members = findAllMembersByProperty(propertyId)
+        return members
 
 # READ BY ID
 async def getMemberByIdService(memberId: str, user):

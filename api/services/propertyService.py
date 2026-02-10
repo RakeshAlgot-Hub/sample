@@ -20,35 +20,99 @@ from core.bedDb import findAllBedsByRoom # New import
 from core.memberDb import findMemberByBedId # New import
 from datetime import datetime, timezone # Ensure timezone is imported
 import logging
+from schemas.propertySchema import UIPropertyCreateSchema, CreateFullPropertyRequestSchema, WizardPropertyRequestSchema, WizardBuildingInputSchema, WizardFloorInputSchema, WizardRoomInputSchema, UIBedPricing # Import UIPropertyCreateSchema
 
 logger = logging.getLogger(__name__)
 
 
 # CREATE
-async def createPropertyService(payload, request):
+async def createPropertyService(payload: UIPropertyCreateSchema, request):
     user = request.state.user
-    logger.info("Property creation started by ownerId=%s for property name=%s", user["id"], payload.name)
+    logger.info("UI Property creation started by ownerId=%s for property name=%s", user["id"], payload.name)
 
-    propertyObj = PropertyModel(
-    name=payload.name,
-    propertyType=payload.propertyType,
-    country=payload.country,
-    state=payload.state,
-    city=payload.city,
-    area=payload.area,
-    addressLine=payload.addressLine,
-    pincode=payload.pincode,
-    phone=payload.phone,
-    ownerId=ObjectId(user["id"]),
-)
+    # 1. Map UIPropertyCreateSchema to CreateFullPropertyRequestSchema
+    wizard_property_request = WizardPropertyRequestSchema(
+        name=payload.name,
+        country="India",  # Default for now, as UI doesn't provide
+        state="Telangana", # Default for now, as UI doesn't provide
+        city=payload.city,
+        address="Default Address", # Default for now, as UI doesn't provide
+        phone="9999999999",  # Default for now, as UI doesn't provide
+    )
 
+    wizard_buildings: list[WizardBuildingInputSchema] = []
+    wizard_floors: list[WizardFloorInputSchema] = []
+    wizard_rooms: list[WizardRoomInputSchema] = []
+
+    # Keep track of building and floor indices for mapping
+    building_id_to_index = {b.id: i for i, b in enumerate(payload.buildings)}
+
+    for building_index, ui_building in enumerate(payload.buildings):
+        wizard_buildings.append(WizardBuildingInputSchema(
+            name=ui_building.name,
+            floor_count=len(ui_building.floors)
+        ))
+
+        for ui_floor in ui_building.floors:
+            # Convert floor label ('G', '1', '2') to integer floor_number
+            floor_number = 0 if ui_floor.label.upper() == 'G' else int(ui_floor.label)
+            
+            wizard_floors.append(WizardFloorInputSchema(
+                building_index=building_id_to_index[ui_building.id],
+                floor_number=floor_number,
+                room_count=len(ui_floor.rooms)
+            ))
+
+            for ui_room in ui_floor.rooms:
+                wizard_rooms.append(WizardRoomInputSchema(
+                    building_index=building_id_to_index[ui_building.id],
+                    floor_number=floor_number,
+                    room_number=int(ui_room.roomNumber), # Assuming roomNumber is always convertible to int
+                    share_type=ui_room.bedCount # UI bedCount maps to backend share_type
+                ))
+    
+    # Construct the CreateFullPropertyRequestSchema
+    full_property_request = CreateFullPropertyRequestSchema(
+        property=wizard_property_request,
+        buildings=wizard_buildings,
+        floors=wizard_floors,
+        rooms=wizard_rooms
+    )
+
+    # 2. Call _createFullPropertyInternal with the transformed payload
     try:
-        new_property = createProperty(propertyObj.__dict__)
-        logger.info("Property created successfully | ownerId=%s | propertyId=%s", user["id"], new_property["id"])
-        return new_property
+        # Note: _createFullPropertyInternal already sets ownerId internally
+        # We need to ensure bedPricing and propertyType from UI are used
+        # Since the wizard logic defaults propertyType to "HOSTEL", we'll need to pass it
+        # and also bedPricing if it's not handled there.
+        # For now, let's pass the UI payload's propertyType and bedPricing along with the full_property_request
+        # This will require a minor adjustment to _createFullPropertyInternal to accept these.
+        # However, to avoid modifying _createFullPropertyInternal in this step,
+        # I'll create a direct transformation for now.
+        
+        # This part needs careful consideration for how to pass bedPricing
+        # and actual propertyType (Hostel/PG, Apartments) from UI payload
+        # to the _createFullPropertyInternal.
+        # The current _createFullPropertyInternal hardcodes propertyType="HOSTEL"
+        # and doesn't take bedPricing.
+
+        # For simplicity and to resolve the immediate error, I will adjust _createFullPropertyInternal
+        # to accept propertyType and bedPricing directly.
+        
+        created_property_response = await _createFullPropertyInternal(
+            payload=full_property_request,
+            request=request,
+            property_type=payload.type, # Pass actual property type from UI
+            bed_pricing=payload.bedPricing # Pass bed pricing from UI
+        )
+        logger.info("UI Property creation successful | ownerId=%s | propertyId=%s", user["id"], created_property_response["property"]["id"])
+        return created_property_response["property"] # Return the main property object as expected by the route
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception("Error creating property for ownerId=%s | name=%s", user["id"], payload.name)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create property")
+        logger.exception("Error creating UI property for ownerId=%s | name=%s", user["id"], payload.name)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create property from UI")
 
 
 # READ ALL
@@ -195,7 +259,7 @@ from bson import ObjectId
 from datetime import datetime, timezone
 import uuid
 
-async def createFullPropertyService(payload: CreateFullPropertyRequestSchema, request):
+async def _createFullPropertyInternal(payload: CreateFullPropertyRequestSchema, request, property_type: str, bed_pricing: list[UIBedPricing]):
     user = request.state.user
     property_data = payload.property
     logger.info("Full property creation started by ownerId=%s for property name=%s", user["id"], property_data.name)
@@ -203,7 +267,7 @@ async def createFullPropertyService(payload: CreateFullPropertyRequestSchema, re
     # 1. Create Property
     propertyObj = PropertyModel(
         name=property_data.name,
-        propertyType="HOSTEL",  # Defaulting as it's not in wizard
+        propertyType=property_type,  # Use the passed property_type
         country=property_data.country,
         state=property_data.state,
         city=property_data.city,
@@ -212,6 +276,7 @@ async def createFullPropertyService(payload: CreateFullPropertyRequestSchema, re
         pincode="", # Defaulting pincode as it's not in wizard
         phone=property_data.phone,
         ownerId=user["id"],
+        bedPricing=bed_pricing # Pass bed pricing to the model
     )
 
     try:

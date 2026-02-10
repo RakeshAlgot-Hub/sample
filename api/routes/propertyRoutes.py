@@ -2,11 +2,9 @@ from fastapi import APIRouter, Request, Query, Response, status
 from typing import List
 
 from schemas.propertySchema import (
-    PropertyCreateSchema,
+    UIPropertyCreateSchema,
     PropertyUpdateSchema,
     PropertyResponseSchema,
-    CreateFullPropertyRequestSchema,
-    CreateFullPropertyResponseSchema,
     PropertyDetails,
 )
 from services.propertyService import (
@@ -15,7 +13,6 @@ from services.propertyService import (
     getPropertyByIdService,
     updatePropertyService,
     deletePropertyService,
-    createFullPropertyService,
     getPropertyDetailsService,
 )
 
@@ -23,13 +20,13 @@ router = APIRouter(prefix="/properties", tags=["Properties"])
 
 
 @router.post("/", response_model=PropertyResponseSchema, status_code=status.HTTP_201_CREATED)
-async def createProperty(payload: PropertyCreateSchema, request: Request):
+async def createProperty(payload: UIPropertyCreateSchema, request: Request):
     return await createPropertyService(payload, request)
 
 
-@router.post("/wizard", response_model=CreateFullPropertyResponseSchema, status_code=status.HTTP_201_CREATED)
-async def createFullProperty(payload: CreateFullPropertyRequestSchema, request: Request):
-    return await createFullPropertyService(payload, request)
+@router.post("/wizard", response_model=PropertyResponseSchema, status_code=status.HTTP_201_CREATED)
+async def createFullProperty(payload: UIPropertyCreateSchema, request: Request):
+    return await createPropertyService(payload, request)
 
 
 @router.get("", response_model=List[PropertyResponseSchema])

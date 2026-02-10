@@ -52,7 +52,7 @@ export default function AccountScreen() {
                             <View style={styles.infoTextContainer}>
                                 <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Name</Text>
                                 <Text style={[styles.infoValue, { color: theme.text }]}>
-                                    {user?.name}
+                                    {user?.fullName}
                                 </Text>
                             </View>
                         </View>

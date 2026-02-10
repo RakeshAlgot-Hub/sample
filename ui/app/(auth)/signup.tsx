@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,25 +12,54 @@ import {
 import { useRouter } from 'expo-router';
 import { useStore } from '@/store/useStore';
 import { useTheme } from '@/theme/useTheme';
-import { Home, User, Mail, Lock } from 'lucide-react-native';
+import { Home, User, Mail, Lock, Smartphone } from 'lucide-react-native';
+import * as Application from 'expo-application';
 
 export default function SignupScreen() {
   const router = useRouter();
   const theme = useTheme();
   const signup = useStore((state) => state.signup);
 
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deviceMetaData, setDeviceMetaData] = useState<{
+    deviceId: string;
+    platform: string;
+    appVersion: string;
+  } | null>(null);
+
+  useEffect(() => {
+    async function getDeviceData() {
+      // Ensure Application.getInstallationIdAsync() is called correctly
+      let deviceId: string | null = null;
+      if (Platform.OS === 'ios') {
+        deviceId = await Application.getIosIdForVendorAsync();
+      } else if (Platform.OS === 'android') {
+        deviceId = await Application.getAndroidId();
+      } else {
+        deviceId = 'web-device-' + Math.random().toString(36).substring(2, 15);
+      }
+
+      const appVersion = Application.nativeApplicationVersion || 'unknown';
+      setDeviceMetaData({
+        deviceId: deviceId || 'unknown', // Provide a fallback if deviceId is null
+        platform: Platform.OS,
+        appVersion,
+      });
+    }
+    getDeviceData();
+  }, []);
 
   const handleSignup = async () => {
     setError('');
 
-    if (!name || !email || !password || !confirmPassword) {
-      setError('Please fill in all fields');
+    if (!fullName || !password || !confirmPassword || (!email && !phoneNumber)) {
+      setError('Please fill in all required fields (Full Name, Password, and either Email or Phone Number)');
       return;
     }
 
@@ -44,9 +73,20 @@ export default function SignupScreen() {
       return;
     }
 
+    if (!deviceMetaData || !deviceMetaData.deviceId) {
+      setError('Device information is not available. Please try again.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      await signup(name.trim(), email.trim(), password);
+      await signup(
+        fullName.trim(),
+        email.trim() || undefined,
+        phoneNumber.trim() || undefined,
+        password,
+        deviceMetaData
+      );
       router.replace('/(tabs)');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Signup failed.';
@@ -107,10 +147,10 @@ export default function SignupScreen() {
                   color: theme.text,
                 },
               ]}
-              placeholder="Enter your name"
+              placeholder="Enter your full name"
               placeholderTextColor={theme.textSecondary}
-              value={name}
-              onChangeText={setName}
+              value={fullName}
+              onChangeText={setFullName}
               autoCapitalize="words"
               autoComplete="name"
             />
@@ -120,7 +160,7 @@ export default function SignupScreen() {
             <View style={styles.inputLabelContainer}>
               <Mail size={18} color={theme.textSecondary} strokeWidth={2} />
               <Text style={[styles.inputLabel, { color: theme.text }]}>
-                Email
+                Email (Optional)
               </Text>
             </View>
             <TextInput
@@ -139,6 +179,32 @@ export default function SignupScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.inputLabelContainer}>
+              <Smartphone size={18} color={theme.textSecondary} strokeWidth={2} />
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Phone Number (Optional)
+              </Text>
+            </View>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.inputBackground,
+                  borderColor: theme.inputBorder,
+                  color: theme.text,
+                },
+              ]}
+              placeholder="Enter your phone number"
+              placeholderTextColor={theme.textSecondary}
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              autoComplete="tel"
             />
           </View>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useStore } from '@/store/useStore';
 import { useTheme } from '@/theme/useTheme';
-import { Home, Mail, Lock } from 'lucide-react-native';
+import { Home, Mail, Lock, Smartphone } from 'lucide-react-native'; // Added Smartphone icon
+import * as Application from 'expo-application'; // Added Application
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -20,21 +21,58 @@ export default function LoginScreen() {
   const login = useStore((state) => state.login);
 
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState(''); // Added phoneNumber
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deviceMetaData, setDeviceMetaData] = useState<{
+    deviceId: string;
+    platform: string;
+    appVersion: string;
+  } | null>(null);
+
+  useEffect(() => {
+    async function getDeviceData() {
+      let deviceId: string | null = null;
+      if (Platform.OS === 'ios') {
+        deviceId = await Application.getIosIdForVendorAsync();
+      } else if (Platform.OS === 'android') {
+        deviceId = await Application.getAndroidId();
+      } else {
+        deviceId = 'web-device-' + Math.random().toString(36).substring(2, 15);
+      }
+
+      const appVersion = Application.nativeApplicationVersion || 'unknown';
+      setDeviceMetaData({
+        deviceId: deviceId || 'unknown', // Provide a fallback if deviceId is null
+        platform: Platform.OS,
+        appVersion,
+      });
+    }
+    getDeviceData();
+  }, []);
 
   const handleLogin = async () => {
     setError('');
 
-    if (!email || !password) {
-      setError('Please fill in all fields');
+    if (!password || (!email && !phoneNumber)) {
+      setError('Please fill in your Password and either Email or Phone Number');
+      return;
+    }
+
+    if (!deviceMetaData || !deviceMetaData.deviceId) {
+      setError('Device information is not available. Please try again.');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      await login(email.trim(), password);
+      await login(
+        email.trim() || undefined,
+        phoneNumber.trim() || undefined,
+        password,
+        deviceMetaData
+      );
       router.replace('/(tabs)');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed.';
@@ -83,7 +121,7 @@ export default function LoginScreen() {
             <View style={styles.inputLabelContainer}>
               <Mail size={18} color={theme.textSecondary} strokeWidth={2} />
               <Text style={[styles.inputLabel, { color: theme.text }]}>
-                Email
+                Email (Optional)
               </Text>
             </View>
             <TextInput
@@ -102,6 +140,32 @@ export default function LoginScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.inputLabelContainer}>
+              <Smartphone size={18} color={theme.textSecondary} strokeWidth={2} />
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Phone Number (Optional)
+              </Text>
+            </View>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.inputBackground,
+                  borderColor: theme.inputBorder,
+                  color: theme.text,
+                },
+              ]}
+              placeholder="Enter your phone number"
+              placeholderTextColor={theme.textSecondary}
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              autoComplete="tel"
             />
           </View>
 

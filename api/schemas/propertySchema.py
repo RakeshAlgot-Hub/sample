@@ -43,9 +43,46 @@ class PropertyResponseSchema(BaseModel):
     createdAt: datetime
     updatedAt: datetime
 
+# ==================== UI-DRIVEN CREATE SCHEMAS ====================
 
+class UIBed(BaseModel):
+    id: str
+    occupied: bool
 
-# ==================== WIZARD SCHEMAS ====================
+class UIRoom(BaseModel):
+    id: str
+    roomNumber: str
+    shareType: str # "single", "double", "triple"
+    bedCount: int
+    beds: list[UIBed]
+
+class UIFloor(BaseModel):
+    id: str
+    label: str # "G", "1", "2", etc.
+    rooms: list[UIRoom]
+
+class UIBuilding(BaseModel):
+    id: str
+    name: str
+    floors: list[UIFloor]
+
+class UIBedPricing(BaseModel):
+    bedCount: int
+    dailyPrice: int
+    monthlyPrice: int
+
+class UIPropertyCreateSchema(BaseModel):
+    name: str
+    type: str # "Hostel/PG" or "Apartments"
+    city: str
+    area: str
+    buildings: list[UIBuilding]
+    bedPricing: list[UIBedPricing]
+    totalRooms: int
+    totalBeds: int
+    createdAt: datetime
+
+# ==================== WIZARD SCHEMAS (Internal Backend Use) ====================
 
 class WizardPropertyRequestSchema(BaseModel):
     name: str

@@ -10,7 +10,7 @@ from routes.memberRoutes import router as memberRouter
 from core.dependencies import JwtAuthMiddleware
 from core.logger import setupLogger
 
-from core.rateLimiter import limiter 
+from core.rateLimiter import limiter
 from slowapi.middleware import SlowAPIMiddleware
 
 setupLogger()
@@ -20,10 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # ... (existing imports)
 
-app = FastAPI(
-    title="Hostel API",
-    version="1.0.0"
-)
+app = FastAPI(title="Hostel API", version="1.0.0")
 
 # CORS Middleware
 origins = [
@@ -39,18 +36,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(JwtAuthMiddleware)
-
-# ... (rest of the file)
-
-
-# ✅ ATTACH LIMITER TO APP
-app.state.limiter = limiter
-app.add_middleware(SlowAPIMiddleware)
-
 # Routers
+app.add_middleware(JwtAuthMiddleware)
 app.include_router(authRouter)
-app.include_router(hostelRouter)
+app.include_router(hostelRouter)  # Assuming hostelRouter is propertyRouter
+app.include_router(buildingRouter)
+app.include_router(floorRouter)
+app.include_router(roomRouter)
+app.include_router(bedRouter)
+app.include_router(memberRouter)
+
 app.include_router(buildingRouter)
 app.include_router(floorRouter)
 app.include_router(roomRouter)
@@ -65,4 +60,5 @@ async def api():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)

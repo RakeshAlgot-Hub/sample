@@ -34,9 +34,9 @@ def generateAccessToken(
     )
 
 
-def generateRefreshToken(userId: str) -> str:
+def generateRefreshToken(userId: str, deviceId: str) -> str:
     payload = _buildSecurePayload(
-        {"uid": userId, "type": "refresh"},
+        {"uid": userId, "type": "refresh", "deviceId": deviceId},
         timedelta(days=settings.refreshTokenTtlDays),
     )
 

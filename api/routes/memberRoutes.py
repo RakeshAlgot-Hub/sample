@@ -13,6 +13,12 @@ from services.memberService import (
 
 router = APIRouter(tags=["Members"])
 
+@router.get("/members", response_model=List[MemberResponseSchema])
+async def get_all_members(request: Request):
+    user = request.state.user
+    # Call the service without a specific propertyId to get all members for the user
+    return await getAllMembersByPropertyService(None, user)
+
 @router.post("/members", response_model=MemberResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_member(payload: MemberCreateSchema, request: Request):
     user = request.state.user

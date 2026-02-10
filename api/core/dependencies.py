@@ -4,17 +4,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette import status
 from bson import ObjectId
 
-from core.security import (
-    verifyToken,
-    generateAccessToken,
-)
+from core.security import verifyToken
 from core.ownersDb import findOwner
-from core.config import settings
-
 
 PUBLIC_PATHS = (
     "/auth/login",
-    "/auth/register",
+    "/auth/signup",
+    "/auth/logout",
     "/docs",
     "/openapi.json",
     "/redoc",
@@ -31,8 +27,15 @@ class JwtAuthMiddleware(BaseHTTPMiddleware):
         if any(request.url.path.startswith(p) for p in PUBLIC_PATHS):
             return await callNext(request)
 
-        accessToken = request.cookies.get("__Secure-access")
-        refreshToken = request.cookies.get("__Secure-refresh")
+        # Try to get access token from Authorization header or cookie
+        accessToken = None
+        print("Checking authentication for path:", request.url.path)
+        auth_header = request.headers.get("Authorization")
+        print("Authorization header:", auth_header)
+        if auth_header and auth_header.startswith("Bearer "):
+            accessToken = auth_header.split(" ")[1]
+        elif request.cookies.get("__Secure-access"):  # Fallback to cookie for existing flows if needed, though mobile will use header
+            accessToken = request.cookies.get("__Secure-access")
 
         if not accessToken:
             return JSONResponse(
@@ -40,60 +43,13 @@ class JwtAuthMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Authentication required"},
             )
 
+        # Verify the access token
         payload = verifyToken(accessToken)
 
-        if not payload:
-            if not refreshToken:
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Session expired. Please login again"},
-                )
-
-            refreshPayload = verifyToken(refreshToken)
-            if not refreshPayload or refreshPayload.get("type") != "refresh":
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Invalid refresh token"},
-                )
-
-            userId = refreshPayload.get("uid")
-            print(userId)
-            user = findOwner({"_id": userId})
-            print("User fetched during refresh:", user)
-
-            if not user or not user.get("isActive", True):
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "User not found or inactive"},
-                )
-
-            newAccessToken = generateAccessToken(userId=str(user["_id"]))
-
-            request.state.user = {
-                "id": str(user["_id"]),
-                "username": user["username"],
-                "email": user["email"],
-                "fullName": user["fullName"],
-                "phoneNumber": user["phoneNumber"],
-                "isActive": user.get("isActive", True),
-            }
-
-            response = await callNext(request)
-            response.set_cookie(
-                key="__Secure-access",
-                value=newAccessToken,
-                httponly=True,
-                secure=settings.cookieSecure,
-                samesite="strict",
-                max_age=settings.accessTokenTtlMinutes * 60,
-                path="/",
-            )
-            return response
-
-        if payload.get("type") != "access":
+        if not payload or payload.get("type") != "access":
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"detail": "Invalid token type"},
+                content={"detail": "Invalid or expired access token"},
             )
 
         userId = payload.get("uid")
@@ -107,11 +63,13 @@ class JwtAuthMiddleware(BaseHTTPMiddleware):
 
         request.state.user = {
             "id": str(user["_id"]),
-            "username": user["username"],
-            "email": user["email"],
             "fullName": user["fullName"],
-            "phoneNumber": user["phoneNumber"],
+            "email": user.get("email"),
+            "phoneNumber": user.get("phoneNumber"),
+            "role": user.get("role", "owner"),
             "isActive": user.get("isActive", True),
+            "isEmailVerified": user.get("isEmailVerified", False),
+            "createdAt": user["createdAt"],
         }
 
         return await callNext(request)

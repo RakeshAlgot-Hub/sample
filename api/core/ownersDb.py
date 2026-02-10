@@ -1,5 +1,6 @@
 # api/core/ownersDb.py
 from datetime import datetime, timezone
+from bson import ObjectId # Added import for ObjectId
 from .database import ownerCollection
 
 
@@ -9,6 +10,10 @@ def getAllOwners(query):
 
 def findOwner(query):
     return ownerCollection.find_one(query)
+
+
+def findOwnerById(ownerId: str): # Added findOwnerById
+    return ownerCollection.find_one({"_id": ObjectId(ownerId)})
 
 
 def updateOwner(query: dict, updateData: dict):

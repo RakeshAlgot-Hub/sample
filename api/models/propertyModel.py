@@ -15,6 +15,7 @@ class PropertyModel:
         phone: str,
         ownerId: ObjectId,
         isActive: bool = True,
+        bedPricing: list = [], # Added bedPricing
     ):
         self.name = name
         self.propertyType = propertyType
@@ -27,5 +28,6 @@ class PropertyModel:
         self.phone = phone
         self.ownerId = ownerId
         self.isActive = isActive
+        self.bedPricing = bedPricing # Store bedPricing
         self.createdAt = datetime.now(timezone.utc)
         self.updatedAt = datetime.now(timezone.utc)

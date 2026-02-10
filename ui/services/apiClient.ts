@@ -13,7 +13,7 @@ export class ApiError extends Error {
 
 type RequestOptions = {
     auth?: boolean;
-    retryOnAuthError?: boolean;
+    // retryOnAuthError?: boolean; // No longer needed as refresh logic is removed
 };
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -43,46 +43,13 @@ const parseResponse = async (response: Response) => {
     return response.text();
 };
 
-const refreshAccessToken = async () => {
-    const refreshToken = await tokenStorage.getRefreshToken();
-    if (!refreshToken) {
-        return null;
-    }
-
-    const response = await fetch(buildUrl('/auth/refresh'), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken }),
-    });
-
-    if (!response.ok) {
-        await tokenStorage.clearTokens();
-        return null;
-    }
-
-    const data = (await parseResponse(response)) as {
-        accessToken: string;
-        refreshToken?: string;
-    };
-
-    if (!data?.accessToken) {
-        await tokenStorage.clearTokens();
-        return null;
-    }
-
-    await tokenStorage.setTokens(data.accessToken, data.refreshToken ?? refreshToken);
-    return data.accessToken;
-};
-
 export const request = async <T>(
     path: string,
     init: RequestInit,
     options?: RequestOptions
 ): Promise<T> => {
     const shouldAuth = options?.auth !== false;
-    const retryOnAuthError = options?.retryOnAuthError !== false;
+    // const retryOnAuthError = options?.retryOnAuthError !== false; // No longer needed
 
     const accessToken = shouldAuth ? await tokenStorage.getAccessToken() : null;
     const headers = new Headers(init.headers);
@@ -99,12 +66,13 @@ export const request = async <T>(
         headers,
     });
 
-    if (response.status === 401 && shouldAuth && retryOnAuthError) {
-        const refreshed = await refreshAccessToken();
-        if (refreshed) {
-            return request<T>(path, init, { ...options, retryOnAuthError: false });
-        }
-    }
+    // Removed refresh token logic. Client (useStore) will handle 401s and token refresh.
+    // if (response.status === 401 && shouldAuth && retryOnAuthError) {
+    //     const refreshed = await refreshAccessToken();
+    //     if (refreshed) {
+    //         return request<T>(path, init, { ...options, retryOnAuthError: false });
+    //     }
+    // }
 
     const data = await parseResponse(response);
 
@@ -123,9 +91,10 @@ export const requestJson = async <T>(
     path: string,
     method: string,
     body?: unknown,
-    options?: RequestOptions
+    options?: RequestOptions,
+    requestInitOverrides?: Partial<RequestInit> // New parameter for custom RequestInit properties
 ) => {
-    const init: RequestInit = { method };
+    const init: RequestInit = { method, ...requestInitOverrides }; // Merge overrides here
     if (body !== undefined) {
         init.body = JSON.stringify(body);
     }
