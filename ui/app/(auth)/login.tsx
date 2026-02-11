@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useStore } from '@/store/useStore';
 import { useTheme } from '@/theme/useTheme';
 import { loginUser } from '@/services/authService';
+import { saveSecureItem } from '@/services/secureStorage';
 import { Home, Mail, Lock } from 'lucide-react-native';
 
 export default function LoginScreen() {
@@ -32,8 +33,16 @@ export default function LoginScreen() {
       return;
     }
     try {
-      const user = await loginUser(email, password);
-      await login(user as import('@/store/useStore').User);
+      const response = await loginUser(email, password) as {
+        access_token: string;
+        refresh_token: string;
+        token_type: string;
+        user: { id: string; name: string; email: string };
+      };
+      // Store tokens for API calls
+      await saveSecureItem('accessToken', response.access_token);
+      await saveSecureItem('refreshToken', response.refresh_token);
+      await login(response.user);
       router.replace('/(tabs)');
     } catch (err: any) {
       setError(

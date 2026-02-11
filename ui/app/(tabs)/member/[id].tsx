@@ -161,7 +161,7 @@ export default function MemberDetailsScreen() {
                         <View style={styles.detailRow}>
                             <Calendar size={16} color={theme.textSecondary} strokeWidth={2} />
                             <Text style={[styles.detailText, { color: theme.text }]}>
-                                {member.joinedDate || 'Not provided'}
+                                {member.joinedDate ? member.joinedDate.split('T')[0] : 'Not provided'}
                             </Text>
                         </View>
                         <View style={styles.detailRow}>

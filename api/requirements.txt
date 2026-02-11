@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+motor
+pydantic
+passlib[argon2]
+argon2-cffi
+python-jose[cryptography]
+email-validator

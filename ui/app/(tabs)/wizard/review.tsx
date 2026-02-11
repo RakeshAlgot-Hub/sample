@@ -200,8 +200,8 @@ export default function ReviewScreen() {
         createdAt: new Date().toISOString(),
       };
 
-      await addProperty(newProperty);
-      nextPropertyId = newProperty.id;
+      const created = await addProperty(newProperty);
+      nextPropertyId = created.id;
 
       if (activePropertyId && activePropertyId !== newProperty.id) {
         Alert.alert(

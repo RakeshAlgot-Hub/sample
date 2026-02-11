@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { useStore } from '@/store/useStore';
 import { useTheme } from '@/theme/useTheme';
 import { signupUser } from '@/services/authService';
+import { saveSecureItem } from '@/services/secureStorage';
 import { Home, User, Mail, Lock } from 'lucide-react-native';
 
 export default function SignupScreen() {
@@ -45,8 +46,14 @@ export default function SignupScreen() {
     }
 
     try {
-      const user = await signupUser(name, email, password);
-      await signup(user);
+      const response = await signupUser(name, email, password) as {
+        access_token: string;
+        refresh_token: string;
+        user: any;
+      };
+      await saveSecureItem('accessToken', response.access_token);
+      await saveSecureItem('refreshToken', response.refresh_token);
+      await signup(response.user);
       router.replace('/(tabs)');
     } catch (err: any) {
       setError(

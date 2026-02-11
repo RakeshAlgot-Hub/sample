@@ -8,6 +8,7 @@ import { fontFamilies } from '@/theme/fonts';
 import { useStore } from '@/store/useStore';
 
 export default function RootLayout() {
+
   useFrameworkReady();
   const router = useRouter();
   const pathname = usePathname();
@@ -26,8 +27,16 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    // Debug log for navigation issues
+    console.log('NAV DEBUG', { isAuthenticated, isLoading, pathname });
     // If not authenticated and not on /login or /signup, redirect to login
-    if (!isLoading && !isAuthenticated && !pathname.startsWith('/(auth)')) {
+    const allowedAuthRoutes = [
+      '/(auth)/login',
+      '/(auth)/signup',
+      '/login',
+      '/signup',
+    ];
+    if (!isLoading && !isAuthenticated && !allowedAuthRoutes.includes(pathname)) {
       router.replace('/(auth)/login');
     }
   }, [isAuthenticated, isLoading, pathname, router]);

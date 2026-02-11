@@ -13,7 +13,18 @@ import { useTheme } from '@/theme/useTheme';
 import { User, Phone } from 'lucide-react-native';
 
 interface MemberFormProps {
-  onSubmit: (name: string, phone: string) => void;
+  onSubmit: (member: {
+    name: string;
+    phone: string;
+    propertyId?: string;
+    buildingId?: string;
+    floorId?: string;
+    roomId?: string;
+    bedId?: string;
+    villageName?: string;
+    joinedDate?: string;
+    proofId?: string;
+  }) => void;
   onCancel?: () => void;
   submitLabel?: string;
 }
@@ -26,10 +37,29 @@ export default function MemberForm({
   const theme = useTheme();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [propertyId, setPropertyId] = useState('');
+  const [buildingId, setBuildingId] = useState('');
+  const [floorId, setFloorId] = useState('');
+  const [roomId, setRoomId] = useState('');
+  const [bedId, setBedId] = useState('');
+  const [villageName, setVillageName] = useState('');
+  const [joinedDate, setJoinedDate] = useState('');
+  const [proofId, setProofId] = useState('');
 
   const handleSubmit = () => {
     if (name.trim() && phone.trim()) {
-      onSubmit(name.trim(), phone.trim());
+      onSubmit({
+        name: name.trim(),
+        phone: phone.trim(),
+        propertyId: propertyId.trim() || undefined,
+        buildingId: buildingId.trim() || undefined,
+        floorId: floorId.trim() || undefined,
+        roomId: roomId.trim() || undefined,
+        bedId: bedId.trim() || undefined,
+        villageName: villageName.trim() || undefined,
+        joinedDate: joinedDate.trim() || undefined,
+        proofId: proofId.trim() || undefined,
+      });
     }
   };
 
@@ -98,6 +128,89 @@ export default function MemberForm({
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
+          />
+        </View>
+
+        {/* Assignment fields (simple text inputs, replace with dropdowns/selectors as needed) */}
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.text }]}>Property ID</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
+            placeholder="Property ID"
+            placeholderTextColor={theme.textSecondary}
+            value={propertyId}
+            onChangeText={setPropertyId}
+          />
+        </View>
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.text }]}>Building ID</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
+            placeholder="Building ID"
+            placeholderTextColor={theme.textSecondary}
+            value={buildingId}
+            onChangeText={setBuildingId}
+          />
+        </View>
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.text }]}>Floor ID</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
+            placeholder="Floor ID"
+            placeholderTextColor={theme.textSecondary}
+            value={floorId}
+            onChangeText={setFloorId}
+          />
+        </View>
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.text }]}>Room ID</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
+            placeholder="Room ID"
+            placeholderTextColor={theme.textSecondary}
+            value={roomId}
+            onChangeText={setRoomId}
+          />
+        </View>
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.text }]}>Bed ID</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
+            placeholder="Bed ID"
+            placeholderTextColor={theme.textSecondary}
+            value={bedId}
+            onChangeText={setBedId}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.text }]}>Village Name</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
+            placeholder="Village Name"
+            placeholderTextColor={theme.textSecondary}
+            value={villageName}
+            onChangeText={setVillageName}
+          />
+        </View>
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.text }]}>Joined Date</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={theme.textSecondary}
+            value={joinedDate}
+            onChangeText={setJoinedDate}
+          />
+        </View>
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.text }]}>Proof ID</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
+            placeholder="Proof ID"
+            placeholderTextColor={theme.textSecondary}
+            value={proofId}
+            onChangeText={setProofId}
           />
         </View>
 

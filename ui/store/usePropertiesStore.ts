@@ -37,6 +37,7 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
     if (!activePropertyId) {
       await get().setActiveProperty(created.id);
     }
+    return created;
   },
 
   removeProperty: async (id: string) => {
