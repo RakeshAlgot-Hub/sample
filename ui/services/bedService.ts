@@ -1,6 +1,5 @@
 import axios from 'axios';
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 export async function getBeds() {
   const res = await axios.get(`${API_URL}/beds`);
   return res.data;

@@ -29,7 +29,7 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
   activePropertyId: null,
 
   addProperty: async (property: Property) => {
-    const created = await propertyService.createProperty(property);
+    const created = await propertyService.createProperty(property) as Property;
     set((state) => ({
       properties: [...state.properties, created],
     }));
@@ -37,7 +37,7 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
     if (!activePropertyId) {
       await get().setActiveProperty(created.id);
     }
-    return created;
+    // No return value needed
   },
 
   removeProperty: async (id: string) => {
@@ -56,7 +56,7 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
     const updated = await propertyService.updateProperty(id, updates);
     set((state) => ({
       properties: state.properties.map((p) =>
-        p.id === id ? { ...p, ...updated } : p
+        p.id === id && updated && typeof updated === 'object' ? { ...p, ...updated } : p
       ),
     }));
   },
@@ -158,7 +158,7 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
 
   loadProperties: async () => {
     try {
-      const properties = await propertyService.getProperties();
+      const properties = await propertyService.getProperties() as Property[];
       set({ properties });
       // Optionally, set activePropertyId if needed
       if (properties.length > 0) {

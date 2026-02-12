@@ -51,3 +51,4 @@ export default function RootLayout() {
     </>
   );
 }
+import 'react-native-reanimated';

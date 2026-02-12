@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getSecureItem } from './secureStorage';
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 async function authHeaders() {
   const token = await getSecureItem('accessToken');
