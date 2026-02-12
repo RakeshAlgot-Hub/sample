@@ -36,7 +36,7 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
         true
       );
     }
-    const created = await memberService.createMember(member);
+    const created = await memberService.createMember(member) as Member;
     set((state) => ({
       members: [...state.members, created],
     }));
@@ -69,7 +69,7 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
   },
 
   updateMember: async (id: string, updates: Partial<Member>) => {
-    const updated = await memberService.updateMember(id, updates);
+    const updated = await memberService.updateMember(id, updates) as Member;
     set((state) => ({
       members: state.members.map((m) =>
         m.id === id ? normalizeMemberPaymentFields(updated) : m
@@ -79,7 +79,7 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
 
   loadMembers: async () => {
     try {
-      const members = await memberService.getMembers();
+      const members = await memberService.getMembers() as Member[];
       set({ members: members.map(normalizeMemberPaymentFields) });
     } catch (error) {
       console.error('Failed to load members:', error);

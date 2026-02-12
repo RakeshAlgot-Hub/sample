@@ -6,9 +6,9 @@ import { Property } from '@/types/property';
 interface PropertiesStore {
   properties: Property[];
   activePropertyId: string | null;
-  addProperty: (property: Property) => Promise<void>;
+  addProperty: (property: Property) => Promise<Property>;
   removeProperty: (id: string) => Promise<void>;
-  updateProperty: (id: string, updates: Partial<Property>) => Promise<void>;
+  updateProperty: (id: string, updates: Partial<Property>) => Promise<Property>;
   setActiveProperty: (id: string | null) => Promise<void>;
   updateBedOccupancy: (
     propertyId: string,
@@ -37,7 +37,7 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
     if (!activePropertyId) {
       await get().setActiveProperty(created.id);
     }
-    // No return value needed
+    return created;
   },
 
   removeProperty: async (id: string) => {
@@ -53,12 +53,13 @@ export const usePropertiesStore = create<PropertiesStore>((set, get) => ({
   },
 
   updateProperty: async (id: string, updates: Partial<Property>) => {
-    const updated = await propertyService.updateProperty(id, updates);
+    const updated = await propertyService.updateProperty(id, updates) as Property;
     set((state) => ({
       properties: state.properties.map((p) =>
         p.id === id && updated && typeof updated === 'object' ? { ...p, ...updated } : p
       ),
     }));
+    return updated;
   },
 
   setActiveProperty: async (id: string | null) => {
