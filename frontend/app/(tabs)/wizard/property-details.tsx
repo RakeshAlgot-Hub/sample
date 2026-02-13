@@ -34,7 +34,6 @@ export default function PropertyDetailsScreen() {
     updatePropertyDetails,
     nextStep,
     resetWizard,
-    loadWizardState,
     editingPropertyId,
   } = useWizardStore();
 
@@ -45,11 +44,7 @@ export default function PropertyDetailsScreen() {
 
   const isEditing = mode === 'edit' || Boolean(editingPropertyId);
 
-  useEffect(() => {
-    if (!isEditing) {
-      loadWizardState();
-    }
-  }, [isEditing, loadWizardState]);
+  // Removed loadWizardState effect (no persistence in backend-driven wizard)
 
   useEffect(() => {
     setName(propertyDetails.name);

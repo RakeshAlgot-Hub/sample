@@ -67,7 +67,7 @@ export default function SplashScreen() {
         >
           <Home size={64} color={theme.background} strokeWidth={2} />
         </View>
-        <Text style={[styles.title, { color: theme.text }]}>PropertyPal</Text>
+        <Text style={[styles.title, { color: theme.text }]}>project</Text>
         <Text style={[styles.tagline, { color: theme.textSecondary }]}>
           Smart Property Management
         </Text>

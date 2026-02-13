@@ -48,6 +48,7 @@ export const useStore = create<AppState>((set) => ({
     set({ isLoading: true });
     try {
       const result = await authService.signup(data);
+      console.log('useStore signup result:', result);
       set({ user: result.user, accessToken: result.token, isAuthenticated: !!result.token, isLoading: false });
     } catch (error: any) {
       set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });

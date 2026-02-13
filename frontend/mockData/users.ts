@@ -1,10 +1,10 @@
 import { User } from '@/store/useStore';
 
 export const mockUsers: Record<string, User & { password: string }> = {
-  'demo@propertypal.com': {
+  'demo@project.com': {
     id: '1',
     name: 'Demo User',
-    email: 'demo@propertypal.com',
+    email: 'demo@project.com',
     password: 'demo123',
   },
   'john@example.com': {

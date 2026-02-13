@@ -27,7 +27,7 @@ export default function TopBar({ onSearchPress }: TopBarProps) {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-            <Text style={[styles.logo, { color: theme.primary }]}>PropertyPal</Text>
+            <Text style={[styles.logo, { color: theme.primary }]}>project</Text>
 
             <View style={styles.actions}>
                 <TouchableOpacity

@@ -148,7 +148,7 @@ export default function LoginScreen() {
 
           <View style={styles.demoInfo}>
             <Text style={[styles.demoText, { color: theme.textSecondary }]}>
-              Demo: demo@propertypal.com / demo123
+              Demo: demo@project.com / demo123
             </Text>
           </View>
         </View>

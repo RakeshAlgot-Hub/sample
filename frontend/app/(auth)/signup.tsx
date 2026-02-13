@@ -44,9 +44,11 @@ export default function SignupScreen() {
     }
 
     try {
-      await signup({ name, email, password });
+      const result = await signup({ name, email, password });
+      console.log('SignupScreen result:', result);
       router.replace('/(tabs)');
     } catch (err: any) {
+      console.log('SignupScreen error:', err);
       setError(err.message || 'Signup failed');
     }
   };

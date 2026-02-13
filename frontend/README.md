@@ -1,4 +1,4 @@
-# PropertyPal
+# project
 
 A mobile-first Expo React Native application for smart property management.
 
@@ -192,7 +192,7 @@ mockData/
 
 ## Demo Credentials
 
-- Email: demo@propertypal.com
+- Email: demo@project.com
 - Password: demo123
 
 ## Getting Started

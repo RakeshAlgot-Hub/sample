@@ -81,7 +81,7 @@ export default function AccountScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.footer}>
-                    <Text style={[styles.footerText, { color: theme.textSecondary }]}>PropertyPal v1.0.0</Text>
+                    <Text style={[styles.footerText, { color: theme.textSecondary }]}>project v1.0.0</Text>
                 </View>
             </ScrollView>
         </SafeAreaView>
