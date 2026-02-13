@@ -70,13 +70,6 @@ export default function SettingsScreen() {
                     onPress: () => router.push('/(tabs)/settings/account'),
                 },
                 {
-                    key: 'hostel',
-                    label: 'Property Details',
-                    icon: Home,
-                    onPress: () =>
-                        router.push('/settings/property-details' as '/settings/property-details/index'),
-                },
-                {
                     key: 'notifications',
                     label: 'Notifications',
                     icon: Bell,

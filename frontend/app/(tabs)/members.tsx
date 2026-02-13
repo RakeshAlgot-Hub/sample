@@ -6,6 +6,8 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
@@ -17,7 +19,7 @@ import { Users, Plus } from 'lucide-react-native';
 export default function MembersScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { members, loadMembersByProperty, clearMembers, removeMember } = useMembersStore();
+  const { members, loadMembersByProperty, clearMembers, removeMember, page, hasMore, isLoading } = useMembersStore();
   const { activePropertyId, loadProperties, properties } = usePropertiesStore();
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function MembersScreen() {
     return properties.find((property) => property.id === activePropertyId) ?? null;
   }, [properties, activePropertyId]);
 
-  if (visibleMembers.length === 0) {
+  if (visibleMembers.length === 0 && !isLoading) {
     return (
       <SafeAreaView
         style={[styles.container, { backgroundColor: theme.background }]}
@@ -90,19 +92,46 @@ export default function MembersScreen() {
     );
   }
 
+  // Handler to load next page
+  const handleLoadMore = () => {
+    if (!isLoading && hasMore && activePropertyId) {
+      loadMembersByProperty(activePropertyId, page + 1);
+    }
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <ScrollView contentContainerStyle={styles.listContent}>
-        {visibleMembers.map((member) => (
+      <FlatList
+        data={visibleMembers}
+        keyExtractor={(member) => member.id}
+        contentContainerStyle={styles.listContent}
+        renderItem={({ item }) => (
           <MemberCard
-            key={member.id}
-            member={member}
-            onRemove={() => handleRemoveMember(member.id)}
+            member={item}
+            onRemove={() => handleRemoveMember(item.id)}
           />
-        ))}
-      </ScrollView>
+        )}
+        ListEmptyComponent={isLoading ? (
+          <View style={{ padding: 32, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={theme.primary} />
+          </View>
+        ) : null}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          hasMore && !isLoading ? (
+            <TouchableOpacity style={{ marginTop: 16, alignItems: 'center' }} onPress={handleLoadMore}>
+              <Text style={{ color: theme.primary, fontWeight: '600', fontSize: 16 }}>Load more members</Text>
+            </TouchableOpacity>
+          ) : isLoading && visibleMembers.length > 0 ? (
+            <View style={{ padding: 16, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={theme.primary} />
+            </View>
+          ) : null
+        }
+      />
       <TouchableOpacity
         style={[styles.fab, { backgroundColor: theme.accent }]}
         onPress={handleAddMember}

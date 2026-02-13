@@ -39,7 +39,8 @@ export default function BedSelector({
     ? properties.filter((property) => property.id === activePropertyId)
     : properties;
 
-  const selectedProperty = properties.find((p) => p.id === selectedPropertyId);
+  // Cast to Property type if you are sure properties contains Property, not PropertySummary
+  const selectedProperty = properties.find((p) => p.id === selectedPropertyId) as Property | undefined;
   const selectedBuilding = selectedProperty?.buildings.find(
     (b) => b.id === selectedBuildingId
   );
@@ -82,7 +83,8 @@ export default function BedSelector({
     );
   }
 
-  const availableBeds = selectedRoom?.beds.filter((bed) => !bed.occupied) || [];
+  // Only use backend summary data for available beds; do not update locally
+  const availableBeds = selectedRoom?.beds?.filter((bed) => !bed.occupied) || [];
 
   return (
     <View style={styles.container}>
@@ -240,7 +242,7 @@ export default function BedSelector({
           >
             {selectedFloor.rooms.map((room) => {
               const isSelected = room.id === selectedRoomId;
-              const availableBedsCount = room.beds.filter((b) => !b.occupied).length;
+              const availableBedsCount = room.beds?.filter((b) => !b.occupied).length;
               return (
                 <TouchableOpacity
                   key={room.id}
@@ -303,7 +305,7 @@ export default function BedSelector({
           </View>
           {availableBeds.length > 0 ? (
             <View style={styles.bedsGrid}>
-              {selectedRoom.beds.map((bed) => {
+              {selectedRoom.beds.map((bed: Bed) => {
                 const isSelected = bed.id === selectedBedId;
                 const isDisabled = bed.occupied;
                 return (

@@ -12,6 +12,9 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useMembersStore } from '@/store/useMembersStore';
+import { createMemberWithBed } from '@/services/memberService';
+import { usePropertiesStore } from '@/store/usePropertiesStore';
+import { useRoomsStore } from '@/store/useRoomsStore';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import {
     addDays,
@@ -30,7 +33,9 @@ const getParam = (value?: string | string[]) =>
 export default function MemberPaymentScreen() {
     const theme = useTheme();
     const router = useRouter();
-    const { addMember } = useMembersStore();
+    const { loadMembersByProperty } = useMembersStore();
+    const { activePropertyId, loadProperties } = usePropertiesStore();
+    const { loadRooms } = useRoomsStore();
     const params = useLocalSearchParams<{
         name?: string;
         phone?: string;
@@ -79,15 +84,12 @@ export default function MemberPaymentScreen() {
         if (!joinedDateValue) {
             return '';
         }
-
         if (paymentStatus === 'due') {
             return formatDateToISO(joinedDateValue);
         }
-
-        const computed =
-            cycleUnit === 'months'
-                ? addMonths(joinedDateValue, normalizedCycle)
-                : addDays(joinedDateValue, normalizedCycle);
+        const computed = cycleUnit === 'months'
+            ? addMonths(joinedDateValue, normalizedCycle)
+            : addDays(joinedDateValue, normalizedCycle);
         return formatDateToISO(computed);
     }, [joinedDateValue, paymentStatus, cycleUnit, normalizedCycle]);
 
@@ -127,28 +129,38 @@ export default function MemberPaymentScreen() {
 
         const nextDue = nextDueDate || formatDateToISO(joinedDateValue);
 
-        await addMember({
-            id: Date.now().toString(),
-            name,
-            phone,
-            villageName,
-            joinedDate,
-            payDate: joinedDate,
-            paymentCycle,
-            nextDueDate: nextDue,
-            proofId,
-            profilePic: profilePic || null,
-            propertyId,
-            buildingId,
-            floorId,
-            roomId,
-            bedId,
-            createdAt: new Date().toISOString(),
-        });
+        // 1. Create member with bed atomically via backend
+        try {
+            await createMemberWithBed({
+                name,
+                phone,
+                propertyId,
+                buildingId,
+                floorId,
+                roomId,
+                bedId,
+                billingCycle: paymentCycle,
+                rentAmount: 0, // TODO: set actual rent amount if available
+            });
+        } catch (err: any) {
+            if (err?.response?.status === 409 || err?.response?.data?.message?.toLowerCase().includes('occupied')) {
+                Alert.alert('Bed Occupied', 'This bed has already been assigned. Please select another bed.');
+            } else {
+                Alert.alert('Assignment Error', 'Failed to assign bed. Please try again.');
+            }
+            return;
+        }
+
+        // 2. Refresh property summary, room beds, and members list
+        await Promise.all([
+            loadProperties(),
+            loadRooms(propertyId, buildingId, floorId),
+            loadMembersByProperty(propertyId),
+        ]);
 
         router.replace('/(tabs)/members');
     }, [
-        addMember,
+        // ...existing code...
         bedId,
         buildingId,
         cycleUnit,
@@ -166,6 +178,9 @@ export default function MemberPaymentScreen() {
         roomId,
         router,
         villageName,
+        loadProperties,
+        loadRooms,
+        loadMembersByProperty,
     ]);
 
     const handleBack = useCallback(() => {

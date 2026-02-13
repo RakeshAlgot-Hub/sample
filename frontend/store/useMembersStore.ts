@@ -1,74 +1,86 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Member } from '@/types/member';
 import { normalizeMemberPaymentFields } from '@/utils/memberPayments';
 
+
 interface MembersStore {
+  membersById: Record<string, Member>;
+  memberIds: string[];
+  /**
+   * Computed array of members for UI compatibility (do not mutate directly)
+   */
   members: Member[];
-  addMember: (member: Member) => Promise<void>;
+  page: number;
+  hasMore: boolean;
+  isLoading: boolean;
   removeMember: (id: string) => Promise<void>;
   updateMember: (id: string, updates: Partial<Member>) => Promise<void>;
-  loadMembersByProperty: (propertyId: string) => Promise<void>;
-  saveMembers: () => Promise<void>;
+  loadMembersByProperty: (propertyId: string, page?: number, limit?: number) => Promise<void>;
   clearMembers: () => void;
   reset: () => void;
 }
 
 export const useMembersStore = create<MembersStore>((set, get) => ({
-  members: [],
-
-  addMember: async (member: Member) => {
-    set((state) => ({
-      members: [...state.members, member],
-    }));
-    await get().saveMembers();
+  membersById: {},
+  memberIds: [],
+  get members() {
+    // Always return members in the order of memberIds
+    return this.memberIds.map((id) => this.membersById[id]).filter(Boolean);
   },
+  page: 1,
+  hasMore: true,
+  isLoading: false,
 
   removeMember: async (id: string) => {
-    set((state) => ({
-      members: state.members.filter((m) => m.id !== id),
-    }));
-    await get().saveMembers();
+    set((state) => {
+      const { [id]: _, ...rest } = state.membersById;
+      return {
+        membersById: rest,
+        memberIds: state.memberIds.filter((mid) => mid !== id),
+      };
+    });
   },
 
   updateMember: async (id: string, updates: Partial<Member>) => {
     set((state) => ({
-      members: state.members.map((m) =>
-        m.id === id ? normalizeMemberPaymentFields({ ...m, ...updates }) : m
-      ),
+      membersById: {
+        ...state.membersById,
+        [id]: normalizeMemberPaymentFields({ ...state.membersById[id], ...updates }),
+      },
     }));
-    await get().saveMembers();
   },
 
-  loadMembersByProperty: async (propertyId: string) => {
+  loadMembersByProperty: async (propertyId: string, page = 1, limit = 20) => {
+    set({ isLoading: true });
     try {
-      const savedMembers = await AsyncStorage.getItem('members');
-      if (savedMembers) {
-        const allMembers: Member[] = JSON.parse(savedMembers);
-        const filtered = allMembers.filter(m => m.propertyId === propertyId);
-        set({ members: filtered.map(normalizeMemberPaymentFields) });
-      } else {
-        set({ members: [] });
+      // Replace with actual backend API call
+      const response = await fetch(`/api/members?propertyId=${propertyId}&page=${page}&limit=${limit}`);
+      if (!response.ok) throw new Error('Failed to fetch members');
+      const { members, hasMore } = await response.json();
+      const normalized: Record<string, Member> = {};
+      const ids: string[] = [];
+      for (const m of members) {
+        normalized[m.id] = m;
+        ids.push(m.id);
       }
-    } catch (error) {
-      console.error('Failed to load members by property:', error);
-    }
-  },
-
-  saveMembers: async () => {
-    try {
-      const { members } = get();
-      await AsyncStorage.setItem('members', JSON.stringify(members));
-    } catch (error) {
-      console.error('Failed to save members:', error);
+      set((state) => ({
+        membersById: page === 1 ? normalized : { ...state.membersById, ...normalized },
+        memberIds: page === 1 ? ids : [...state.memberIds, ...ids],
+        page,
+        hasMore,
+        isLoading: false,
+      }));
+    } catch (e) {
+      set({ isLoading: false });
+      // Optionally handle error
     }
   },
 
   clearMembers: () => {
-    set({ members: [] });
+    set({ membersById: {}, memberIds: [], page: 1, hasMore: true });
   },
 
   reset: () => {
-    set({ members: [] });
+    set({ membersById: {}, memberIds: [], page: 1, hasMore: true });
   },
 }));

@@ -13,8 +13,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import { Building2, Pencil, Trash2 } from 'lucide-react-native';
-import { getBuildingsByProperty, saveBuilding, getFloorsByBuilding, getRoomsByFloor, getBedsByRoom } from '@/utils/propertyRepository';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as buildingService from '@/services/buildingService';
+// No floorService or roomService needed for summary-only loading
 
 export default function PropertyBuildingsScreen() {
     const theme = useTheme();
@@ -30,9 +30,10 @@ export default function PropertyBuildingsScreen() {
         loadBuildings();
     }, [id]);
 
+    // Only load building summaries, no nested floors/rooms
     const loadBuildings = async () => {
         setLoading(true);
-        const b = await getBuildingsByProperty(id as string);
+        const b = await buildingService.getBuildingSummaries(id as string);
         setBuildings(b);
         setLoading(false);
     };
@@ -47,9 +48,7 @@ export default function PropertyBuildingsScreen() {
             Alert.alert('Building name required');
             return;
         }
-        const updated = { ...building, name: draftName.trim() };
-        await saveBuilding(updated);
-        // Update all related floors, rooms, beds if needed (if you store building name in them)
+        await buildingService.updateBuilding(building.propertyId, building.id, { name: draftName.trim() });
         setEditingId(null);
         setDraftName('');
         await loadBuildings();
@@ -60,52 +59,15 @@ export default function PropertyBuildingsScreen() {
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Delete', style: 'destructive', onPress: async () => {
-                    // Remove all related floors, rooms, beds
-                    const floors = await getFloorsByBuilding(building.id);
-                    for (const floor of floors) {
-                        const rooms = await getRoomsByFloor(floor.id);
-                        for (const room of rooms) {
-                            const beds = await getBedsByRoom(room.id);
-                            // Remove beds
-                            for (const bed of beds) {
-                                await removeBed(bed.id);
-                            }
-                            await removeRoom(room.id);
-                        }
-                        await removeFloor(floor.id);
-                    }
-                    await removeBuilding(building.id);
+                    // Backend is responsible for cascading deletes
+                    await buildingService.deleteBuilding(building.propertyId, building.id);
                     await loadBuildings();
                 }
             }
         ]);
     };
 
-    // Placeholder remove functions (implement in propertyRepository as needed)
-    const removeBuilding = async (buildingId: string) => {
-        const data = await AsyncStorage.getItem('buildings_collection');
-        const all = data ? JSON.parse(data) : [];
-        const filtered = all.filter((b: any) => b.id !== buildingId);
-        await AsyncStorage.setItem('buildings_collection', JSON.stringify(filtered));
-    };
-    const removeFloor = async (floorId: string) => {
-        const data = await AsyncStorage.getItem('floors_collection');
-        const all = data ? JSON.parse(data) : [];
-        const filtered = all.filter((f: any) => f.id !== floorId);
-        await AsyncStorage.setItem('floors_collection', JSON.stringify(filtered));
-    };
-    const removeRoom = async (roomId: string) => {
-        const data = await AsyncStorage.getItem('rooms_collection');
-        const all = data ? JSON.parse(data) : [];
-        const filtered = all.filter((r: any) => r.id !== roomId);
-        await AsyncStorage.setItem('rooms_collection', JSON.stringify(filtered));
-    };
-    const removeBed = async (bedId: string) => {
-        const data = await AsyncStorage.getItem('beds_collection');
-        const all = data ? JSON.parse(data) : [];
-        const filtered = all.filter((b: any) => b.id !== bedId);
-        await AsyncStorage.setItem('beds_collection', JSON.stringify(filtered));
-    };
+    // No local hierarchy or totals, backend handles all cascade and summary counts.
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}> 

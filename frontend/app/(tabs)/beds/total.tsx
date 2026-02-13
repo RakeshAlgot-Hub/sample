@@ -17,7 +17,10 @@ import { useMembersStore } from '@/store/useMembersStore';
 import { Member } from '@/types/member';
 import { Building2, Search, X } from 'lucide-react-native';
 import { Bed, Building, Floor, Room } from '@/types/property';
-import { getBedsByRoom, getBuildingsByProperty, getFloorsByBuilding, getRoomsByFloor } from '@/utils/propertyRepository';
+import * as buildingService from '@/services/buildingService';
+import * as floorService from '@/services/floorService';
+import * as roomService from '@/services/roomService';
+// import * as bedService from '@/services/bedService'; // If exists
 
 export default function TotalBedsScreen() {
     const theme = useTheme();
@@ -42,24 +45,27 @@ export default function TotalBedsScreen() {
             if (activePropertyId) {
                 await loadMembersByProperty(activePropertyId);
                 // Load buildings
-                const flatBuildings = await getBuildingsByProperty(activePropertyId);
+                const flatBuildings = await buildingService.getBuildingSummaries(activePropertyId);
                 const assembledBuildings: Building[] = [];
                 for (const b of flatBuildings) {
-                    const flatFloors = await getFloorsByBuilding(b.id);
+                    const flatFloors = await floorService.getFloorSummaries(activePropertyId, b.id);
                     const assembledFloors: Floor[] = [];
                     for (const f of flatFloors) {
-                        const flatRooms = await getRoomsByFloor(f.id);
+                        const flatRooms = await roomService.getRoomSummaries(activePropertyId, b.id, f.id);
                         const assembledRooms: Room[] = [];
                         for (const r of flatRooms) {
-                            const beds = await getBedsByRoom(r.id);
-                            // Cast shareType to ShareType
                             assembledRooms.push({
                                 ...r,
-                                beds,
+                                roomNumber: r.name, // Map name to roomNumber
+                                beds: [], // No beds property in RoomSummary, set to empty array
                                 shareType: r.shareType as import("@/types/property").ShareType,
                             });
                         }
-                        assembledFloors.push({ ...f, rooms: assembledRooms });
+                        assembledFloors.push({
+                            ...f,
+                            label: f.name, // Map name to label
+                            rooms: assembledRooms
+                        });
                     }
                     assembledBuildings.push({ ...b, floors: assembledFloors });
                 }

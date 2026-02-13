@@ -1,21 +1,18 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Animated } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Animated, ActivityIndicator, FlatList } from 'react-native';
 import { useTheme } from '@/theme/useTheme';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
 import { Bed, CheckCircle, Circle, Home, Building2, Layers, Search, AlertCircle } from 'lucide-react-native';
+import { getAvailableBeds, AvailableBedSummary } from '@/services/bedService';
+import { Property, Building, Floor, Room } from '@/types/property';
 
 interface AvailableBed {
-  propertyId: string;
+  id: string;
   propertyName: string;
-  buildingId: string;
-  buildingName: string;
-  floorId: string;
   floorLabel: string;
   roomId: string;
   roomNumber: string;
-  bedId: string;
   bedNumber: number;
-  bedCount: number;
   dailyPrice?: number;
   monthlyPrice?: number;
 }
@@ -27,7 +24,9 @@ interface BedSelectorProps {
 
 export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSelectorProps) {
   const theme = useTheme();
-  const { properties, activePropertyId } = usePropertiesStore();
+  const propertiesStore = usePropertiesStore();
+  const properties = propertiesStore.properties;
+  const activePropertyId = propertiesStore.activePropertyId;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -38,137 +37,98 @@ export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSel
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
 
+  // Backend paginated available beds
+  const [beds, setBeds] = useState<AvailableBed[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
   const bedFade = useRef(new Animated.Value(1)).current;
 
-  // Collect all available beds (memoized to prevent recalculation on every render)
-  const allAvailableBeds = useMemo(() => {
-    const beds: AvailableBed[] = [];
+  // Get current hierarchy data (for selectors only)
+  function isFullProperty(obj: any): obj is Property {
+    return obj && Array.isArray(obj.buildings);
+  }
+  const currentPropertyRaw = properties.find(p => p.id === selectedPropertyId);
+  const currentProperty = isFullProperty(currentPropertyRaw) ? currentPropertyRaw : undefined;
+  const currentBuilding = currentProperty?.buildings.find((b: Building) => b.id === selectedBuildingId);
+  const currentFloor = currentBuilding?.floors.find((f: Floor) => f.id === selectedFloorId);
+  const currentRoom = currentFloor?.rooms.find((r: Room) => r.id === selectedRoomId);
+  // Only show selector UI if currentProperty is a full Property (not PropertySummary)
+  const showSelector = !!currentProperty;
 
-    properties
-      .filter((property) => !activePropertyId || property.id === activePropertyId)
-      .forEach((property) => {
-        property.buildings.forEach((building) => {
-          building.floors.forEach((floor) => {
-            floor.rooms.forEach((room) => {
-              room.beds.forEach((bed, bedIndex) => {
-                if (!bed.occupied) {
-                  const bedCount = room.bedCount ?? room.beds.length;
-                  const pricing = property.bedPricing?.find(
-                    (entry) => entry.bedCount === bedCount
-                  );
-                  beds.push({
-                    propertyId: property.id,
-                    propertyName: property.name,
-                    buildingId: building.id,
-                    buildingName: building.name,
-                    floorId: floor.id,
-                    floorLabel: floor.label,
-                    roomId: room.id,
-                    roomNumber: room.roomNumber,
-                    bedId: bed.id,
-                    bedNumber: bedIndex + 1,
-                    bedCount,
-                    dailyPrice: pricing?.dailyPrice,
-                    monthlyPrice: pricing?.monthlyPrice,
-                  });
-                }
-              });
-            });
-          });
-        });
-      });
-
-    return beds;
-  }, [properties]);
-
-  // Get current hierarchy data
-  const currentProperty = useMemo(() => properties.find(p => p.id === selectedPropertyId), [selectedPropertyId, properties]);
-  const currentBuilding = useMemo(() => currentProperty?.buildings.find(b => b.id === selectedBuildingId), [currentProperty, selectedBuildingId]);
-  const currentFloor = useMemo(() => currentBuilding?.floors.find(f => f.id === selectedFloorId), [currentBuilding, selectedFloorId]);
-  const currentRoom = useMemo(() => currentFloor?.rooms.find(r => r.id === selectedRoomId), [currentFloor, selectedRoomId]);
-
+  // Fetch beds from backend when room changes or page changes
   useEffect(() => {
-    if (showSearch) {
-      return;
-    }
+    if (!selectedPropertyId || !selectedBuildingId || !selectedFloorId || !selectedRoomId) return;
+    setIsLoading(true);
+    getAvailableBeds({
+      propertyId: selectedPropertyId,
+      buildingId: selectedBuildingId,
+      floorId: selectedFloorId,
+      roomId: selectedRoomId,
+      page,
+      limit: 20,
+    })
+      .then((res) => {
+        // Map AvailableBedSummary to AvailableBed
+        const mappedBeds: AvailableBed[] = res.beds.map((bed: AvailableBedSummary) => ({
+          id: bed.id,
+          propertyName: bed.propertyName ?? '',
+          floorLabel: bed.floorLabel ?? '',
+          roomId: bed.roomId ?? '',
+          roomNumber: bed.roomNumber ?? '',
+          bedNumber: bed.bedNumber ?? 0,
+          dailyPrice: bed.dailyPrice,
+          monthlyPrice: bed.monthlyPrice,
+        }));
+        setBeds((prev) => page === 1 ? mappedBeds : [...prev, ...mappedBeds]);
+        setHasMore(res.hasMore);
+      })
+      .finally(() => setIsLoading(false));
+  }, [selectedPropertyId, selectedBuildingId, selectedFloorId, selectedRoomId, page]);
 
-    bedFade.setValue(0.85);
-    Animated.timing(bedFade, {
-      toValue: 1,
-      duration: 220,
-      useNativeDriver: false,
-    }).start();
-  }, [selectedPropertyId, selectedBuildingId, selectedFloorId, selectedRoomId, showSearch, bedFade]);
-
-  // Auto-select first property if not selected
+  // Reset beds when room changes
   useEffect(() => {
-    if (activePropertyId) {
-      setSelectedPropertyId(activePropertyId);
-      return;
-    }
+    setBeds([]);
+    setPage(1);
+    setHasMore(true);
+  }, [selectedPropertyId, selectedBuildingId, selectedFloorId, selectedRoomId]);
 
-    if (!selectedPropertyId && properties.length > 0) {
-      setSelectedPropertyId(properties[0].id);
-    }
-  }, [properties, activePropertyId]);
-
-  // Auto-select first building when property changes
-  useEffect(() => {
-    if (selectedPropertyId && currentProperty && currentProperty.buildings.length > 0) {
-      setSelectedBuildingId(currentProperty.buildings[0].id);
-    }
-  }, [selectedPropertyId, currentProperty]);
-
-  // Auto-select first floor when building changes
-  useEffect(() => {
-    if (selectedBuildingId && currentBuilding && currentBuilding.floors.length > 0) {
-      setSelectedFloorId(currentBuilding.floors[0].id);
-    }
-  }, [selectedBuildingId, currentBuilding]);
-
-  // Auto-select first room when floor changes
-  useEffect(() => {
-    if (selectedFloorId && currentFloor && currentFloor.rooms.length > 0) {
-      setSelectedRoomId(currentFloor.rooms[0].id);
-    }
-  }, [selectedFloorId, currentFloor]);
-
-  // Filter beds based on search or selector (memoized)
-  const displayBeds = useMemo(() => {
-    if (showSearch && searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      return allAvailableBeds.filter(bed =>
-        bed.propertyName.toLowerCase().includes(query) ||
-        bed.buildingName.toLowerCase().includes(query) ||
-        bed.floorLabel.toLowerCase().includes(query) ||
-        bed.roomNumber.toLowerCase().includes(query) ||
-        bed.bedNumber.toString().includes(query)
-      );
-    } else if (!showSearch && currentRoom) {
-      return allAvailableBeds.filter(bed => bed.roomId === selectedRoomId);
-    }
-    return [];
-  }, [showSearch, searchQuery, currentRoom, selectedRoomId, allAvailableBeds]);
+  // Filter for search
+  const displayBeds = showSearch && searchQuery.trim()
+    ? beds.filter(bed => {
+        const query = searchQuery.toLowerCase();
+        return (
+          (bed.id && bed.id.toLowerCase().includes(query)) ||
+          (bed.roomId && bed.roomId.toLowerCase().includes(query))
+        );
+      })
+    : beds;
 
   if (properties.length === 0) {
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={[styles.emptyContainer, { backgroundColor: theme.card, borderColor: theme.border }]}> 
         <AlertCircle size={48} color={theme.textSecondary} />
         <Text style={[styles.emptyTitle, { color: theme.text }]}>No Properties</Text>
-        <Text style={[styles.emptyDescription, { color: theme.textSecondary }]}>
-          Create a property with buildings and floors first.
-        </Text>
+        <Text style={[styles.emptyDescription, { color: theme.textSecondary }]}>Create a property with buildings and floors first.</Text>
       </View>
     );
   }
 
+  // Handler to load next page
+  const handleLoadMore = () => {
+    if (!isLoading && hasMore) {
+      setPage((p) => p + 1);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Search Bar */}
-      <View style={[styles.searchContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={[styles.searchContainer, { backgroundColor: theme.card, borderColor: theme.border }]}> 
         <Search size={18} color={theme.textSecondary} />
         <TextInput
-          style={[styles.searchInput, { color: theme.text }]}
+          style={[styles.searchInput, { color: theme.text }]} 
           placeholder="Search beds, rooms, floors..."
           placeholderTextColor={theme.textSecondary}
           value={searchQuery}
@@ -184,259 +144,121 @@ export default function AvailableBedsList({ selectedBedId, onBedSelect }: BedSel
 
       {showSearch && searchQuery.trim() ? (
         // Search Results
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.bedsList}>
-          {displayBeds.length === 0 ? (
+        <FlatList
+          data={displayBeds}
+          keyExtractor={(bed) => bed.id}
+          contentContainerStyle={styles.bedsList}
+          renderItem={({ item: bed }) => {
+            const isSelected = bed.id === selectedBedId;
+            return (
+              <TouchableOpacity
+                key={bed.id}
+                style={[
+                  styles.bedCard,
+                  {
+                    backgroundColor: isSelected ? theme.primary + '15' : theme.card,
+                    borderColor: isSelected ? theme.primary : theme.border,
+                  },
+                ]}
+                onPress={() => {
+                  onBedSelect(bed);
+                  setShowSearch(false);
+                  setSearchQuery('');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.bedCardContent}>
+                  <View style={styles.bedCardLeft}>
+                    <View style={[styles.bedIconContainer, { backgroundColor: isSelected ? theme.primary : theme.background }]}> 
+                      <Bed size={18} color={isSelected ? '#fff' : theme.primary} />
+                    </View>
+                    <View style={styles.bedInfo}>
+                      <Text style={[styles.bedTitle, { color: theme.text }]}>Bed {bed.id}</Text>
+                      <View style={styles.breadcrumb}>
+                        <Text style={[styles.breadcrumbText, { color: theme.textSecondary }]}>Room {bed.roomId}</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={[styles.checkIcon, { borderColor: isSelected ? theme.primary : theme.border }]}> 
+                    {isSelected ? (
+                      <CheckCircle size={20} color={theme.primary} fill={theme.primary} />
+                    ) : (
+                      <Circle size={20} color={theme.border} />
+                    )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+          ListEmptyComponent={isLoading && beds.length === 0 ? (
+            <ActivityIndicator size="small" color={theme.primary} style={{ marginTop: 20 }} />
+          ) : displayBeds.length === 0 ? (
             <View style={styles.emptyMessage}>
               <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No beds found</Text>
             </View>
-          ) : (
-            displayBeds.map((bed) => {
-              const isSelected = bed.bedId === selectedBedId;
+          ) : null}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            hasMore && !isLoading ? (
+              <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={handleLoadMore}>
+                <Text style={{ color: theme.primary, fontWeight: '600' }}>Load more beds</Text>
+              </TouchableOpacity>
+            ) : isLoading && beds.length > 0 ? (
+              <View style={{ padding: 16, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={theme.primary} />
+              </View>
+            ) : null
+          }
+        />
+      ) : (
+        showSelector ? (
+          <FlatList
+            data={displayBeds}
+            keyExtractor={(bed) => bed.id}
+            contentContainerStyle={styles.bedGrid}
+            numColumns={3}
+            renderItem={({ item: bed }) => {
+              const isSelected = bed.id === selectedBedId;
               return (
                 <TouchableOpacity
-                  key={bed.bedId}
+                  key={bed.id}
                   style={[
-                    styles.bedCard,
+                    styles.bedOption,
                     {
-                      backgroundColor: isSelected ? theme.primary + '15' : theme.card,
+                      backgroundColor: isSelected ? theme.primary : theme.card,
                       borderColor: isSelected ? theme.primary : theme.border,
                     },
                   ]}
-                  onPress={() => {
-                    onBedSelect(bed);
-                    setShowSearch(false);
-                    setSearchQuery('');
-                  }}
+                  onPress={() => onBedSelect(bed)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.bedCardContent}>
-                    <View style={styles.bedCardLeft}>
-                      <View style={[styles.bedIconContainer, { backgroundColor: isSelected ? theme.primary : theme.background }]}>
-                        <Bed size={18} color={isSelected ? '#fff' : theme.primary} />
-                      </View>
-                      <View style={styles.bedInfo}>
-                        <Text style={[styles.bedTitle, { color: theme.text }]}>
-                          Bed {bed.bedNumber} • Room {bed.roomNumber}
-                        </Text>
-                        {(bed.dailyPrice !== undefined || bed.monthlyPrice !== undefined) && (
-                          <Text style={[styles.bedPrice, { color: theme.textSecondary }]}>
-                            {bed.dailyPrice !== undefined ? `Day Rs ${bed.dailyPrice}` : 'Day -'}
-                            {'  •  '}
-                            {bed.monthlyPrice !== undefined
-                              ? `Month Rs ${bed.monthlyPrice}`
-                              : 'Month -'}
-                          </Text>
-                        )}
-                        <View style={styles.breadcrumb}>
-                          <Text style={[styles.breadcrumbText, { color: theme.textSecondary }]}>
-                            {bed.propertyName} → {bed.buildingName} → {bed.floorLabel}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                    <View style={[styles.checkIcon, { borderColor: isSelected ? theme.primary : theme.border }]}>
-                      {isSelected ? (
-                        <CheckCircle size={20} color={theme.primary} fill={theme.primary} />
-                      ) : (
-                        <Circle size={20} color={theme.border} />
-                      )}
-                    </View>
-                  </View>
+                  <Text style={[styles.bedOptionText, { color: isSelected ? '#fff' : theme.text }]}>Bed {bed.id}</Text>
                 </TouchableOpacity>
               );
-            })
-          )}
-        </ScrollView>
-      ) : (
-        // Selector View
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.selectorView}>
-          {/* Property Selector */}
-          <View style={styles.selectorSection}>
-            <Text style={[styles.selectorLabel, { color: theme.text }]}>
-              <Home size={14} color={theme.textSecondary} /> Property
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionsList}>
-              {properties.map((property) => {
-                const isSelected = property.id === selectedPropertyId;
-                return (
-                  <TouchableOpacity
-                    key={property.id}
-                    style={[
-                      styles.option,
-                      {
-                        backgroundColor: isSelected ? theme.primary : theme.card,
-                        borderColor: isSelected ? theme.primary : theme.border,
-                      },
-                    ]}
-                    onPress={() => {
-                      const nextBuilding = property.buildings[0];
-                      const nextFloor = nextBuilding?.floors[0];
-                      const nextRoom = nextFloor?.rooms[0];
-
-                      setSelectedPropertyId(property.id);
-                      setSelectedBuildingId(nextBuilding?.id ?? null);
-                      setSelectedFloorId(nextFloor?.id ?? null);
-                      setSelectedRoomId(nextRoom?.id ?? null);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.optionText, { color: isSelected ? '#fff' : theme.text }]}>
-                      {property.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* Building Selector */}
-          {currentProperty && currentProperty.buildings.length > 0 && (
-            <View style={styles.selectorSection}>
-              <Text style={[styles.selectorLabel, { color: theme.text }]}>
-                <Building2 size={14} color={theme.textSecondary} /> Building
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionsList}>
-                {currentProperty.buildings.map((building) => {
-                  const isSelected = building.id === selectedBuildingId;
-                  return (
-                    <TouchableOpacity
-                      key={building.id}
-                      style={[
-                        styles.option,
-                        {
-                          backgroundColor: isSelected ? theme.primary : theme.card,
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        },
-                      ]}
-                      onPress={() => {
-                        const nextFloor = building.floors[0];
-                        const nextRoom = nextFloor?.rooms[0];
-
-                        setSelectedBuildingId(building.id);
-                        setSelectedFloorId(nextFloor?.id ?? null);
-                        setSelectedRoomId(nextRoom?.id ?? null);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.optionText, { color: isSelected ? '#fff' : theme.text }]}>
-                        {building.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Floor Selector */}
-          {currentBuilding && currentBuilding.floors.length > 0 && (
-            <View style={styles.selectorSection}>
-              <Text style={[styles.selectorLabel, { color: theme.text }]}>
-                <Layers size={14} color={theme.textSecondary} /> Floor
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionsList}>
-                {currentBuilding.floors.map((floor) => {
-                  const isSelected = floor.id === selectedFloorId;
-                  return (
-                    <TouchableOpacity
-                      key={floor.id}
-                      style={[
-                        styles.option,
-                        {
-                          backgroundColor: isSelected ? theme.primary : theme.card,
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        },
-                      ]}
-                      onPress={() => {
-                        const nextRoom = floor.rooms[0];
-
-                        setSelectedFloorId(floor.id);
-                        setSelectedRoomId(nextRoom?.id ?? null);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.optionText, { color: isSelected ? '#fff' : theme.text }]}>
-                        {floor.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Room Selector */}
-          {currentFloor && currentFloor.rooms.length > 0 && (
-            <View style={styles.selectorSection}>
-              <Text style={[styles.selectorLabel, { color: theme.text }]}>
-                <Bed size={14} color={theme.textSecondary} /> Room
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionsList}>
-                {currentFloor.rooms.map((room) => {
-                  const isSelected = room.id === selectedRoomId;
-                  return (
-                    <TouchableOpacity
-                      key={room.id}
-                      style={[
-                        styles.option,
-                        {
-                          backgroundColor: isSelected ? theme.primary : theme.card,
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        },
-                      ]}
-                      onPress={() => setSelectedRoomId(room.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.optionText, { color: isSelected ? '#fff' : theme.text }]}>
-                        Room {room.roomNumber}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Bed Selector */}
-          {currentRoom && currentFloor && currentFloor.rooms.length > 0 && (
-            <View style={styles.selectorSection}>
-              <Text style={[styles.selectorLabel, { color: theme.text }]}>
-                <Bed size={14} color={theme.textSecondary} /> Select Bed
-              </Text>
-              {displayBeds.length === 0 ? (
-                <Animated.View style={[styles.emptyMessage, { backgroundColor: theme.card, opacity: bedFade }]}>
-                  <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                    No available beds in this room
-                  </Text>
-                </Animated.View>
-              ) : (
-                <Animated.View style={[styles.bedGrid, { opacity: bedFade }]}>
-                  {displayBeds.map((bed) => {
-                    const isSelected = bed.bedId === selectedBedId;
-                    return (
-                      <TouchableOpacity
-                        key={bed.bedId}
-                        style={[
-                          styles.bedOption,
-                          {
-                            backgroundColor: isSelected ? theme.primary : theme.card,
-                            borderColor: isSelected ? theme.primary : theme.border,
-                          },
-                        ]}
-                        onPress={() => onBedSelect(bed)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.bedOptionText, { color: isSelected ? '#fff' : theme.text }]}>
-                          Bed {bed.bedNumber}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </Animated.View>
-              )}
-            </View>
-          )}
-        </ScrollView>
+            }}
+            ListEmptyComponent={isLoading && beds.length === 0 ? (
+              <ActivityIndicator size="small" color={theme.primary} style={{ marginTop: 20 }} />
+            ) : displayBeds.length === 0 ? (
+              <Animated.View style={[styles.emptyMessage, { backgroundColor: theme.card, opacity: bedFade }]}> 
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No available beds in this room</Text>
+              </Animated.View>
+            ) : null}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              hasMore && !isLoading ? (
+                <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={handleLoadMore}>
+                  <Text style={{ color: theme.primary, fontWeight: '600' }}>Load more beds</Text>
+                </TouchableOpacity>
+              ) : isLoading && beds.length > 0 ? (
+                <View style={{ padding: 16, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={theme.primary} />
+                </View>
+              ) : null
+            }
+          />
+        ) : null
       )}
     </View>
   );

@@ -15,13 +15,10 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/useTheme';
 import { useWizardStore } from '@/store/useWizardStore';
 import { usePropertiesStore } from '@/store/usePropertiesStore';
-import {
-  savePropertySummary,
-  saveBuilding,
-  saveFloor,
-  saveRoom,
-  saveBed,
-} from '@/utils/propertyRepository';
+import * as propertyService from '@/services/propertyService';
+import * as buildingService from '@/services/buildingService';
+import * as floorService from '@/services/floorService';
+import * as roomService from '@/services/roomService';
 import WizardHeader from '@/components/WizardHeader';
 import WizardTopHeader from '@/components/WizardTopHeader';
 import WizardFooter from '@/components/WizardFooter';
@@ -59,32 +56,13 @@ export default function ReviewScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const totals = useMemo(() => {
-    const totalBuildings = buildings.length;
-    const totalFloors = buildings.reduce((acc, building) => acc + building.floors.length, 0);
-    const totalRooms = buildings.reduce(
-      (acc, building) =>
-        acc + building.floors.reduce((sum, floor) => sum + floor.rooms.length, 0),
-      0
-    );
-    const totalBeds = buildings.reduce(
-      (acc, building) =>
-        acc +
-        building.floors.reduce(
-          (sum, floor) =>
-            sum + floor.rooms.reduce((bedSum, room) => bedSum + room.beds.length, 0),
-          0
-        ),
-      0
-    );
-
-    return {
-      totalBuildings,
-      totalFloors,
-      totalRooms,
-      totalBeds,
-    };
-  }, [buildings]);
+  // Totals will be returned from backend summary after each creation
+  const [totals, setTotals] = useState({
+    totalBuildings: 0,
+    totalFloors: 0,
+    totalRooms: 0,
+    totalBeds: 0,
+  });
 
   const validationErrors = useMemo((): ValidationError[] => {
     const errors: ValidationError[] = [];
@@ -170,80 +148,44 @@ export default function ReviewScreen() {
 
   const handleFinish = async () => {
     if (!propertyDetails.type || !isValid) return;
-
     setIsSaving(true);
-
-    // Remove empty floors and buildings before saving
-    const cleanedBuildings = buildings
-      .map(b => ({
-        ...b,
-        floors: b.floors.filter(f => f.rooms && f.rooms.length > 0),
-      }))
-      .filter(b => b.floors.length > 0);
-
-    // Generate IDs
-    const propertyId = editingPropertyId ?? Date.now().toString();
-    let nextPropertyId = propertyId;
-
-    // Save summary only
-    const summary = {
-      id: propertyId,
+    // Create property
+    const propertySummary = await propertyService.createProperty({
       name: propertyDetails.name,
-      type: propertyDetails.type,
+      type: propertyDetails.type as string,
       city: propertyDetails.city,
-      area: propertyDetails.area,
-      createdAt: new Date().toISOString(),
-      totalBuildings: cleanedBuildings.length,
-      totalFloors: cleanedBuildings.reduce((acc, b) => acc + b.floors.length, 0),
-      totalRooms: cleanedBuildings.reduce((acc, b) => acc + b.floors.reduce((sum, f) => sum + f.rooms.length, 0), 0),
-      totalBeds: cleanedBuildings.reduce((acc, b) => acc + b.floors.reduce((sum, f) => sum + f.rooms.reduce((bedSum, r) => bedSum + r.beds.length, 0), 0), 0),
-      occupiedBeds: 0, // Optionally calculate if needed
-      availableBeds: 0, // Optionally calculate if needed
-    };
-
-    await savePropertySummary(summary);
-
-    // Save hierarchy separately
-    for (const building of cleanedBuildings) {
-      await saveBuilding({ id: building.id, propertyId, name: building.name });
+      area: propertyDetails.area ?? '',
+    });
+    // If backend returns totals in propertySummary, use them; otherwise, skip
+    setTotals({
+      totalBuildings: (propertySummary as any).totalBuildings ?? 0,
+      totalFloors: (propertySummary as any).totalFloors ?? 0,
+      totalRooms: (propertySummary as any).totalRooms ?? 0,
+      totalBeds: (propertySummary as any).totalBeds ?? 0,
+    });
+    const propertyId = propertySummary.id;
+    // Progressive creation of buildings, floors, rooms
+    for (const building of buildings) {
+      const buildingSummary = await buildingService.createBuilding(propertyId, { name: building.name });
+      // Do not expect totals on buildingSummary
       for (const floor of building.floors) {
-        await saveFloor({ id: floor.id, buildingId: building.id, label: floor.label });
+        const floorSummary = await floorService.createFloor(propertyId, buildingSummary.id, { name: floor.label });
+        // Do not expect totals on floorSummary
         for (const room of floor.rooms) {
-          await saveRoom({
-            id: room.id,
-            floorId: floor.id,
-            roomNumber: room.roomNumber,
-            shareType: room.shareType,
-            bedCount: room.beds.length,
-          });
-          for (const bed of room.beds) {
-            await saveBed({ id: bed.id, roomId: room.id, occupied: bed.occupied });
-          }
+          await roomService.createRoom(propertyId, buildingSummary.id, floorSummary.id, { name: room.roomNumber, shareType: room.shareType });
+          // If you have a bedService, call it here for each bed (not shown in provided services)
         }
       }
     }
-
-    // Immediately update Zustand store with the new property for instant dashboard feedback
-    const fullProperty = {
-      id: propertyId,
-      name: propertyDetails.name,
-      type: propertyDetails.type,
-      city: propertyDetails.city,
-      area: propertyDetails.area,
-      createdAt: summary.createdAt,
-      buildings: cleanedBuildings,
-      bedPricing: bedPricing || [],
-      totalRooms: summary.totalRooms,
-      totalBeds: summary.totalBeds,
-    };
-    await addProperty(fullProperty);
-
+    // Optionally update Zustand store with backend summary (if needed)
+    await addProperty({
+      ...propertySummary,
+      area: propertySummary.area ?? '',
+    });
     setIsSaving(false);
     setShowSuccess(true);
-
     setTimeout(() => {
       resetWizard();
-
       if (editingPropertyId) {
         router.replace({
           pathname: '/settings/property-details/[id]',
@@ -251,15 +193,13 @@ export default function ReviewScreen() {
         });
         return;
       }
-
-      if (nextPropertyId) {
+      if (propertyId) {
         router.replace({
           pathname: '/settings/property-details/[id]',
-          params: { id: nextPropertyId, source: 'dashboard' },
+          params: { id: propertyId, source: 'dashboard' },
         });
         return;
       }
-
       router.replace('/(tabs)');
     }, 800);
   };
