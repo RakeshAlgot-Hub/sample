@@ -33,13 +33,11 @@ export default function LoginScreen() {
       return;
     }
 
-    const user = validateCredentials(email, password);
-
-    if (user) {
-      await login(user);
+    try {
+      await login(email, password);
       router.replace('/(tabs)');
-    } else {
-      setError('Invalid email or password');
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
     }
   };
 

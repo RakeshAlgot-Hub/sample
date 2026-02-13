@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import * as authService from '@/services/authService';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Only used for theme persistence
 
 export interface User {
   id: string;
@@ -8,13 +10,14 @@ export interface User {
 }
 
 interface AppState {
-  isAuthenticated: boolean;
   user: User | null;
-  themeMode: 'light' | 'dark';
+  accessToken: string | null;
+  isAuthenticated: boolean;
   isLoading: boolean;
+  themeMode: 'light' | 'dark';
 
-  login: (user: User) => Promise<void>;
-  signup: (user: User) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (data: { name: string; email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   toggleTheme: () => Promise<void>;
   initializeAuth: () => Promise<void>;
@@ -22,35 +25,40 @@ interface AppState {
 }
 
 export const useStore = create<AppState>((set) => ({
-  isAuthenticated: false,
   user: null,
-  themeMode: 'dark',
+  accessToken: null,
+  isAuthenticated: false,
   isLoading: true,
+  themeMode: 'dark',
 
-  login: async (user: User) => {
+
+  login: async (email: string, password: string) => {
+    set({ isLoading: true });
     try {
-      await AsyncStorage.setItem('isAuthenticated', 'true');
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      set({ isAuthenticated: true, user });
-    } catch (error) {
-      console.error('Failed to save auth state:', error);
+      const result = await authService.login(email, password);
+      set({ user: result.user, accessToken: result.token, isAuthenticated: !!result.token, isLoading: false });
+    } catch (error: any) {
+      set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
+      throw error;
     }
   },
 
-  signup: async (user: User) => {
+
+  signup: async (data: { name: string; email: string; password: string }) => {
+    set({ isLoading: true });
     try {
-      await AsyncStorage.setItem('isAuthenticated', 'true');
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      set({ isAuthenticated: true, user });
-    } catch (error) {
-      console.error('Failed to save auth state:', error);
+      const result = await authService.signup(data);
+      set({ user: result.user, accessToken: result.token, isAuthenticated: !!result.token, isLoading: false });
+    } catch (error: any) {
+      set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
+      throw error;
     }
   },
+
 
   logout: async () => {
     try {
-      // Clear all AsyncStorage data (properties, members, wizard data, etc.)
-      await AsyncStorage.clear();
+      await authService.logout();
 
       // Reset all store states to initial values
       const { usePropertiesStore } = await import('./usePropertiesStore');
@@ -61,9 +69,9 @@ export const useStore = create<AppState>((set) => ({
       useMembersStore.getState().reset();
       useWizardStore.getState().resetWizard();
 
-      set({ isAuthenticated: false, user: null });
+      set({ user: null, accessToken: null, isAuthenticated: false });
     } catch (error) {
-      console.error('Failed to clear auth state:', error);
+      // Optionally handle error
     }
   },
 
@@ -75,20 +83,18 @@ export const useStore = create<AppState>((set) => ({
     });
   },
 
-  initializeAuth: async () => {
-    try {
-      const isAuthenticated = await AsyncStorage.getItem('isAuthenticated');
-      const userString = await AsyncStorage.getItem('user');
 
-      if (isAuthenticated === 'true' && userString) {
-        const user = JSON.parse(userString);
-        set({ isAuthenticated: true, user, isLoading: false });
+  initializeAuth: async () => {
+    set({ isLoading: true });
+    try {
+      const session = await authService.getStoredSession();
+      if (session) {
+        set({ user: session.user, accessToken: session.token, isAuthenticated: !!session.token, isLoading: false });
       } else {
-        set({ isLoading: false });
+        set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
       }
     } catch (error) {
-      console.error('Failed to initialize auth:', error);
-      set({ isLoading: false });
+      set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
     }
   },
 
