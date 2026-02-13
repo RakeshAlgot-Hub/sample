@@ -11,6 +11,7 @@ interface MembersStore {
   loadMembersByProperty: (propertyId: string) => Promise<void>;
   saveMembers: () => Promise<void>;
   clearMembers: () => void;
+  reset: () => void;
 }
 
 export const useMembersStore = create<MembersStore>((set, get) => ({
@@ -64,6 +65,10 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
   },
 
   clearMembers: () => {
+    set({ members: [] });
+  },
+
+  reset: () => {
     set({ members: [] });
   },
 }));
