@@ -112,7 +112,7 @@ export default function AddMemberScreen() {
 
   useEffect(() => {
     if (!selectedBed && !hasBedParams) {
-      router.replace('/beds/available');
+      router.replace('/beds/total');
     }
   }, [selectedBed, hasBedParams, router]);
 
@@ -300,7 +300,7 @@ export default function AddMemberScreen() {
                 <Text style={[styles.stepTitle, { color: theme.text }]}>Member Details</Text>
                 <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>Add profile information</Text>
               </View>
-              <TouchableOpacity onPress={() => router.replace('/beds/available')} activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => router.replace('/beds/total')} activeOpacity={0.7}>
                 <Text style={[styles.linkText, { color: theme.accent }]}>Change Bed</Text>
               </TouchableOpacity>
             </View>

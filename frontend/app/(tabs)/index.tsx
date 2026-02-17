@@ -137,25 +137,7 @@ export default function DashboardScreen() {
             <Text style={[styles.heroTitle, { color: theme.text }]}>Dashboard</Text>
             <Text style={[styles.heroSubtitle, { color: theme.textSecondary }]}>Overview</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => router.push('/properties')}
-            activeOpacity={0.7}
-            style={[
-              { borderColor: theme.cardBorder, backgroundColor: theme.secondary },
-            ]}
-          >
-            <View style={styles.propertyButtonContent}>
-              <View>
-                <Text style={[styles.propertyLabel, { color: theme.textSecondary }]}>
-                  Active Property
-                </Text>
-                <Text style={[styles.propertyName, { color: theme.text }]}>
-                  {activeProperty?.name || 'No Property'}
-                </Text>
-              </View>
-              <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2.5} />
-            </View>
-          </TouchableOpacity>
+              {/* Removed property-details navigation. Properties are now accessible via bottom bar. */}
         </Animated.View>
 
         <Animated.View entering={FadeInDown.duration(450).delay(60)}>
@@ -166,31 +148,15 @@ export default function DashboardScreen() {
             ]}
           >
             <View style={styles.bedsSummaryRow}>
-              <TouchableOpacity
-                style={styles.bedsSummaryItem}
-                onPress={() => router.push('/beds/total')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.bedsSummaryLabel, { color: theme.textSecondary }]}>
-                  Total Beds
-                </Text>
-                <Text style={[styles.bedsSummaryValue, { color: theme.text }]}>
-                  {analytics.totalBeds}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.bedsSummaryItem}>
+                <Text style={[styles.bedsSummaryLabel, { color: theme.textSecondary }]}>Total Beds</Text>
+                <Text style={[styles.bedsSummaryValue, { color: theme.text }]}>{analytics.totalBeds}</Text>
+              </View>
               <View style={[styles.bedsSummaryDivider, { backgroundColor: theme.cardBorder }]} />
-              <TouchableOpacity
-                style={styles.bedsSummaryItem}
-                onPress={() => router.push('/beds/available')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.bedsSummaryLabel, { color: theme.textSecondary }]}>
-                  Available Beds
-                </Text>
-                <Text style={[styles.bedsSummaryValue, { color: theme.text }]}>
-                  {analytics.availableBeds}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.bedsSummaryItem}>
+                <Text style={[styles.bedsSummaryLabel, { color: theme.textSecondary }]}>Available Beds</Text>
+                <Text style={[styles.bedsSummaryValue, { color: theme.text }]}>{analytics.availableBeds}</Text>
+              </View>
             </View>
           </View>
         </Animated.View>

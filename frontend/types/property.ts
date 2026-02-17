@@ -6,12 +6,9 @@ export interface PropertySummary {
   city: string;
   area?: string;
   createdAt: string;
-  totalBuildings: number;
-  totalRooms: number;
-  totalFloors: number;
-  totalBeds: number;
-  occupiedBeds: number;
-  availableBeds: number;
+  buildings?: string[];
+  floors?: string[];
+  shareTypes?: number[];
 }
 export type PropertyType = 'Hostel/PG' | 'Apartments';
 export type ShareType = 'single' | 'double' | 'triple';

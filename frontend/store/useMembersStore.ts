@@ -53,10 +53,7 @@ export const useMembersStore = create<MembersStore>((set, get) => ({
   loadMembersByProperty: async (propertyId: string, page = 1, limit = 20) => {
     set({ isLoading: true });
     try {
-      // Replace with actual backend API call
-      const response = await fetch(`/api/members?propertyId=${propertyId}&page=${page}&limit=${limit}`);
-      if (!response.ok) throw new Error('Failed to fetch members');
-      const { members, hasMore } = await response.json();
+      const { members, hasMore } = await (await import('@/services/memberService')).getMembers(propertyId, page, limit);
       const normalized: Record<string, Member> = {};
       const ids: string[] = [];
       for (const m of members) {

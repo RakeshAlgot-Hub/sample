@@ -57,7 +57,7 @@ export default function PropertyDetailsScreen() {
     resetWizard();
     if (editingPropertyId) {
       router.replace({
-        pathname: '/settings/property-details/[id]',
+        pathname: './settings/property-details/[id]',
         params: { id: editingPropertyId },
       });
       return;
@@ -101,7 +101,7 @@ export default function PropertyDetailsScreen() {
       />
       <WizardHeader
         currentStep={1}
-        totalSteps={6}
+        totalSteps={3}
         title="Property Details"
         onClose={handleClose}
         showClose={false}

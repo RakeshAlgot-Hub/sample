@@ -46,7 +46,7 @@ export default function BuildingsScreen() {
     resetWizard();
     if (editingPropertyId) {
       router.replace({
-        pathname: '/settings/property-details/[id]',
+        pathname: './settings/property-details/[id]',
         params: { id: editingPropertyId },
       });
       return;
@@ -59,14 +59,19 @@ export default function BuildingsScreen() {
     router.back();
   }, [previousStep, router]);
 
-  const handleAddBuilding = () => {
+  const handleAddBuilding = async () => {
     if (newBuildingName.trim()) {
-      const building: Building = {
-        id: Date.now().toString() + Math.random(),
-        name: newBuildingName.trim(),
-        floors: [],
-      };
-      addBuilding(building);
+      // Add building to local wizard state only
+      useWizardStore.setState((state: any) => ({
+        buildings: [
+          ...state.buildings,
+          {
+            id: Math.random().toString(36).substr(2, 9),
+            name: newBuildingName.trim(),
+            floors: [],
+          },
+        ],
+      }));
       setNewBuildingName('');
     }
   };
@@ -76,9 +81,9 @@ export default function BuildingsScreen() {
     setEditingName(building.name);
   };
 
-  const handleSaveEdit = () => {
-    if (editingId && editingName.trim()) {
-      updateBuilding(editingId, editingName.trim());
+  const handleSaveEdit = async () => {
+    if (editingId && editingName.trim() && editingPropertyId) {
+      await updateBuilding(editingPropertyId, editingId, { name: editingName.trim() });
       setEditingId(null);
       setEditingName('');
     }
@@ -95,7 +100,7 @@ export default function BuildingsScreen() {
 
   const handleNext = () => {
     nextStep();
-    router.push('/wizard/floors');
+    router.push('/wizard/review');
   };
 
   const canProceed = buildings.length > 0;
@@ -112,7 +117,7 @@ export default function BuildingsScreen() {
       />
       <WizardHeader
         currentStep={2}
-        totalSteps={6}
+        totalSteps={3}
         title="Buildings"
         onClose={handleClose}
         showClose={false}
@@ -302,7 +307,7 @@ export default function BuildingsScreen() {
       <WizardFooter
         onBack={handleBack}
         onNext={handleNext}
-        nextLabel="Next"
+        nextLabel="Review"
         nextDisabled={!canProceed}
         showBack={false}
       />
@@ -311,9 +316,9 @@ export default function BuildingsScreen() {
         title="Delete Building"
         message="Delete this building and all its floors, rooms, and beds?"
         onCancel={() => setPendingDeleteId(null)}
-        onConfirm={() => {
-          if (pendingDeleteId) {
-            removeBuilding(pendingDeleteId);
+        onConfirm={async () => {
+          if (pendingDeleteId && editingPropertyId) {
+            await removeBuilding(editingPropertyId, pendingDeleteId);
           }
           setPendingDeleteId(null);
         }}

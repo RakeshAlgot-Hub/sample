@@ -66,38 +66,13 @@ export default function ReviewScreen() {
 
   const validationErrors = useMemo((): ValidationError[] => {
     const errors: ValidationError[] = [];
-
-    buildings.forEach((building) => {
-      if (building.floors.length === 0) {
-        errors.push({
-          type: 'building',
-          message: `Building "${building.name}" has no floors`,
-        });
-      }
-
-      building.floors.forEach((floor) => {
-        if (floor.rooms.length === 0) {
-          errors.push({
-            type: 'floor',
-            message: `Floor ${floor.label} in "${building.name}" has no rooms`,
-          });
-        }
-
-        floor.rooms.forEach((room) => {
-          if (room.beds.length === 0) {
-            errors.push({
-              type: 'room',
-              message: `Room ${room.roomNumber} in "${building.name}" Floor ${floor.label} has no beds`,
-            });
-          }
-        });
-      });
-    });
-
+    if (buildings.length === 0) {
+      errors.push({ type: 'building', message: 'At least one building is required.' });
+    }
     return errors;
   }, [buildings]);
 
-  const isValid = validationErrors.length === 0 && allowedBedCounts.length > 0;
+  const isValid = validationErrors.length === 0;
 
   const getEmptyFloors = useMemo(() => {
     const empty = [];
@@ -115,7 +90,7 @@ export default function ReviewScreen() {
     resetWizard();
     if (editingPropertyId) {
       router.replace({
-        pathname: '/settings/property-details/[id]',
+        pathname: './settings/property-details/[id]',
         params: { id: editingPropertyId },
       });
       return;
@@ -149,14 +124,15 @@ export default function ReviewScreen() {
   const handleFinish = async () => {
     if (!propertyDetails.type || !isValid) return;
     setIsSaving(true);
-    // Create property
+    // Call createProperty endpoint with full property structure
+    // Map buildings to array of names for backend
     const propertySummary = await propertyService.createProperty({
       name: propertyDetails.name,
       type: propertyDetails.type as string,
       city: propertyDetails.city,
       area: propertyDetails.area ?? '',
+      buildings: buildings.map((b) => b.name),
     });
-    // If backend returns totals in propertySummary, use them; otherwise, skip
     setTotals({
       totalBuildings: (propertySummary as any).totalBuildings ?? 0,
       totalFloors: (propertySummary as any).totalFloors ?? 0,
@@ -164,50 +140,16 @@ export default function ReviewScreen() {
       totalBeds: (propertySummary as any).totalBeds ?? 0,
     });
     const propertyId = propertySummary.id;
-    // Progressive creation of buildings, floors, rooms
-    for (const building of buildings) {
-      const buildingSummary = await buildingService.createBuilding(propertyId, { name: building.name });
-      // Do not expect totals on buildingSummary
-      for (const floor of building.floors) {
-        const floorSummary = await floorService.createFloor(propertyId, buildingSummary.id, { name: floor.label });
-        // Do not expect totals on floorSummary
-        for (const room of floor.rooms) {
-          await roomService.createRoom(propertyId, buildingSummary.id, floorSummary.id, { name: room.roomNumber, shareType: room.shareType });
-          // If you have a bedService, call it here for each bed (not shown in provided services)
-        }
-      }
-    }
-    // Optionally update Zustand store with backend summary (if needed)
-    await addProperty({
-      ...propertySummary,
-      area: propertySummary.area ?? '',
-    });
     setIsSaving(false);
     setShowSuccess(true);
     setTimeout(() => {
       resetWizard();
-      if (editingPropertyId) {
-        router.replace({
-          pathname: '/settings/property-details/[id]',
-          params: { id: editingPropertyId },
-        });
-        return;
-      }
-      if (propertyId) {
-        router.replace({
-          pathname: '/settings/property-details/[id]',
-          params: { id: propertyId, source: 'dashboard' },
-        });
-        return;
-      }
-      router.replace('/(tabs)');
+      router.replace('/properties');
     }, 800);
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}> 
       <WizardTopHeader
         onBack={handleBack}
         title="Review"
@@ -215,55 +157,32 @@ export default function ReviewScreen() {
         onClose={handleClose}
       />
       <WizardHeader
-        currentStep={6}
-        totalSteps={6}
+        currentStep={3}
+        totalSteps={3}
         title="Review"
         onClose={handleClose}
         showClose={false}
         showSteps
         showTitle={false}
       />
-
-      <ScrollView 
-        contentContainerStyle={[
-          styles.scrollContent, 
-          isWideScreen && styles.scrollContentWide
-        ]}
-      >
-        {/* Header Section */}
-        <View style={[styles.headerSection, isWideScreen && styles.headerSectionWide]}>
-          <ReviewSummary propertyDetails={propertyDetails} />
-          
-          {isWideScreen && (
-            <View style={styles.emptySpace} />
+      <ScrollView contentContainerStyle={[styles.scrollContent, isWideScreen && styles.scrollContentWide]}> 
+        <View style={styles.headerSection}> 
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Property Details</Text>
+          <Text style={{ color: theme.text }}>Name: {propertyDetails.name}</Text>
+          <Text style={{ color: theme.text }}>Type: {propertyDetails.type}</Text>
+          <Text style={{ color: theme.text }}>City: {propertyDetails.city}</Text>
+          {propertyDetails.area && <Text style={{ color: theme.text }}>Area: {propertyDetails.area}</Text>} 
+        </View>
+        <View style={styles.headerSection}> 
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Buildings</Text>
+          {buildings.length === 0 ? (
+            <Text style={{ color: theme.textSecondary }}>No buildings added</Text>
+          ) : (
+            buildings.map((building) => (
+              <Text key={building.id} style={{ color: theme.text }}>- {building.name}</Text>
+            ))
           )}
         </View>
-
-        {/* Stats Grid */}
-        <View style={[styles.statsGrid, isWideScreen && styles.statsGridWide]}>
-          <TotalStatsCard
-            totalBuildings={totals.totalBuildings}
-            totalFloors={totals.totalFloors}
-            totalRooms={totals.totalRooms}
-            totalBeds={totals.totalBeds}
-          />
-        </View>
-
-        {/* Buildings Hierarchy */}
-        <View style={styles.hierarchySection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Property Structure
-          </Text>
-          <View style={[styles.buildingsList, isWideScreen && styles.buildingsListWide]}>
-            {buildings.map((building, index) => (
-              <View key={building.id} style={isWideScreen ? {} : {}}>
-                <HierarchyCard building={building} />
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Spacer for footer */}
         <View style={{ height: Platform.select({ web: 20, default: 40 }) }} />
       </ScrollView>
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, StyleSheet, SafeAreaView } from 'react-native';
 import { Tabs, usePathname } from 'expo-router';
 import { Platform } from 'react-native';
-import { CreditCard, LayoutDashboard, Users } from 'lucide-react-native';
+import { Building2, CreditCard, LayoutDashboard, Users } from 'lucide-react-native';
 import { useTheme } from '@/theme/useTheme';
 import TopBar from '@/components/TopBar';
 import MemberSearchModal from '@/components/MemberSearchModal';
@@ -11,8 +11,8 @@ export default function TabLayout() {
   const theme = useTheme();
   const [searchVisible, setSearchVisible] = useState(false);
   const pathname = usePathname();
-  const hideTopBar = pathname.includes('/member/') || pathname.includes('/wizard/') || pathname.includes('/settings') || pathname.includes('/beds/') || pathname.includes('/floors') || pathname.includes('/properties') || pathname.includes('/buildings') || pathname.includes('/rooms');
-  const hideTabBar = pathname.includes('/settings') || pathname.includes('/beds/') || pathname.includes('/floors') || pathname.includes('/properties') || pathname.includes('/buildings') || pathname.includes('/rooms');
+  const hideTopBar = pathname.includes('/member/') || pathname.includes('/wizard/') || pathname.includes('/settings') || pathname.includes('/beds/') || pathname.includes('/floors') || pathname.includes('/buildings') || pathname.includes('/rooms');
+  const hideTabBar = pathname.includes('/settings') || pathname.includes('/beds/') || pathname.includes('/floors') || pathname.includes('/buildings') || pathname.includes('/rooms');
 
   return (
     <>
@@ -97,7 +97,15 @@ export default function TabLayout() {
         <Tabs.Screen name="beds/total" options={{ href: null }} />
         <Tabs.Screen name="beds/available" options={{ href: null }} />
         <Tabs.Screen name="floors" options={{ href: null }} />
-        <Tabs.Screen name="properties" options={{ href: null }} />
+        <Tabs.Screen
+          name="properties"
+          options={{
+            title: 'Properties',
+            tabBarIcon: ({ size, color }) => (
+              <Building2 size={size} color={color} strokeWidth={2} />
+            ),
+          }}
+        />
         <Tabs.Screen name="buildings" options={{ href: null }} />
         <Tabs.Screen name="rooms" options={{ href: null }} />
         {/* Hidden from tab bar but keep tabs visible on these screens */}

@@ -14,7 +14,8 @@ interface WizardStore extends WizardState {
   createProperty: () => Promise<string | null>;
   addBuilding: (propertyId: string, data: { name: string }) => Promise<string | null>;
   addFloor: (propertyId: string, buildingId: string, data: { name: string }) => Promise<string | null>;
-  addRoom: (propertyId: string, buildingId: string, floorId: string, data: { name: string; shareType: string }) => Promise<string | null>;
+  updateBuilding: (propertyId: string, buildingId: string, data: { name?: string }) => Promise<void>;
+  removeBuilding: (propertyId: string, buildingId: string) => Promise<void>;
   resetWizard: () => void;
 }
 
@@ -84,10 +85,15 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
     return floors.length > 0 ? floors[floors.length - 1].id : null;
   },
 
-  addRoom: async (propertyId, buildingId, floorId, data) => {
-    await useRoomsStore.getState().addRoom(propertyId, buildingId, floorId, data);
-    const rooms = useRoomsStore.getState().rooms;
-    return rooms.length > 0 ? rooms[rooms.length - 1].id : null;
+
+  updateBuilding: async (propertyId, buildingId, data) => {
+    await useBuildingsStore.getState().updateBuilding(propertyId, buildingId, data);
+    // Optionally update wizard state if needed
+  },
+
+  removeBuilding: async (propertyId, buildingId) => {
+    await useBuildingsStore.getState().removeBuilding(propertyId, buildingId);
+    // Optionally update wizard state if needed
   },
 
 

@@ -1,3 +1,7 @@
+# Update a building for a property
+from fastapi import Body
+
+
 from fastapi import APIRouter, HTTPException, status
 from typing import List
 from app.models.property import PropertyCreate, PropertyUpdate, PropertySummary
@@ -26,3 +30,11 @@ async def delete_property(id: str):
     if not deleted:
         raise HTTPException(status_code=404, detail="Property not found")
     return None
+
+# Get all buildings for a property (now just names)
+@router.get("/{property_id}/buildings", response_model=List[str])
+async def get_property_buildings(property_id: str):
+    buildings = await property_service.get_property_buildings(property_id)
+    if buildings is None:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return buildings

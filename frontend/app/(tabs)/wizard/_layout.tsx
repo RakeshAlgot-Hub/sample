@@ -11,9 +11,6 @@ export default function WizardLayout() {
     >
       <Stack.Screen name="property-details" />
       <Stack.Screen name="buildings" />
-      <Stack.Screen name="floors" />
-      <Stack.Screen name="share-types" />
-      <Stack.Screen name="rooms" />
       <Stack.Screen name="review" />
     </Stack>
   );

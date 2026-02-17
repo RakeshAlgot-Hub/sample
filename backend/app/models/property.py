@@ -8,24 +8,22 @@ class PropertyBase(BaseModel):
     city: str
     area: Optional[str] = None
 
+
 class PropertyCreate(PropertyBase):
-    pass
+    buildings: Optional[list[str]] = []
+
+
 
 class PropertyUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
     city: Optional[str] = None
     area: Optional[str] = None
+    buildings: Optional[list[str]] = None
 
-class PropertyInDB(PropertyBase):
+class PropertySummary(PropertyBase):
     id: str
     createdAt: datetime
-    totalBuildings: int = 0
-    totalRooms: int = 0
-    totalFloors: int = 0
-    totalBeds: int = 0
-    occupiedBeds: int = 0
-    availableBeds: int = 0
-
-class PropertySummary(PropertyInDB):
-    pass
+    buildings: list[str] = []
+    floors: list[str] = []
+    shareTypes: list[int] = []

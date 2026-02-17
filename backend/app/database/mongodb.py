@@ -4,3 +4,6 @@ import os
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client["project"]
+
+def get_collection(name: str):
+	return db[name]

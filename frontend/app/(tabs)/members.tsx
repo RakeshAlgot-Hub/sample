@@ -39,7 +39,7 @@ export default function MembersScreen() {
   }, [activePropertyId]);
 
   const handleAddMember = () => {
-    router.push('/beds/available');
+    router.push('/beds/total');
   };
 
   const handleRemoveMember = async (id: string) => {

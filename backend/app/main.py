@@ -3,7 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import example
 from app.routes import auth
+
 from app.routes import property as property_routes
+from app.routes import member as member_routes
 
 
 
@@ -24,7 +26,9 @@ app.add_middleware(
 
 app.include_router(example.router)
 app.include_router(auth.router)
+
 app.include_router(property_routes.router)
+app.include_router(member_routes.router)
 
 
 

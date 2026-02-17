@@ -1,33 +1,63 @@
+
 import api from './api';
 
-export interface RoomSummary {
+export interface Room {
   id: string;
-  floorId: string;
-  buildingId: string;
   propertyId: string;
-  name: string;
-  shareType: string;
+  roomNumber: string;
+  buildingName: string;
+  floorName: string;
+  shareType: number;
   createdAt: string;
-  totalBeds: number;
-  occupiedBeds: number;
-  availableBeds: number;
+  updatedAt: string;
+  isActive: boolean;
 }
 
-export async function createRoom(propertyId: string, buildingId: string, floorId: string, data: { name: string; shareType: string }) {
-  const response = await api.post<RoomSummary>(`/properties/${propertyId}/buildings/${buildingId}/floors/${floorId}/rooms`, data);
-  return response.data;
+// Fetch all rooms for a property
+export async function getRoomsByProperty(propertyId: string): Promise<Room[]> {
+  try {
+    const response = await api.get<Room[]>(`/rooms?propertyId=${propertyId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to fetch rooms:', error);
+    throw error;
+  }
 }
 
-export async function updateRoom(propertyId: string, buildingId: string, floorId: string, roomId: string, data: { name?: string; shareType?: string }) {
-  const response = await api.patch<RoomSummary>(`/properties/${propertyId}/buildings/${buildingId}/floors/${floorId}/rooms/${roomId}`, data);
-  return response.data;
+// Create a new room
+export async function createRoom(payload: {
+  propertyId: string;
+  roomNumber: string;
+  buildingName: string;
+  floorName: string;
+  shareType: number;
+}): Promise<Room> {
+  try {
+    const response = await api.post<Room>('/rooms', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to create room:', error);
+    throw error;
+  }
 }
 
-export async function deleteRoom(propertyId: string, buildingId: string, floorId: string, roomId: string) {
-  await api.delete(`/properties/${propertyId}/buildings/${buildingId}/floors/${floorId}/rooms/${roomId}`);
+// Update a room
+export async function updateRoom(roomId: string, payload: Partial<Omit<Room, 'id' | 'createdAt' | 'updatedAt' | 'isActive'>>): Promise<Room> {
+  try {
+    const response = await api.put<Room>(`/rooms/${roomId}`, payload);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to update room:', error);
+    throw error;
+  }
 }
 
-export async function getRoomSummaries(propertyId: string, buildingId: string, floorId: string): Promise<RoomSummary[]> {
-  const response = await api.get<RoomSummary[]>(`/properties/${propertyId}/buildings/${buildingId}/floors/${floorId}/rooms`);
-  return response.data;
+// Delete a room
+export async function deleteRoom(roomId: string): Promise<void> {
+  try {
+    await api.delete(`/rooms/${roomId}`);
+  } catch (error) {
+    console.error('Failed to delete room:', error);
+    throw error;
+  }
 }
