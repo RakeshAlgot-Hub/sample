@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tenanttracker.app"
@@ -17,7 +17,11 @@
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#075E54"
       },
-      "package": "com.tenanttracker.app"
+      "package": "com.tenanttracker.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -40,7 +44,11 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "http://192.168.0.105:8000"
+      "apiUrl": "http://192.168.0.105:8000",
+      "router": {},
+      "eas": {
+        "projectId": "808b8cb7-50a5-4bd3-8e15-c67386cdf46d"
+      }
     }
   }
 }

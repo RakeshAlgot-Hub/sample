@@ -1,44 +1,50 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-
-
+from fastapi.responses import JSONResponse
+import os
 
 from app.routes import rooms, auth, properties, units, tenants, units_update, dashboard, payments
 
-
-
 app = FastAPI()
 
-# Allow CORS for frontend
+# Safe CORS setup
+allowedOrigins = os.getenv("ALLOWED_ORIGINS")
+
+if allowedOrigins:
+    allowedOrigins = allowedOrigins.split(",")
+else:
+    allowedOrigins = []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can restrict this to your frontend URL
+    allow_origins=allowedOrigins,
     allow_credentials=True,
-    allow_methods=["*"] ,
-    allow_headers=["*"]
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-
-
-
-
+# Routers
 app.include_router(auth.router)
 app.include_router(properties.router)
 app.include_router(rooms.router)
 app.include_router(units.router)
 app.include_router(tenants.router)
 app.include_router(units_update.router)
-
 app.include_router(dashboard.router)
 app.include_router(payments.router)
 
-
-
 @app.get("/")
-def root():
-    return {"message": "FastAPI + MongoDB backend is running!"}
+async def root():
+    return {"message": "Backend is running"}
 
+@app.get("/health")
+async def healthCheck():
+    return {"status": "ok"}
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+# Global error handler (optional but recommended)
+@app.exception_handler(Exception)
+async def globalExceptionHandler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"}
+    )

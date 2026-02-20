@@ -5,7 +5,7 @@ from jose import jwt
 from datetime import datetime, timedelta
 import os
 
-SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
+SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30  # 30 days
