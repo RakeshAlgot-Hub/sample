@@ -1,0 +1,444 @@
+import React, { useState } from 'react';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import { ArrowRight, Info } from 'lucide-react-native';
+import { UnitResponse } from '@/services/unitService';
+import { Colors } from '@/constants/Colors';
+import { Fonts, Spacing, BorderRadius } from '@/constants/Theme';
+
+export interface TenantForm {
+  fullName: string;
+  phoneNumber: string;
+  address: string;
+  documentId: string;
+  profilePictureUrl: string;
+  checkInDate: string;
+  depositAmount: string;
+}
+
+interface Step2Props {
+  tenant: TenantForm;
+  setTenant: (t: TenantForm) => void;
+  onNext: () => void;
+  onBack: () => void;
+  selectedUnit: UnitResponse | null;
+  loading: boolean;
+  showNextButton?: boolean;
+  nextButtonLabel?: string;
+  nextButtonDisabled?: boolean;
+}
+
+export function Step2TenantDetails({
+  tenant,
+  setTenant,
+  onNext,
+  onBack,
+  selectedUnit,
+  loading,
+  showNextButton = true,
+  nextButtonLabel = 'Continue',
+  nextButtonDisabled,
+}: Step2Props) {
+  const [touched, setTouched] = useState<{ [k: string]: boolean }>({});
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const requiredFields: (keyof TenantForm)[] = [
+    'fullName',
+    'phoneNumber',
+    'address',
+    'documentId',
+    'profilePictureUrl',
+    'checkInDate',
+    'depositAmount',
+  ];
+
+  const isValid = requiredFields.every((f) => tenant[f]);
+
+  const handleChange = (field: keyof TenantForm, value: string) => {
+    setTenant({ ...tenant, [field]: value });
+    setTouched({ ...touched, [field]: true });
+  };
+
+  const getBedInfo = () => {
+    if (!selectedUnit) return null;
+    const building =
+      ('buildingName' in selectedUnit
+        ? (selectedUnit as any).buildingName
+        : undefined) || selectedUnit.buildingId;
+    const floor =
+      ('floorName' in selectedUnit ? (selectedUnit as any).floorName : undefined) ||
+      selectedUnit.floorId;
+    const room =
+      ('roomNumber' in selectedUnit
+        ? (selectedUnit as any).roomNumber
+        : undefined) || selectedUnit.roomId;
+    return { building, floor, room, bed: selectedUnit.bedNumber };
+  };
+
+  const bedInfo = getBedInfo();
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Tenant Details</Text>
+          <Text style={styles.subtitle}>
+            Fill in the tenant information to complete registration
+          </Text>
+        </View>
+
+        {bedInfo && (
+          <View style={styles.bedInfoCard}>
+            <View style={styles.bedInfoHeader}>
+              <Info size={16} color={Colors.info} />
+              <Text style={styles.bedInfoTitle}>Selected Bed</Text>
+            </View>
+            <Text style={styles.bedInfoText}>
+              Building {bedInfo.building} • Floor {bedInfo.floor} • Room{' '}
+              {bedInfo.room} • Bed {bedInfo.bed}
+            </Text>
+            <TouchableOpacity
+              style={styles.changeBedButton}
+              onPress={onBack}
+              disabled={loading}>
+              <Text style={styles.changeBedText}>Change Bed</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Full Name *</Text>
+            <TextInput
+              style={[
+                styles.input,
+                !tenant.fullName && touched.fullName && styles.inputError,
+              ]}
+              value={tenant.fullName}
+              onChangeText={(v) => handleChange('fullName', v)}
+              editable={!loading}
+              placeholder="Enter full name"
+              placeholderTextColor={Colors.text.hint}
+            />
+            {!tenant.fullName && touched.fullName && (
+              <Text style={styles.errorText}>Full name is required</Text>
+            )}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Phone Number *</Text>
+            <TextInput
+              style={[
+                styles.input,
+                !tenant.phoneNumber && touched.phoneNumber && styles.inputError,
+              ]}
+              value={tenant.phoneNumber}
+              onChangeText={(v) => handleChange('phoneNumber', v)}
+              editable={!loading}
+              placeholder="Enter phone number"
+              placeholderTextColor={Colors.text.hint}
+              keyboardType="phone-pad"
+            />
+            {!tenant.phoneNumber && touched.phoneNumber && (
+              <Text style={styles.errorText}>Phone number is required</Text>
+            )}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Address *</Text>
+            <TextInput
+              style={[
+                styles.input,
+                styles.textArea,
+                !tenant.address && touched.address && styles.inputError,
+              ]}
+              value={tenant.address}
+              onChangeText={(v) => handleChange('address', v)}
+              editable={!loading}
+              placeholder="Enter full address"
+              placeholderTextColor={Colors.text.hint}
+              multiline
+              numberOfLines={3}
+            />
+            {!tenant.address && touched.address && (
+              <Text style={styles.errorText}>Address is required</Text>
+            )}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Document Id *</Text>
+            <TextInput
+              style={[
+                styles.input,
+                !tenant.documentId && touched.documentId && styles.inputError,
+              ]}
+              value={tenant.documentId}
+              onChangeText={(v) => handleChange('documentId', v)}
+              editable={!loading}
+              placeholder="Enter Document Id here ( e,g. Aadhar number, Passport number or URL to the document )"
+              placeholderTextColor={Colors.text.hint}
+            />
+            {!tenant.documentId && touched.documentId && (
+              <Text style={styles.errorText}>Document URL is required</Text>
+            )}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Profile Picture *</Text>
+            <TextInput
+              style={[
+                styles.input,
+                !tenant.profilePictureUrl &&
+                  touched.profilePictureUrl &&
+                  styles.inputError,
+              ]}
+              value={tenant.profilePictureUrl}
+              onChangeText={(v) => handleChange('profilePictureUrl', v)}
+              editable={!loading}
+              placeholder="Paste profile picture URL"
+              placeholderTextColor={Colors.text.hint}
+            />
+            {!tenant.profilePictureUrl && touched.profilePictureUrl && (
+              <Text style={styles.errorText}>Profile picture URL is required</Text>
+            )}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Check-in Date *</Text>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                !tenant.checkInDate && touched.checkInDate && styles.inputError,
+                { justifyContent: 'center' },
+              ]}
+              onPress={() => setShowDatePicker(true)}
+              disabled={loading}
+            >
+              <Text style={{ color: tenant.checkInDate ? Colors.text.primary : Colors.text.hint }}>
+                {tenant.checkInDate || 'Select date'}
+              </Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={tenant.checkInDate ? new Date(tenant.checkInDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(
+                  event: DateTimePickerEvent,
+                  date?: Date | undefined
+                ) => {
+                  setShowDatePicker(false);
+                  if (date) handleChange('checkInDate', date.toISOString().split('T')[0]);
+                }}
+              />
+            )}
+            {!tenant.checkInDate && touched.checkInDate && (
+              <Text style={styles.errorText}>Check-in date is required</Text>
+            )}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Deposit Amount *</Text>
+            <TextInput
+              style={[
+                styles.input,
+                !tenant.depositAmount && touched.depositAmount && styles.inputError,
+              ]}
+              value={tenant.depositAmount}
+              onChangeText={(v) => handleChange('depositAmount', v)}
+              editable={!loading}
+              placeholder="Enter deposit amount"
+              placeholderTextColor={Colors.text.hint}
+              keyboardType="decimal-pad"
+            />
+            {!tenant.depositAmount && touched.depositAmount && (
+              <Text style={styles.errorText}>Deposit amount is required</Text>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onBack}
+          disabled={loading}>
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+        {showNextButton && (
+          <TouchableOpacity
+            style={[
+              styles.nextButton,
+              ((typeof nextButtonDisabled === 'boolean'
+                ? nextButtonDisabled
+                : !isValid) ||
+                loading) &&
+                styles.disabledButton,
+            ]}
+            onPress={onNext}
+            disabled={
+              (typeof nextButtonDisabled === 'boolean'
+                ? nextButtonDisabled
+                : !isValid) || loading
+            }>
+            {loading ? (
+              <ActivityIndicator size="small" color={Colors.background.paper} />
+            ) : (
+              <>
+                <Text style={styles.nextButtonText}>{nextButtonLabel}</Text>
+                <ArrowRight size={18} color={Colors.background.paper} />
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background.paper,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: Spacing.xl,
+  },
+  header: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.base,
+  },
+  title: {
+    fontSize: Fonts.size.xxxl,
+    fontWeight: Fonts.weight.bold,
+    color: Colors.text.primary,
+    marginBottom: Spacing.xs,
+  },
+  subtitle: {
+    fontSize: Fonts.size.base,
+    color: Colors.text.secondary,
+    lineHeight: 20,
+  },
+  bedInfoCard: {
+    backgroundColor: Colors.infoLight,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    marginHorizontal: Spacing.xl,
+    marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: Colors.info,
+  },
+  bedInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  bedInfoTitle: {
+    fontSize: Fonts.size.base,
+    fontWeight: Fonts.weight.semiBold,
+    color: Colors.text.primary,
+  },
+  bedInfoText: {
+    fontSize: Fonts.size.sm,
+    color: Colors.text.secondary,
+    marginBottom: Spacing.md,
+  },
+  changeBedButton: {
+    alignSelf: 'flex-start',
+  },
+  changeBedText: {
+    fontSize: Fonts.size.base,
+    fontWeight: Fonts.weight.semiBold,
+    color: Colors.info,
+  },
+  form: {
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.lg,
+  },
+  inputGroup: {
+    gap: Spacing.md,
+  },
+  label: {
+    fontSize: Fonts.size.base,
+    fontWeight: Fonts.weight.semiBold,
+    color: Colors.text.primary,
+  },
+  input: {
+    backgroundColor: Colors.background.paper,
+    borderWidth: 1,
+    borderColor: Colors.border.medium,
+    borderRadius: BorderRadius.md,
+    padding: 14,
+    fontSize: Fonts.size.base,
+    color: Colors.text.primary,
+  },
+  inputError: {
+    borderColor: Colors.danger,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  errorText: {
+    fontSize: Fonts.size.xs,
+    color: Colors.danger,
+    marginTop: Spacing.xs,
+  },
+  footer: {
+    flexDirection: 'row',
+    padding: Spacing.base,
+    backgroundColor: Colors.background.paper,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.light,
+    gap: Spacing.md,
+  },
+  backButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.background.paper,
+    borderWidth: 1,
+    borderColor: Colors.border.medium,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonText: {
+    fontSize: Fonts.size.md,
+    fontWeight: Fonts.weight.semiBold,
+    color: Colors.text.primary,
+  },
+  nextButton: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 14,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  nextButtonText: {
+    fontSize: Fonts.size.md,
+    fontWeight: Fonts.weight.semiBold,
+    color: Colors.background.paper,
+  },
+  disabledButton: {
+    backgroundColor: Colors.neutral[300],
+  },
+});
