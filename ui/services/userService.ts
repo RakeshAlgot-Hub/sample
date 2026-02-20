@@ -28,7 +28,13 @@ export const userService = {
   async register(data: RegisterRequest): Promise<AuthResponse> {
     try {
       const api = getApi();
-      const response = await api.post<AuthResponse>('/auth/register', data);
+      // Use env or hardcoded for now; replace with secure config in production
+      const REGISTER_SECRET = process.env.EXPO_PUBLIC_REGISTER_SECRET || 'your_register_secret_here';
+      const response = await api.post<AuthResponse>(
+        '/auth/register',
+        data,
+        { headers: { 'X-REGISTER-SECRET': REGISTER_SECRET } }
+      );
 
       const { accessToken, refreshToken } = response.data;
       await setTokens(accessToken, refreshToken);

@@ -44,10 +44,11 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "http://192.168.0.105:8000",
+      "apiUrl": "https://portfolio-2zxo.onrender.com",
       "router": {},
+      "EXPO_PUBLIC_REGISTER_SECRET": "RakeshSECRETS",
       "eas": {
-        "projectId": "808b8cb7-50a5-4bd3-8e15-c67386cdf46d"
+        "projectId": "545974f5-c944-4b85-8740-7376674822f1"
       }
     }
   }

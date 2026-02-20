@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from app.utils.helpers import get_current_user
 from app.database.mongodb import db
 from bson import ObjectId
 from datetime import datetime
@@ -6,7 +7,7 @@ from datetime import datetime
 router = APIRouter()
 
 @router.put("/units/{unit_id}", status_code=status.HTTP_200_OK)
-async def update_unit_endpoint(unit_id: str, data: dict):
+async def update_unit_endpoint(unit_id: str, data: dict, current_user=Depends(get_current_user)):
     units_collection = db["units"]
     update_fields = {}
     if "status" in data:

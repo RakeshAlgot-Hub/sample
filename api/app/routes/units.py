@@ -1,5 +1,6 @@
 from app.database.mongodb import db
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, status, HTTPException, Depends
+from app.utils.helpers import get_current_user
 from app.services.unit_service import create_units_service
 from app.models.unit_schema import UnitCreateRequest
 from typing import List
@@ -9,7 +10,7 @@ router = APIRouter()
 
 # Bulk create units endpoint for UI
 @router.post("/units/bulk", status_code=status.HTTP_201_CREATED)
-async def create_units_bulk_endpoint(data: dict):
+async def create_units_bulk_endpoint(data: dict, current_user=Depends(get_current_user)):
     # expects: propertyId, buildingId, floorId, roomId, noOfBeds
     required = ["propertyId", "buildingId", "floorId", "roomId", "noOfBeds"]
     if not all(k in data for k in required):
@@ -26,7 +27,7 @@ async def create_units_bulk_endpoint(data: dict):
     return units
 
 @router.get("/units", status_code=status.HTTP_200_OK)
-async def get_units(propertyId: str):
+async def get_units(propertyId: str, current_user=Depends(get_current_user)):
     units_collection = db["units"]
     buildings_collection = db["properties"]
     rooms_collection = db["rooms"]

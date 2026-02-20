@@ -1,4 +1,5 @@
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, status, HTTPException, Depends
+from app.utils.helpers import get_current_user
 from app.database.mongodb import db
 from bson import ObjectId
 from datetime import datetime
@@ -6,7 +7,7 @@ from datetime import datetime
 router = APIRouter()
 
 @router.get("/payments", status_code=status.HTTP_200_OK)
-async def get_payments(propertyId: str):
+async def get_payments(propertyId: str, current_user=Depends(get_current_user)):
     tenants_collection = db["tenants"]
     units_collection = db["units"]
     tenants_cursor = tenants_collection.find({"propertyId": propertyId})
@@ -41,16 +42,16 @@ async def get_payments(propertyId: str):
     return payments
 
 @router.get("/payments/paid", status_code=status.HTTP_200_OK)
-async def get_paid_payments(propertyId: str):
+async def get_paid_payments(propertyId: str, current_user=Depends(get_current_user)):
     # The frontend determines paid status, so just return all payments
-    return await get_payments(propertyId)
+    return await get_payments(propertyId, current_user)
 
 @router.get("/payments/due", status_code=status.HTTP_200_OK)
-async def get_due_payments(propertyId: str):
+async def get_due_payments(propertyId: str, current_user=Depends(get_current_user)):
     # The frontend determines due status, so just return all payments
-    return await get_payments(propertyId)
+    return await get_payments(propertyId, current_user)
 
 @router.get("/payments/upcoming", status_code=status.HTTP_200_OK)
-async def get_upcoming_payments(propertyId: str):
+async def get_upcoming_payments(propertyId: str, current_user=Depends(get_current_user)):
     # The frontend determines upcoming status, so just return all payments
-    return await get_payments(propertyId)
+    return await get_payments(propertyId, current_user)

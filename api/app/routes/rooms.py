@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from app.utils.helpers import get_current_user
 from app.services.room_service import create_room_service
 from app.models.room_schema import RoomCreateRequest
 from app.database.mongodb import db
@@ -9,7 +10,7 @@ router = APIRouter()
 
 
 @router.post("/rooms", status_code=status.HTTP_201_CREATED)
-async def create_room_endpoint(request: RoomCreateRequest):
+async def create_room_endpoint(request: RoomCreateRequest, current_user=Depends(get_current_user)):
     room = await create_room_service(
         request.propertyId,
         request.buildingId,
@@ -23,7 +24,7 @@ async def create_room_endpoint(request: RoomCreateRequest):
 
 
 @router.get("/rooms")
-async def get_rooms(propertyId: str):
+async def get_rooms(propertyId: str, current_user=Depends(get_current_user)):
     rooms_collection = db["rooms"]
     rooms_cursor = rooms_collection.find({"propertyId": propertyId})
     rooms = []

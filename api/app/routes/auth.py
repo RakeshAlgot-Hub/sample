@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Header
 from app.models.user_schema import UserCreate, UserLogin, UserOut, UserInDB
 from app.database.mongodb import db
 from datetime import datetime
@@ -6,19 +6,27 @@ from bson import ObjectId
 from fastapi.responses import JSONResponse
 
 from fastapi.encoders import jsonable_encoder
-from jose import JWTError
+from jose import JWTError,jwt
 from app.utils.helpers import hash_password, verify_password, create_access_token, create_refresh_token, SECRET_KEY, ALGORITHM
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 users_collection = db["users"]
 
+import os
+
+REGISTER_SECRET = os.getenv("REGISTER_SECRET")
+
 @router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED, summary="Register a new user", tags=["auth"])
-async def register(user: UserCreate):
+async def register(user: UserCreate, x_register_secret: str = Header(None)):
     """
     Register a new user. Email must be unique. Password is securely hashed. Role is always set to 'propertyowner'.
     Returns user info and JWT token on success.
     """
+    # Secret key check
+    if not REGISTER_SECRET or x_register_secret != REGISTER_SECRET:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Invalid registration secret.")
+
     existing = await users_collection.find_one({"email": user.email})
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
@@ -95,7 +103,6 @@ async def refresh_token_endpoint(payload: dict):
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh token")
     try:
-        from jose import jwt
         decoded = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         if decoded.get("type") != "refresh":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")

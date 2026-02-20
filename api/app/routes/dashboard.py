@@ -1,4 +1,5 @@
 from fastapi import APIRouter, status, HTTPException, Depends
+from app.utils.helpers import get_current_user
 from app.database.mongodb import db
 from bson import ObjectId
 
@@ -6,7 +7,7 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 @router.get("/stats", status_code=status.HTTP_200_OK)
-async def get_dashboard_stats(propertyId: str):
+async def get_dashboard_stats(propertyId: str, current_user=Depends(get_current_user)):
     rooms_collection = db["rooms"]
     units_collection = db["units"]
     tenants_collection = db["tenants"]
@@ -35,7 +36,7 @@ async def get_dashboard_stats(propertyId: str):
 
 
 @router.get("/property-stats", status_code=status.HTTP_200_OK)
-async def get_property_stats(propertyId: str):
+async def get_property_stats(propertyId: str, current_user=Depends(get_current_user)):
     properties_collection = db["properties"]
     units_collection = db["units"]
     prop = await properties_collection.find_one({"_id": ObjectId(propertyId)})

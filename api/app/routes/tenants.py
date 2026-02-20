@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from app.utils.helpers import get_current_user
 from app.database.mongodb import db
 from datetime import datetime
 from bson import ObjectId
@@ -6,7 +7,7 @@ from bson import ObjectId
 router = APIRouter()
 
 @router.post("/tenants", status_code=status.HTTP_201_CREATED)
-async def create_tenant_endpoint(tenant: dict):
+async def create_tenant_endpoint(tenant: dict, current_user=Depends(get_current_user)):
     required = [
         "propertyId", "unitId", "fullName", "documentId", "phoneNumber", "checkInDate", "depositAmount", "status"
     ]
@@ -50,7 +51,7 @@ async def create_tenant_endpoint(tenant: dict):
 
 
 @router.get("/tenants", status_code=status.HTTP_200_OK)
-async def get_tenants(propertyId: str):
+async def get_tenants(propertyId: str, current_user=Depends(get_current_user)):
     tenants_collection = db["tenants"]
     tenants_cursor = tenants_collection.find({"propertyId": propertyId})
     tenants = []
@@ -62,7 +63,7 @@ async def get_tenants(propertyId: str):
 
 
 @router.delete("/tenants/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_tenant(tenant_id: str):
+async def delete_tenant(tenant_id: str, current_user=Depends(get_current_user)):
     tenants_collection = db["tenants"]
     result = await tenants_collection.delete_one({"_id": ObjectId(tenant_id)})
     if result.deleted_count == 0:
@@ -70,7 +71,7 @@ async def delete_tenant(tenant_id: str):
     return
 
 @router.patch("/tenants/{tenant_id}", status_code=status.HTTP_200_OK)
-async def update_tenant(tenant_id: str, data: dict):
+async def update_tenant(tenant_id: str, data: dict, current_user=Depends(get_current_user)):
     tenants_collection = db["tenants"]
     update_fields = {k: v for k, v in data.items() if k in [
         "propertyId", "unitId", "fullName", "documentId", "phoneNumber", "checkInDate", "depositAmount", "status"
