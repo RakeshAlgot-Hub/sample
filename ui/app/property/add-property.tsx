@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { usePropertyStore } from '@/store/property';
 import { ChevronLeft, Plus, X, Check } from 'lucide-react-native';
@@ -21,6 +22,7 @@ type PropertyType = 'Hostel' | 'Apartment';
 export default function AddPropertyScreen() {
   const router = useRouter();
   const { addProperty } = usePropertyStore();
+  const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -303,7 +305,7 @@ export default function AddPropertyScreen() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}>
@@ -375,7 +377,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 48,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },

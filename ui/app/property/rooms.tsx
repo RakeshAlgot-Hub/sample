@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { usePropertyStore } from '@/store/property';
 import { useRoomStore } from '@/store/rooms';
@@ -18,6 +19,7 @@ export default function ManageRoomsScreen() {
   const { getSelectedProperty } = usePropertyStore();
   const { rooms, deleteRoom, fetchRooms, isLoading } = useRoomStore();
   const property = getSelectedProperty();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (property) {
@@ -28,7 +30,7 @@ export default function ManageRoomsScreen() {
   if (!property) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <ChevronLeft size={24} color="#333" />
           </TouchableOpacity>
@@ -65,7 +67,7 @@ export default function ManageRoomsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ChevronLeft size={24} color="#333" />
         </TouchableOpacity>
@@ -185,7 +187,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 48,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },

@@ -10,6 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { usePropertyStore } from '@/store/property';
 import { ChevronLeft, Edit2, Trash2, X } from 'lucide-react-native';
@@ -18,6 +19,7 @@ export default function ManageBuildingsScreen() {
   const router = useRouter();
   const { getSelectedProperty } = usePropertyStore();
   const property = getSelectedProperty();
+  const insets = useSafeAreaInsets();
 
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -25,7 +27,7 @@ export default function ManageBuildingsScreen() {
   if (!property) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <ChevronLeft size={24} color="#333" />
           </TouchableOpacity>
@@ -75,7 +77,7 @@ export default function ManageBuildingsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ChevronLeft size={24} color="#333" />
         </TouchableOpacity>
@@ -167,7 +169,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 48,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },

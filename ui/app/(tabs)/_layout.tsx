@@ -1,4 +1,6 @@
+import { View } from 'react-native';
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   LayoutDashboard,
   Users,
@@ -6,9 +8,11 @@ import {
 } from 'lucide-react-native';
 import { AppHeader } from '@/components/AppHeader';
 
-export default function TabsLayout() {
+export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
       <AppHeader />
       <Tabs
         screenOptions={{
@@ -19,8 +23,8 @@ export default function TabsLayout() {
             backgroundColor: '#fff',
             borderTopWidth: 1,
             borderTopColor: '#e0e0e0',
-            height: 60,
-            paddingBottom: 8,
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom,
             paddingTop: 8,
           },
           tabBarLabelStyle: {
@@ -56,6 +60,6 @@ export default function TabsLayout() {
           }}
         />
       </Tabs>
-    </>
+    </View>
   );
 }

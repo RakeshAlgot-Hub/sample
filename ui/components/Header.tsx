@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -13,32 +14,37 @@ interface HeaderProps {
 export function Header({ title, showBack = false, onBack, rightComponent }: HeaderProps) {
   const router = useRouter();
   const { colors, fonts } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.primary }]}>
-      <View style={styles.leftSection}>
-        {showBack && (
-          <TouchableOpacity style={styles.backButton} onPress={onBack || router.back}>
-            <ArrowLeft size={24} color={colors.background.paper} />
-          </TouchableOpacity>
-        )}
-        <Text style={[styles.title, { fontSize: fonts.size.xl, fontWeight: fonts.weight.semiBold, color: colors.background.paper }]}>
-          {title}
-        </Text>
+    <View style={[styles.container, { backgroundColor: colors.primary, paddingTop: insets.top }]}>
+      <View style={styles.content}>
+        <View style={styles.leftSection}>
+          {showBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack || router.back}>
+              <ArrowLeft size={24} color={colors.background.paper} />
+            </TouchableOpacity>
+          )}
+          <Text style={[styles.title, { fontSize: fonts.size.xl, fontWeight: fonts.weight.semiBold, color: colors.background.paper }]}>
+            {title}
+          </Text>
+        </View>
+        {rightComponent && <View style={styles.rightSection}>{rightComponent}</View>}
       </View>
-      {rightComponent && <View style={styles.rightSection}>{rightComponent}</View>}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    width: '100%',
+  },
+  content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 48,
   },
   leftSection: {
     flexDirection: 'row',

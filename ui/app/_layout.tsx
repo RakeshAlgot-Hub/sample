@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useAuthStore } from '@/store/auth';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
@@ -30,24 +31,28 @@ export default function RootLayout() {
 
   if (!isInitialized) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#075E54" />
-      </View>
+      <SafeAreaProvider>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color="#075E54" />
+        </View>
+      </SafeAreaProvider>
     );
   }
 
   return (
-    <ThemeProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="property" />
-        <Stack.Screen name="settings" />
-        <Stack.Screen name="logout" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="property" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="logout" />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
