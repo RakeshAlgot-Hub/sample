@@ -42,7 +42,7 @@ async def create_tenant_endpoint(tenant: dict, current_user=Depends(get_current_
         "phoneNumber": tenant["phoneNumber"],
         "checkInDate": tenant["checkInDate"],
         "depositAmount": tenant["depositAmount"],
-        "status": tenant["status"],
+        "status": "paid",
         "createdAt": now,
         "updatedAt": now,
     }

@@ -16,6 +16,9 @@ async def get_properties(current_user=Depends(get_current_user)):
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_property(property: dict, current_user=Depends(get_current_user)):
+    # If ownerId is not provided, use current_user
+    if "ownerId" not in property or not property["ownerId"]:
+        property["ownerId"] = current_user
     return await create_property_service(property)
 
 @router.get("/{property_id}", status_code=status.HTTP_200_OK)
@@ -23,6 +26,10 @@ async def get_property(property_id: str, current_user=Depends(get_current_user))
     prop = await get_property_by_id(property_id)
     if not prop:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+    if prop.get("ownerId") != current_user:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Not your property")
+    prop["id"] = str(prop["_id"])
+    prop.pop("_id", None)
     return prop
 
 @router.put("/{property_id}", status_code=status.HTTP_200_OK)
@@ -30,11 +37,16 @@ async def update_property(property_id: str, property: dict, current_user=Depends
     prop = await update_property_service(property_id, property)
     if not prop:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+    if prop.get("ownerId") != current_user:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Not your property")
+    prop["id"] = str(prop["_id"])
+    prop.pop("_id", None)
     return prop
 
 @router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_property(property_id: str, current_user=Depends(get_current_user)):
-    deleted = await delete_property_service(property_id)
+    from app.services.property_service import cascade_delete_property
+    deleted = await cascade_delete_property(property_id, current_user)
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found or forbidden")
     return None

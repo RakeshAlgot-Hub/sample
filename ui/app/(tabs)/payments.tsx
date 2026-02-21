@@ -69,12 +69,12 @@ export default function PaymentsScreen() {
       }
 
       if (pageNum === 1) {
-        setPayments(data.data);
+        setPayments(Array.isArray(data.data) ? data.data : []);
       } else {
-        setPayments(prev => [...prev, ...data.data]);
+        setPayments(prev => Array.isArray(data.data) ? [...prev, ...data.data] : prev);
       }
 
-      setHasMore(pageNum < data.totalPages);
+      setHasMore(pageNum < (data.totalPages || 1));
     } catch (err) {
       setError('Failed to load payments');
       console.error(err);
@@ -115,8 +115,8 @@ export default function PaymentsScreen() {
   };
 
   const tabConfig = {
-    paid: { label: 'Paid', count: payments.length },
-    due: { label: 'Due', count: payments.length },
+    paid: { label: 'Paid', count: Array.isArray(payments) ? payments.length : 0 },
+    due: { label: 'Due', count: Array.isArray(payments) ? payments.length : 0 },
   };
 
   const renderEmptyState = () => (

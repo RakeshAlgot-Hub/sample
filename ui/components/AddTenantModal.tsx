@@ -24,7 +24,7 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
     fullName: '',
     phoneNumber: '',
     address: '',
-    documentUrl: '',
+    documentId: '',
     profilePictureUrl: '',
     checkInDate: '',
     depositAmount: ''
@@ -40,7 +40,7 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
         fullName: '',
         phoneNumber: '',
         address: '',
-        documentUrl: '',
+        documentId: '',
         profilePictureUrl: '',
         checkInDate: '',
         depositAmount: ''
@@ -54,7 +54,7 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
   }, [visible, propertyId]);
 
   useEffect(() => {
-    setSelectedUnit(availableUnits.find(u => u.id === selectedUnitId) || null);
+    setSelectedUnit((availableUnits || []).find(u => u.id === selectedUnitId) || null);
   }, [selectedUnitId, availableUnits]);
 
   const handleNext = () => setStep(s => s + 1);
@@ -69,7 +69,7 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
         propertyId,
         unitId: selectedUnit.id,
         fullName: tenant.fullName,
-        documentId: tenant.documentUrl, // using documentUrl as documentId
+        documentId: tenant.documentId, // using documentId as documentId
         phoneNumber: tenant.phoneNumber,
         checkInDate: tenant.checkInDate,
         depositAmount: tenant.depositAmount,

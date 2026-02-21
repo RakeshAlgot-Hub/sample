@@ -2,7 +2,7 @@ import os
 
 class Settings:
     mongoUrl: str = os.getenv("MONGO_URL")
-    debug: bool = os.getenv("DEBUG", "False") == "True"
+    # debug removed (not used)
 
 settings = Settings()
 

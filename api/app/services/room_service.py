@@ -1,3 +1,23 @@
+from motor.motor_asyncio import AsyncIOMotorClient
+
+async def cascade_delete_room(room_id: str, property_id: str, owner_id: str):
+    rooms_collection = db["rooms"]
+    properties_collection = db["properties"]
+    # Validate ownership
+    prop = await properties_collection.find_one({"_id": ObjectId(property_id)})
+    if not prop or prop.get("ownerId") != owner_id:
+        return False
+    room = await rooms_collection.find_one({"_id": ObjectId(room_id)})
+    if not room or room.get("propertyId") != str(property_id):
+        return False
+    client: AsyncIOMotorClient = db.client
+    async with await client.start_session() as s:
+        async with s.start_transaction():
+            await db["units"].delete_many({"roomId": room_id}, session=s)
+            await db["tenants"].delete_many({"roomId": room_id}, session=s)
+            await db["payments"].delete_many({"roomId": room_id}, session=s)
+            result = await rooms_collection.delete_one({"_id": ObjectId(room_id)}, session=s)
+            return result.deleted_count > 0
 from app.database.mongodb import db
 from bson import ObjectId
 from datetime import datetime,timezone

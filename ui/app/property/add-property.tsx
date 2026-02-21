@@ -78,7 +78,7 @@ export default function AddPropertyScreen() {
         buildings
       );
       if (status === 201) {
-        router.replace('/(tabs)/properties');
+        router.replace('/settings/properties');
         Alert.alert('Success', 'Property added successfully');
       } else {
         Alert.alert('Error', 'Failed to add property');

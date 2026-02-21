@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { propertyService, PropertyResponse } from '@/services/propertyService';
+import { useAuthStore } from '@/store/auth';
 
 export type Building = { id: string; name: string };
 export type Floor = { id: string; name: string };
@@ -43,10 +44,14 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
   error: null,
 
   initialize: async () => {
+    const { user } = useAuthStore.getState();
+    if (!user) {
+      set({ isInitialized: true, properties: [], selectedPropertyId: null });
+      return;
+    }
     try {
       const storedSelectedId = await AsyncStorage.getItem(SELECTED_PROPERTY_KEY);
       set({ selectedPropertyId: storedSelectedId, isInitialized: true });
-
       await get().fetchProperties();
     } catch (error) {
       console.error('Failed to initialize properties:', error);
@@ -55,6 +60,11 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
   },
 
   fetchProperties: async () => {
+    const { user } = useAuthStore.getState();
+    if (!user) {
+      set({ properties: [], isLoading: false });
+      return;
+    }
     set({ isLoading: true, error: null });
 
     try {

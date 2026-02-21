@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApi, setTokens, clearTokens, handleApiError, ApiError } from '@/lib/api';
 
 export interface LoginRequest {
@@ -28,12 +29,10 @@ export const userService = {
   async register(data: RegisterRequest): Promise<AuthResponse> {
     try {
       const api = getApi();
-      // Use env or hardcoded for now; replace with secure config in production
-      const REGISTER_SECRET = process.env.EXPO_PUBLIC_REGISTER_SECRET || 'your_register_secret_here';
+      // No secret sent from frontend
       const response = await api.post<AuthResponse>(
         '/auth/register',
-        data,
-        { headers: { 'X-REGISTER-SECRET': REGISTER_SECRET } }
+        data
       );
 
       const { accessToken, refreshToken } = response.data;
@@ -62,7 +61,8 @@ export const userService = {
   async logout(): Promise<void> {
     try {
       const api = getApi();
-      await api.post('/auth/logout');
+      const refreshToken = await AsyncStorage.getItem('@tenant_tracker_refresh_token');
+      await api.post('/auth/logout', { refreshToken });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

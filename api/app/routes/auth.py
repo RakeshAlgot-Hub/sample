@@ -1,14 +1,12 @@
 
-from app.models.user_schema import UserCreate, UserLogin, UserOut, UserInDB
+from app.models.user_schema import UserCreate, UserLogin, UserOut, AuthResponse
 from app.database.mongodb import db
 from datetime import datetime,timezone
 from bson import ObjectId
 from fastapi.responses import JSONResponse
 from fastapi import Body,APIRouter, HTTPException, status, Header, Request
 from app.utils.rate_limit import rate_limit_dep
-import secrets
 from datetime import timedelta
-from app.utils.email import send_verification_email
 from app.database.token_blacklist import blacklist_token, is_token_blacklisted
 from fastapi.encoders import jsonable_encoder
 from jose import JWTError,jwt
@@ -18,19 +16,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 users_collection = db["users"]
 
-import os
 
-REGISTER_SECRET = os.getenv("REGISTER_SECRET")
-
-@router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED, summary="Register a new user", tags=["auth"])
-async def register(user: UserCreate, x_register_secret: str = Header(None)):
+@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, summary="Register a new user", tags=["auth"])
+async def register(user: UserCreate):
     """
     Register a new user. Email must be unique. Password is securely hashed. Role is always set to 'propertyowner'.
     Returns user info and JWT token on success.
     """
-    # Secret key check
-    if not REGISTER_SECRET or x_register_secret != REGISTER_SECRET:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Invalid registration secret.")
+    # Registration is open (no secret required)
 
     existing = await users_collection.find_one({"email": user.email})
     if existing:
@@ -38,14 +31,12 @@ async def register(user: UserCreate, x_register_secret: str = Header(None)):
     hashed_pw = hash_password(user.password)
 
     now = datetime.now(timezone.utc)
-    verification_token = secrets.token_urlsafe(32)
-    verification_expires = now + timedelta(hours=24)
     user_doc = {
         "name": user.name,
         "email": user.email,
         "password": hashed_pw,
         "role": "propertyowner",
-        "isVerified": False,
+        "isVerified": True,
         "isDeleted": False,
         "lastLogin": None,
         "createdAt": now,
@@ -55,21 +46,29 @@ async def register(user: UserCreate, x_register_secret: str = Header(None)):
         "deviceType": None,
         "osVersion": None,
         "appVersion": None,
-        "emailVerificationToken": verification_token,
-        "emailVerificationExpires": verification_expires,
     }
     try:
         result = await users_collection.insert_one(user_doc)
         user_id = str(result.inserted_id)
-        # Send OTP in email body for testing
-        otp_message = f"Your verification code is: {verification_token}"
-        await send_verification_email(user.email, otp_message)
-        return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Registration successful. Please check your email for the verification code."})
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"User registration failed: {e}")
+        # Generate tokens
+        access_token = create_access_token({"sub": user_id})
+        refresh_token = create_refresh_token({"sub": user_id})
+        user_out = UserOut(
+            id=user_id,
+            name=user_doc["name"],
+            email=user_doc["email"]
+        )
+        response = AuthResponse(
+            accessToken=access_token,
+            refreshToken=refresh_token,
+            user=user_out
+        )
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=response.dict())
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User registration failed")
 
 
-@router.post("/login", response_model=dict, status_code=status.HTTP_200_OK, summary="Authenticate user and return JWT", tags=["auth"])
+@router.post("/login", response_model=AuthResponse, status_code=status.HTTP_200_OK, summary="Authenticate user and return JWT", tags=["auth"])
 @rate_limit_dep
 async def login(request: Request, data: UserLogin):
     """
@@ -81,24 +80,22 @@ async def login(request: Request, data: UserLogin):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     if user.get("isDeleted"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deleted")
-    if not user.get("isVerified"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified. Please check your inbox.")
+
     try:
-    
         await users_collection.update_one({"_id": user["_id"]}, {"$set": {"lastLogin": datetime.now(timezone.utc)}})
-        token = create_access_token({"sub": str(user["_id"])})
-        refresh_token = create_refresh_token({"sub": str(user["_id"])})
-        response = {
-            "user": {
-                "id": str(user["_id"]),
-                "name": user["name"],
-                "email": user["email"],
-                "createdAt": user["createdAt"]
-            },
-            "accessToken": token,
-            "refreshToken": refresh_token
-        }
-        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response))
+        token = create_access_token({"sub": str(user["_id"])});
+        refresh_token = create_refresh_token({"sub": str(user["_id"])});
+        user_out = UserOut(
+            id=str(user["_id"]),
+            name=user["name"],
+            email=user["email"]
+        )
+        response = AuthResponse(
+            accessToken=token,
+            refreshToken=refresh_token,
+            user=user_out
+        )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=response.dict())
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Login failed")
 # Add refresh endpoint OUTSIDE login function
@@ -127,7 +124,7 @@ async def refresh_token_endpoint(payload: dict):
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
     except Exception:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Login failed")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token refresh failed")
 
 
 
@@ -144,31 +141,5 @@ async def logout(payload: dict = Body(...)):
     return {"success": True}
 
 
-# Email verification endpoint (POST, accepts email and otp)
-@router.post("/verify-email", summary="Verify user email", tags=["auth"])
-async def verify_email(payload: dict = Body(...)):
-    """
-    Verifies a user's email using the OTP code.
-    Accepts: { "email": "...", "otp": "..." }
-    """
-    email = payload.get("email")
-    otp = payload.get("otp")
-    if not email or not otp:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email and OTP are required.")
-    user = await users_collection.find_one({"email": email, "emailVerificationToken": otp})
-    if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification code.")
-    if user.get("isVerified"):
-        return {"message": "Email already verified."}
-    expires = user.get("emailVerificationExpires")
+ 
 
-    if expires and datetime.now(timezone.utc) > expires:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verification code has expired.")
-    await users_collection.update_one(
-        {"_id": user["_id"]},
-        {"$set": {"isVerified": True}, "$unset": {"emailVerificationToken": "", "emailVerificationExpires": ""}}
-    )
-    return {"message": "Email verified successfully."}
-from fastapi import APIRouter, HTTPException, status, Depends, Header
-from fastapi import Request
-from app.utils.rate_limit import rate_limit_dep

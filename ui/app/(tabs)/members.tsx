@@ -40,8 +40,8 @@ export default function MembersScreen() {
   const { getSelectedProperty } = usePropertyStore();
   const property = getSelectedProperty();
 
-  const { units, fetchUnits } = useUnitStore();
-  const { rooms, fetchRooms } = useRoomStore();
+  const { units = [], fetchUnits } = useUnitStore();
+  const { rooms = [], fetchRooms } = useRoomStore();
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchDebounce(search), 300);
@@ -73,12 +73,12 @@ export default function MembersScreen() {
       ]);
 
       if (pageNum === 1) {
-        setTenants(tenantData.data);
+        setTenants(Array.isArray(tenantData.data) ? tenantData.data : []);
       } else {
-        setTenants(prev => [...prev, ...tenantData.data]);
+        setTenants(prev => Array.isArray(tenantData.data) ? [...prev, ...tenantData.data] : prev);
       }
 
-      setHasMore(pageNum < tenantData.totalPages);
+      setHasMore(pageNum < (tenantData.totalPages || 1));
     } catch {
       if (pageNum === 1) {
         setTenants([]);
@@ -130,6 +130,7 @@ export default function MembersScreen() {
   const handleSuccess = () => {
     setPage(1);
     setHasMore(true);
+    setShowAddTenant(false);
     fetchAllData(1);
   };
 
@@ -166,7 +167,7 @@ export default function MembersScreen() {
             <View style={styles.headerInfo}>
               <Text style={styles.headerTitle}>Tenants</Text>
               <Text style={styles.headerSubtitle}>
-                {tenants.length} {tenants.length === 1 ? 'tenant' : 'tenants'}
+                {Array.isArray(tenants) ? tenants.length : 0} {Array.isArray(tenants) && tenants.length === 1 ? 'tenant' : 'tenants'}
               </Text>
             </View>
             <TouchableOpacity
@@ -214,8 +215,8 @@ export default function MembersScreen() {
           ) : null
         }
         renderItem={({ item }) => {
-          const unit = units.find((u) => u.id === item.unitId);
-          const room = unit ? rooms.find((r) => r.id === unit.roomId) : undefined;
+          const unit = Array.isArray(units) ? units.find((u) => u.id === item.unitId) : undefined;
+          const room = unit && Array.isArray(rooms) ? rooms.find((r) => r.id === unit.roomId) : undefined;
           const roomNumber = room?.roomNumber || '-';
           return (
             <View style={styles.tenantCard}>

@@ -28,6 +28,8 @@ export function Step1SelectBed({
   onNext,
   loading,
 }: Step1Props) {
+  // Prevent undefined errors
+  const safeAvailableUnits = availableUnits || [];
   const getBedInfo = (unit: UnitResponse) => {
     const building =
       ('buildingName' in unit ? (unit as any).buildingName : undefined) ||
@@ -58,7 +60,7 @@ export function Step1SelectBed({
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          {availableUnits.length === 0 ? (
+          {safeAvailableUnits.length === 0 ? (
             <View style={styles.emptyState}>
               <Bed size={48} color={Colors.neutral[400]} strokeWidth={1.5} />
               <Text style={styles.emptyText}>No available beds</Text>
@@ -67,7 +69,7 @@ export function Step1SelectBed({
               </Text>
             </View>
           ) : (
-            availableUnits.map((unit) => {
+            safeAvailableUnits.map((unit) => {
               const { building, floor, room } = getBedInfo(unit);
               const isSelected = selectedUnitId === unit.id;
               const isDisabled = unit.status === 'occupied';

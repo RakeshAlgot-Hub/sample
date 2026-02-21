@@ -18,8 +18,6 @@ class UserInDB(BaseModel):
     deviceType: Optional[str] = None
     osVersion: Optional[str] = None
     appVersion: Optional[str] = None
-    emailVerificationToken: Optional[str] = None
-    emailVerificationExpires: Optional[datetime] = None
     propertyLimit: int = 3
 
 class UserOut(BaseModel):
@@ -35,3 +33,8 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+class AuthResponse(BaseModel):
+    accessToken: str
+    refreshToken: str
+    user: UserOut
