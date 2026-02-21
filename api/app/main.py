@@ -4,10 +4,16 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
-
 from app.routes import rooms, auth, properties, units, tenants, units_update, dashboard, payments
+from app.utils.rate_limit import limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
 
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, lambda request, exc: JSONResponse(status_code=429, content={"detail": "Too many requests. Please try again later."}))
+app.add_middleware(SlowAPIMiddleware)
 
 # Safe CORS setup
 allowedOrigins = os.getenv("ALLOWED_ORIGINS")
@@ -15,7 +21,7 @@ allowedOrigins = os.getenv("ALLOWED_ORIGINS")
 if allowedOrigins:
     allowedOrigins = allowedOrigins.split(",")
 else:
-    allowedOrigins = []
+    allowedOrigins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,

@@ -93,6 +93,7 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
           title={step === 1 ? 'Select Bed' : step === 2 ? 'Tenant Details' : 'Review & Confirm'}
           showBack={true}
           onBack={step === 1 ? onClose : handleBack}
+          showMenu={false}
         />
         {step === 1 && (
           <Step1SelectBed
@@ -128,5 +129,8 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
 }
 
 const styles = StyleSheet.create({
-  modalContent: { flex: 1, backgroundColor: Colors.background.paper },
+  modalContent: {
+    flex: 1,
+    backgroundColor: Colors.background.paper
+  },
 });

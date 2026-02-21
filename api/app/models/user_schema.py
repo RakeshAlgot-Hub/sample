@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime,timezone
 
 class UserInDB(BaseModel):
     id: Optional[str] = None
@@ -10,14 +10,17 @@ class UserInDB(BaseModel):
     role: str = Field(default="propertyowner")
     isVerified: bool = False
     isDeleted: bool = False
-    lastLogin: Optional[datetime] = None
-    createdAt: datetime = Field(default_factory=datetime.utcnow)
-    updatedAt: datetime = Field(default_factory=datetime.utcnow)
+    lastLogin: Optional[datetime] = None    
+    createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updatedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Device tracking fields for future scalability
     deviceId: Optional[str] = None
     deviceType: Optional[str] = None
     osVersion: Optional[str] = None
     appVersion: Optional[str] = None
+    emailVerificationToken: Optional[str] = None
+    emailVerificationExpires: Optional[datetime] = None
+    propertyLimit: int = 3
 
 class UserOut(BaseModel):
     id: str

@@ -11,18 +11,17 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { usePropertyStore } from '@/store/property';
-import { ChevronLeft, Plus, X, Check } from 'lucide-react-native';
+import { Plus, X, Check } from 'lucide-react-native';
 import { propertyService } from '@/services/propertyService';
+import { Header } from '@/components/Header';
 
 type PropertyType = 'Hostel' | 'Apartment';
 
 export default function AddPropertyScreen() {
   const router = useRouter();
   const { addProperty } = usePropertyStore();
-  const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -305,15 +304,7 @@ export default function AddPropertyScreen() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}>
-          <ChevronLeft size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Property</Text>
-        <View style={styles.headerRight} />
-      </View>
+      <Header title="Add Property" showBack />
 
       {renderStepIndicator()}
 
@@ -369,27 +360,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  headerRight: {
-    width: 32,
   },
   stepIndicator: {
     flexDirection: 'row',

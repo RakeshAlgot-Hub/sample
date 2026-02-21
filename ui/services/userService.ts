@@ -60,14 +60,8 @@ export const userService = {
   },
 
   async logout(): Promise<void> {
-    try {
-      const api = getApi();
-      await api.post('/auth/logout');
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      await clearTokens();
-    }
+    // No backend /auth/logout endpoint; just clear tokens locally
+    await clearTokens();
   },
 
   async getCurrentUser(): Promise<User> {

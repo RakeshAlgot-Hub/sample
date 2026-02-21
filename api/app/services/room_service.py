@@ -1,6 +1,6 @@
 from app.database.mongodb import db
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime,timezone
 import uuid
 
 async def create_room_service(propertyId: str, buildingId: str, roomNumber: str, floor: str, shareType: int):
@@ -8,6 +8,13 @@ async def create_room_service(propertyId: str, buildingId: str, roomNumber: str,
     property = await properties_collection.find_one({"_id": ObjectId(propertyId)})
     if not property:
         return None
+
+    rooms_collection = db["rooms"]
+    room_count = await rooms_collection.count_documents({"propertyId": str(propertyId)})
+    room_limit = property.get("roomLimit", 90)
+    if room_count >= room_limit:
+        raise Exception(f"Maximum {room_limit} rooms allowed per property.")
+
     room = {
         "propertyId": str(propertyId),
         "buildingId": str(buildingId),
@@ -15,10 +22,9 @@ async def create_room_service(propertyId: str, buildingId: str, roomNumber: str,
         "floor": str(floor),
         "shareType": int(shareType),
         "occupiedCount": 0,
-        "createdAt": datetime.utcnow(),
-        "updatedAt": datetime.utcnow(),
+        "createdAt": datetime.now(timezone.utc),
+        "updatedAt": datetime.now(timezone.utc),
     }
-    rooms_collection = db["rooms"]
     result = await rooms_collection.insert_one(room)
     room["id"] = str(result.inserted_id)
     # Remove _id from response if present

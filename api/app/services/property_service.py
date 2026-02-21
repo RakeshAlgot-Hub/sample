@@ -2,6 +2,7 @@ from app.database.mongodb import db
 from datetime import datetime
 from bson import ObjectId
 import uuid
+from datetime import timezone
 properties_collection = db["properties"]
 
 async def get_all_properties():
@@ -13,8 +14,22 @@ async def get_all_properties():
     return properties
 
 async def create_property_service(property: dict):
-    property["createdAt"] = datetime.utcnow()
-    property["updatedAt"] = datetime.utcnow()
+    # Limit user to propertyLimit
+    user_id = property.get("ownerId")
+    if not user_id:
+        raise Exception("ownerId is required in property data")
+    users_collection = db["users"]
+    user = await users_collection.find_one({"_id": ObjectId(user_id)})
+    property_limit = user.get("propertyLimit", 3) if user else 3
+    count = await properties_collection.count_documents({"ownerId": user_id})
+    if count >= property_limit:
+        raise Exception(f"Maximum {property_limit} properties allowed per user.")
+   
+    property["createdAt"] = datetime.now(timezone.utc)
+    property["updatedAt"] = datetime.now(timezone.utc)
+    # Set default room limit automatically
+    if "roomLimit" not in property:
+        property["roomLimit"] = 90
     # Ensure buildings are objects with id and name
     property["buildings"] = [
         {"id": str(uuid.uuid4()), "name": b["name"] if isinstance(b, dict) and "name" in b else str(b)}
@@ -44,7 +59,7 @@ async def get_property_by_id(property_id: str):
     return prop
 
 async def update_property_service(property_id: str, property: dict):
-    property["updatedAt"] = datetime.utcnow()
+    property["updatedAt"] = datetime.now(timezone.utc)
     result = await properties_collection.update_one({"_id": ObjectId(property_id)}, {"$set": property})
     if result.matched_count == 0:
         return None

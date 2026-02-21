@@ -105,6 +105,7 @@ export function EditTenantModal({
           title={showBedSelect ? 'Change Bed' : 'Edit Tenant'}
           showBack={true}
           onBack={showBedSelect ? () => setShowBedSelect(false) : onClose}
+          showMenu={false}
         />
         {showBedSelect ? (
           <Step1SelectBed

@@ -10,9 +10,10 @@ interface AppHeaderProps {
   title?: string;
   showBack?: boolean;
   onBack?: () => void;
+  showMenu?: boolean;
 }
 
-export function AppHeader({ title, showBack, onBack }: AppHeaderProps) {
+export function AppHeader({ title = 'TenantTracker', showBack, onBack, showMenu = true }: AppHeaderProps) {
   const router = useRouter();
   const { colors, fonts } = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -36,19 +37,23 @@ export function AppHeader({ title, showBack, onBack }: AppHeaderProps) {
             {title}
           </Text>
         </View>
-        <View ref={buttonRef}>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => setMenuVisible(true)}>
-            <MoreVertical size={24} color={colors.background.paper} />
-          </TouchableOpacity>
-        </View>
-        <Menu
-          visible={menuVisible}
-          onClose={() => setMenuVisible(false)}
-          options={menuOptions}
-          anchorRef={buttonRef}
-        />
+        {showMenu && (
+          <>
+            <View ref={buttonRef}>
+              <TouchableOpacity
+                style={styles.menuButton}
+                onPress={() => setMenuVisible(true)}>
+                <MoreVertical size={24} color={colors.background.paper} />
+              </TouchableOpacity>
+            </View>
+            <Menu
+              visible={menuVisible}
+              onClose={() => setMenuVisible(false)}
+              options={menuOptions}
+              anchorRef={buttonRef}
+            />
+          </>
+        )}
       </View>
     </View>
   );

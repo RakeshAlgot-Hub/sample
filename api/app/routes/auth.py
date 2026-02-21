@@ -1,10 +1,15 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Header
+
 from app.models.user_schema import UserCreate, UserLogin, UserOut, UserInDB
 from app.database.mongodb import db
-from datetime import datetime
+from datetime import datetime,timezone
 from bson import ObjectId
 from fastapi.responses import JSONResponse
-
+from fastapi import Body,APIRouter, HTTPException, status, Header, Request
+from app.utils.rate_limit import rate_limit_dep
+import secrets
+from datetime import timedelta
+from app.utils.email import send_verification_email
+from app.database.token_blacklist import blacklist_token, is_token_blacklisted
 from fastapi.encoders import jsonable_encoder
 from jose import JWTError,jwt
 from app.utils.helpers import hash_password, verify_password, create_access_token, create_refresh_token, SECRET_KEY, ALGORITHM
@@ -31,7 +36,10 @@ async def register(user: UserCreate, x_register_secret: str = Header(None)):
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
     hashed_pw = hash_password(user.password)
-    now = datetime.utcnow()
+
+    now = datetime.now(timezone.utc)
+    verification_token = secrets.token_urlsafe(32)
+    verification_expires = now + timedelta(hours=24)
     user_doc = {
         "name": user.name,
         "email": user.email,
@@ -47,29 +55,23 @@ async def register(user: UserCreate, x_register_secret: str = Header(None)):
         "deviceType": None,
         "osVersion": None,
         "appVersion": None,
+        "emailVerificationToken": verification_token,
+        "emailVerificationExpires": verification_expires,
     }
     try:
         result = await users_collection.insert_one(user_doc)
         user_id = str(result.inserted_id)
-        token = create_access_token({"sub": user_id})
-        refresh_token = create_refresh_token({"sub": user_id})
-        response = {
-            "user": {
-                "id": user_id,
-                "name": user_doc["name"],
-                "email": user_doc["email"],
-                "createdAt": user_doc["createdAt"]
-            },
-            "accessToken": token,
-            "refreshToken": refresh_token
-        }
-        return JSONResponse(status_code=status.HTTP_201_CREATED, content=jsonable_encoder(response))
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User registration failed")
+        # Send OTP in email body for testing
+        otp_message = f"Your verification code is: {verification_token}"
+        await send_verification_email(user.email, otp_message)
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Registration successful. Please check your email for the verification code."})
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"User registration failed: {e}")
 
 
 @router.post("/login", response_model=dict, status_code=status.HTTP_200_OK, summary="Authenticate user and return JWT", tags=["auth"])
-async def login(data: UserLogin):
+@rate_limit_dep
+async def login(request: Request, data: UserLogin):
     """
     Authenticate user with email and password. Returns user info and JWT token on success.
     Blocks login if account is deleted.
@@ -79,8 +81,11 @@ async def login(data: UserLogin):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     if user.get("isDeleted"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deleted")
+    if not user.get("isVerified"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified. Please check your inbox.")
     try:
-        await users_collection.update_one({"_id": user["_id"]}, {"$set": {"lastLogin": datetime.utcnow()}})
+    
+        await users_collection.update_one({"_id": user["_id"]}, {"$set": {"lastLogin": datetime.now(timezone.utc)}})
         token = create_access_token({"sub": str(user["_id"])})
         refresh_token = create_refresh_token({"sub": str(user["_id"])})
         response = {
@@ -103,6 +108,9 @@ async def refresh_token_endpoint(payload: dict):
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh token")
     try:
+        # Check if token is blacklisted
+        if await is_token_blacklisted(refresh_token):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is invalidated (blacklisted)")
         decoded = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         if decoded.get("type") != "refresh":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
@@ -120,3 +128,47 @@ async def refresh_token_endpoint(payload: dict):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Login failed")
+
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK, summary="Logout user", tags=["auth"])
+async def logout(payload: dict = Body(...)):
+    """
+    Logout user by blacklisting refresh token.
+    Accepts: { "refreshToken": "..." }
+    """
+    refresh_token = payload.get("refreshToken")
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh token")
+    await blacklist_token(refresh_token)
+    return {"success": True}
+
+
+# Email verification endpoint (POST, accepts email and otp)
+@router.post("/verify-email", summary="Verify user email", tags=["auth"])
+async def verify_email(payload: dict = Body(...)):
+    """
+    Verifies a user's email using the OTP code.
+    Accepts: { "email": "...", "otp": "..." }
+    """
+    email = payload.get("email")
+    otp = payload.get("otp")
+    if not email or not otp:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email and OTP are required.")
+    user = await users_collection.find_one({"email": email, "emailVerificationToken": otp})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification code.")
+    if user.get("isVerified"):
+        return {"message": "Email already verified."}
+    expires = user.get("emailVerificationExpires")
+
+    if expires and datetime.now(timezone.utc) > expires:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verification code has expired.")
+    await users_collection.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"isVerified": True}, "$unset": {"emailVerificationToken": "", "emailVerificationExpires": ""}}
+    )
+    return {"message": "Email verified successfully."}
+from fastapi import APIRouter, HTTPException, status, Depends, Header
+from fastapi import Request
+from app.utils.rate_limit import rate_limit_dep

@@ -8,18 +8,17 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { usePropertyStore } from '@/store/property';
 import { useRoomStore } from '@/store/rooms';
-import { ChevronLeft, Plus, Trash2 } from 'lucide-react-native';
+import { Plus, Trash2 } from 'lucide-react-native';
+import { Header } from '@/components/Header';
 
 export default function ManageRoomsScreen() {
   const router = useRouter();
   const { getSelectedProperty } = usePropertyStore();
   const { rooms, deleteRoom, fetchRooms, isLoading } = useRoomStore();
   const property = getSelectedProperty();
-  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (property) {
@@ -30,13 +29,7 @@ export default function ManageRoomsScreen() {
   if (!property) {
     return (
       <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: insets.top }]}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <ChevronLeft size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Manage Rooms</Text>
-          <View style={styles.headerRight} />
-        </View>
+        <Header title="Manage Rooms" showBack />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Property not found</Text>
         </View>
@@ -67,13 +60,7 @@ export default function ManageRoomsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Rooms</Text>
-        <View style={styles.headerRight} />
-      </View>
+      <Header title="Manage Rooms" showBack />
 
       <ScrollView style={styles.content}>
         {isLoading ? (
@@ -179,27 +166,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 64,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  headerRight: {
-    width: 32,
   },
   content: {
     flex: 1,

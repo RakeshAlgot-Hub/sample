@@ -1,12 +1,12 @@
 from app.database.mongodb import db
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime,timezone
 
 async def create_units_service(propertyId: str, buildingId: str, floorId: str, roomId: str, num_beds: int):
     units_collection = db["units"]
     units = []
-    for bed_number in range(1, num_beds + 1):
-        now = datetime.utcnow()
+    for bed_number in range(1, num_beds + 1):        
+        now = datetime.now(timezone.utc)
         unit = {
             "propertyId": propertyId,
             "buildingId": buildingId,

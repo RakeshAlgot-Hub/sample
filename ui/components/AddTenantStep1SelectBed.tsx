@@ -40,89 +40,87 @@ export function Step1SelectBed({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Select Bed</Text>
-          <Text style={styles.subtitle}>
-            Choose an available bed for the new tenant
-          </Text>
-        </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Loading available beds...</Text>
-          </View>
-        ) : (
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}>
-            {availableUnits.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Bed size={48} color={Colors.neutral[400]} strokeWidth={1.5} />
-                <Text style={styles.emptyText}>No available beds</Text>
-                <Text style={styles.emptySubtext}>
-                  All beds are currently occupied
-                </Text>
-              </View>
-            ) : (
-              availableUnits.map((unit) => {
-                const { building, floor, room } = getBedInfo(unit);
-                const isSelected = selectedUnitId === unit.id;
-                const isDisabled = unit.status === 'occupied';
-
-                return (
-                  <TouchableOpacity
-                    key={unit.id}
-                    style={[
-                      styles.bedOption,
-                      isSelected && styles.selectedBed,
-                      isDisabled && styles.disabledBed,
-                    ]}
-                    disabled={isDisabled}
-                    onPress={() => onSelect(unit.id)}>
-                    <View style={styles.bedIconContainer}>
-                      <Bed
-                        size={20}
-                        color={
-                          isSelected
-                            ? Colors.primary
-                            : isDisabled
-                            ? Colors.neutral[400]
-                            : Colors.text.secondary
-                        }
-                      />
-                    </View>
-                    <View style={styles.bedInfo}>
-                      <Text
-                        style={[
-                          styles.bedTitle,
-                          isDisabled && styles.disabledText,
-                        ]}>
-                        Bed {unit.bedNumber}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.bedDetails,
-                          isDisabled && styles.disabledText,
-                        ]}>
-                        Building {building} • Floor {floor} • Room {room}
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <View style={styles.checkContainer}>
-                        <Check size={20} color={Colors.primary} strokeWidth={3} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })
-            )}
-          </ScrollView>
-        )}
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Select Bed</Text>
+        <Text style={styles.subtitle}>
+          Choose an available bed for the new tenant
+        </Text>
       </View>
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Loading available beds...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}>
+          {availableUnits.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Bed size={48} color={Colors.neutral[400]} strokeWidth={1.5} />
+              <Text style={styles.emptyText}>No available beds</Text>
+              <Text style={styles.emptySubtext}>
+                All beds are currently occupied
+              </Text>
+            </View>
+          ) : (
+            availableUnits.map((unit) => {
+              const { building, floor, room } = getBedInfo(unit);
+              const isSelected = selectedUnitId === unit.id;
+              const isDisabled = unit.status === 'occupied';
+
+              return (
+                <TouchableOpacity
+                  key={unit.id}
+                  style={[
+                    styles.bedOption,
+                    isSelected && styles.selectedBed,
+                    isDisabled && styles.disabledBed,
+                  ]}
+                  disabled={isDisabled}
+                  onPress={() => onSelect(unit.id)}>
+                  <View style={styles.bedIconContainer}>
+                    <Bed
+                      size={20}
+                      color={
+                        isSelected
+                          ? Colors.primary
+                          : isDisabled
+                          ? Colors.neutral[400]
+                          : Colors.text.secondary
+                      }
+                    />
+                  </View>
+                  <View style={styles.bedInfo}>
+                    <Text
+                      style={[
+                        styles.bedTitle,
+                        isDisabled && styles.disabledText,
+                      ]}>
+                      Bed {unit.bedNumber}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.bedDetails,
+                        isDisabled && styles.disabledText,
+                      ]}>
+                      Building {building} • Floor {floor} • Room {room}
+                    </Text>
+                  </View>
+                  {isSelected && (
+                    <View style={styles.checkContainer}>
+                      <Check size={20} color={Colors.primary} strokeWidth={3} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
 
       <View style={styles.footer}>
         <TouchableOpacity
@@ -132,17 +130,14 @@ export function Step1SelectBed({
           <Text style={styles.nextButtonText}>Continue</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.background.paper,
-  },
   container: {
     flex: 1,
+    backgroundColor: Colors.background.paper,
   },
   header: {
     paddingHorizontal: Spacing.xl,

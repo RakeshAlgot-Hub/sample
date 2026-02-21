@@ -10,16 +10,15 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { usePropertyStore } from '@/store/property';
-import { ChevronLeft, Edit2, Trash2, X } from 'lucide-react-native';
+import { Edit2, Trash2, X } from 'lucide-react-native';
+import { Header } from '@/components/Header';
 
 export default function ManageBuildingsScreen() {
   const router = useRouter();
   const { getSelectedProperty } = usePropertyStore();
   const property = getSelectedProperty();
-  const insets = useSafeAreaInsets();
 
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -27,13 +26,7 @@ export default function ManageBuildingsScreen() {
   if (!property) {
     return (
       <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: insets.top }]}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <ChevronLeft size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Manage Buildings</Text>
-          <View style={styles.headerRight} />
-        </View>
+        <Header title="Manage Buildings" showBack />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Property not found</Text>
         </View>
@@ -77,13 +70,7 @@ export default function ManageBuildingsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Buildings</Text>
-        <View style={styles.headerRight} />
-      </View>
+      <Header title="Manage Buildings" showBack />
 
       <ScrollView style={styles.content}>
         {property.buildings.length === 0 ? (
@@ -161,27 +148,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  headerRight: {
-    width: 32,
   },
   content: {
     flex: 1,

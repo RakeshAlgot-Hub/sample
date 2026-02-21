@@ -13,7 +13,7 @@ export default function TabLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <AppHeader />
+      <AppHeader title="TenantTracker" />
       <Tabs
         screenOptions={{
           headerShown: false,

@@ -31,7 +31,8 @@ async def create_tenant_endpoint(tenant: dict, current_user=Depends(get_current_
         raise HTTPException(status_code=400, detail="depositAmount must be a valid number")
 
     tenants_collection = db["tenants"]
-    now = datetime.utcnow()
+    from datetime import timezone
+    now = datetime.now(timezone.utc)
     tenant_doc = {
         "propertyId": tenant["propertyId"],
         "unitId": tenant["unitId"],
@@ -78,7 +79,8 @@ async def update_tenant(tenant_id: str, data: dict, current_user=Depends(get_cur
     ]}
     if not update_fields:
         raise HTTPException(status_code=400, detail="No valid fields to update")
-    update_fields["updatedAt"] = datetime.utcnow()
+    from datetime import timezone
+    update_fields["updatedAt"] = datetime.now(timezone.utc)
     result = await tenants_collection.update_one({"_id": ObjectId(tenant_id)}, {"$set": update_fields})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Tenant not found")
