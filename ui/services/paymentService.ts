@@ -11,6 +11,22 @@ export interface PaymentData {
   paidDate?: string;
 }
 
+export interface PaginatedPaymentResponse {
+  data: PaymentData[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PaymentQueryParams {
+  propertyId: string;
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: 'paid' | 'due';
+}
+
 const getPaymentStatus = (dueDate: string): 'paid' | 'due' => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -68,43 +84,38 @@ function joinTenantUnitPayments(tenants: any[], units: any[]): PaymentData[] {
 }
 
 export const paymentService = {
-    async updatePaymentStatus(tenantId: string, status: 'paid' | 'due'): Promise<void> {
-      try {
-        const api = getApi();
-        await api.patch(`/tenants/${tenantId}`, { status });
-      } catch (error) {
-        throw handleApiError(error);
-      }
-    },
-  async getPayments(propertyId: string): Promise<PaymentData[]> {
+  async updatePaymentStatus(tenantId: string, status: 'paid' | 'due'): Promise<void> {
     try {
       const api = getApi();
-      const [tenantsRes, unitsRes] = await Promise.all([
-        api.get('/tenants', { params: { propertyId } }),
-        api.get('/units', { params: { propertyId } }),
-      ]);
-      return joinTenantUnitPayments(tenantsRes.data, unitsRes.data);
+      await api.patch(`/tenants/${tenantId}`, { status });
     } catch (error) {
       throw handleApiError(error);
     }
   },
 
-  async getPaidPayments(propertyId: string): Promise<PaymentData[]> {
-    const all = await this.getPayments(propertyId);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return all.filter((p) => {
-      if (!p.paidDate) return false;
-      const paidDate = new Date(p.paidDate);
-      paidDate.setHours(0, 0, 0, 0);
-      return paidDate < today;
-    });
+  async getPayments(propertyId: string, params?: Omit<PaymentQueryParams, 'propertyId'>): Promise<PaginatedPaymentResponse> {
+    try {
+      const api = getApi();
+      const response = await api.get<PaginatedPaymentResponse>('/payments', {
+        params: {
+          propertyId,
+          page: params?.page,
+          limit: params?.limit,
+          search: params?.search,
+          status: params?.status
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
   },
 
-  async getDuePayments(propertyId: string): Promise<PaymentData[]> {
-    const all = await this.getPayments(propertyId);
-    return all.filter((p) => p.status === 'due');
+  async getPaidPayments(propertyId: string, params?: { page?: number; limit?: number; search?: string }): Promise<PaginatedPaymentResponse> {
+    return this.getPayments(propertyId, { ...params, status: 'paid' });
   },
 
-  // removed getUpcomingPayments
+  async getDuePayments(propertyId: string, params?: { page?: number; limit?: number; search?: string }): Promise<PaginatedPaymentResponse> {
+    return this.getPayments(propertyId, { ...params, status: 'due' });
+  },
 };

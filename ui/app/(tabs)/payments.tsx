@@ -1,11 +1,12 @@
-import { View, Text, StyleSheet, ScrollView, FlatList, ActivityIndicator } from 'react-native';
-import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TextInput } from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
 import { Pressable } from 'react-native';
 import PaymentCard from '@/components/payments/PaymentCard';
 import { paymentService, PaymentData } from '@/services/paymentService';
 import { usePropertyStore } from '@/store/property';
 import { Colors } from '@/constants/Colors';
 import { Fonts, Spacing, BorderRadius } from '@/constants/Theme';
+import { Search } from 'lucide-react-native';
 
 type TabType = 'paid' | 'due';
 
@@ -14,42 +15,103 @@ export default function PaymentsScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('due');
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [search, setSearch] = useState('');
+  const [searchDebounce, setSearchDebounce] = useState('');
   const selectedPropertyId = usePropertyStore((s) => s.selectedPropertyId);
 
   useEffect(() => {
-    loadPayments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedPropertyId]);
+    const timer = setTimeout(() => setSearchDebounce(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const loadPayments = async () => {
+  const loadPayments = useCallback(async (pageNum = 1, isRefresh = false) => {
     if (!selectedPropertyId) {
       setPayments([]);
       setError('No property selected');
       setLoading(false);
       return;
     }
+
+    if (pageNum === 1) {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
-      setLoading(true);
       setError(null);
-      let data: PaymentData[] = [];
+      let data;
 
       switch (activeTab) {
         case 'paid':
-          data = await paymentService.getPaidPayments(selectedPropertyId);
+          data = await paymentService.getPaidPayments(selectedPropertyId, {
+            page: pageNum,
+            limit: 20,
+            search: searchDebounce
+          });
           break;
         case 'due':
-          data = await paymentService.getDuePayments(selectedPropertyId);
+          data = await paymentService.getDuePayments(selectedPropertyId, {
+            page: pageNum,
+            limit: 20,
+            search: searchDebounce
+          });
           break;
       }
 
-      setPayments(data);
+      if (pageNum === 1) {
+        setPayments(data.data);
+      } else {
+        setPayments(prev => [...prev, ...data.data]);
+      }
+
+      setHasMore(pageNum < data.totalPages);
     } catch (err) {
       setError('Failed to load payments');
       console.error(err);
+      if (pageNum === 1) {
+        setPayments([]);
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
     }
+  }, [activeTab, selectedPropertyId, searchDebounce]);
+
+  useEffect(() => {
+    setPage(1);
+    setHasMore(true);
+    loadPayments(1);
+  }, [activeTab, selectedPropertyId, searchDebounce]);
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore && !loading) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadPayments(nextPage);
+    }
+  };
+
+  const handleRefresh = () => {
+    setPage(1);
+    setHasMore(true);
+    loadPayments(1, true);
+  };
+
+  const handleStatusChanged = () => {
+    setPage(1);
+    setHasMore(true);
+    loadPayments(1);
   };
 
   const tabConfig = {
@@ -91,7 +153,18 @@ export default function PaymentsScreen() {
         ))}
       </View>
 
-      {loading ? (
+      <View style={styles.searchContainer}>
+        <Search size={20} color={Colors.text.secondary} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by tenant name..."
+          placeholderTextColor={Colors.text.hint}
+          value={search}
+          onChangeText={setSearch}
+        />
+      </View>
+
+      {loading && page === 1 ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -99,8 +172,6 @@ export default function PaymentsScreen() {
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
-      ) : payments.length === 0 ? (
-        renderEmptyState()
       ) : (
         <FlatList
           data={payments}
@@ -108,13 +179,23 @@ export default function PaymentsScreen() {
             <PaymentCard
               payment={item}
               status={activeTab}
-              onStatusChanged={loadPayments}
+              onStatusChanged={handleStatusChanged}
             />
           )}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          scrollEnabled={true}
-          nestedScrollEnabled={true}
+          ListEmptyComponent={renderEmptyState()}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color={Colors.primary} />
+              </View>
+            ) : null
+          }
         />
       )}
     </View>
@@ -157,6 +238,21 @@ const styles = StyleSheet.create({
   tabLabelActive: {
     color: Colors.background.paper,
   },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background.paper,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.light,
+    gap: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.text.primary,
+  },
   listContent: {
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
@@ -183,6 +279,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.base,
+    paddingVertical: 64,
   },
   emptyTitle: {
     fontSize: Fonts.size.lg,
@@ -194,5 +291,9 @@ const styles = StyleSheet.create({
     fontSize: Fonts.size.md,
     color: Colors.text.secondary,
     textAlign: 'center',
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
 });

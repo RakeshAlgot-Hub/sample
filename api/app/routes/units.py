@@ -2,10 +2,9 @@ from app.database.mongodb import db
 from fastapi import APIRouter, status, HTTPException, Depends
 from app.utils.helpers import get_current_user
 from app.services.unit_service import create_units_service
-from app.models.unit_schema import UnitCreateRequest
-from typing import List
 from bson import ObjectId
-
+from typing import Optional
+from fastapi import Query
 router = APIRouter()
 
 # Bulk create units endpoint for UI
@@ -26,14 +25,36 @@ async def create_units_bulk_endpoint(data: dict, current_user=Depends(get_curren
         raise HTTPException(status_code=400, detail="Units could not be created")
     return units
 
+
+
 @router.get("/units", status_code=status.HTTP_200_OK)
-async def get_units(propertyId: str, current_user=Depends(get_current_user)):
+async def get_units(
+    propertyId: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    buildingId: Optional[str] = Query(None),
+    roomId: Optional[str] = Query(None),
+    current_user=Depends(get_current_user)
+):
     units_collection = db["units"]
     buildings_collection = db["properties"]
     rooms_collection = db["rooms"]
-    cursor = units_collection.find({"propertyId": propertyId})
+    query = {"propertyId": propertyId}
+    if status:
+        query["status"] = status
+    if buildingId:
+        query["buildingId"] = buildingId
+    if roomId:
+        query["roomId"] = roomId
+    if search:
+        query["$or"] = [
+            {"bedNumber": {"$regex": search, "$options": "i"}},
+        ]
+    total = await units_collection.count_documents(query)
+    cursor = units_collection.find(query).skip((page - 1) * limit).limit(limit)
     units = []
-    # Cache for building/room lookups
     building_name_map = {}
     room_number_map = {}
     async for unit in cursor:
@@ -41,9 +62,9 @@ async def get_units(propertyId: str, current_user=Depends(get_current_user)):
         unit.pop("_id", None)
         # Get building name
         b_id = unit.get("buildingId")
+        name = None
         if b_id and b_id not in building_name_map:
             prop = await buildings_collection.find_one({"_id": ObjectId(propertyId)})
-            name = None
             if prop and "buildings" in prop:
                 for b in prop["buildings"]:
                     if (b.get("id") or b.get("_id")) == b_id:
@@ -58,4 +79,9 @@ async def get_units(propertyId: str, current_user=Depends(get_current_user)):
             room_number_map[r_id] = room["roomNumber"] if room and "roomNumber" in room else r_id
         unit["roomNumber"] = room_number_map.get(r_id, r_id)
         units.append(unit)
-    return units
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "results": units
+    }

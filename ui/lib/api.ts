@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 const API_BASE_URL =
-  Constants.expoConfig?.extra?.apiUrl || 'http://192.168.0.105:8000';
+  Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8000';
 
 const TOKEN_KEY = '@tenant_tracker_access_token';
 const REFRESH_TOKEN_KEY = '@tenant_tracker_refresh_token';

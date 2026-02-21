@@ -18,8 +18,8 @@ export const useUnitStore = create<UnitState>((set) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const units = await unitService.getUnits(propertyId);
-      set({ units, isLoading: false });
+      const response = await unitService.getUnits(propertyId);
+      set({ units: response.data, isLoading: false });
     } catch (error: any) {
       const errorMessage = error.message || 'Failed to fetch units';
       set({ isLoading: false, error: errorMessage });

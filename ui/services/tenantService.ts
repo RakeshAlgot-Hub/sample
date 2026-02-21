@@ -24,6 +24,22 @@ export interface TenantResponse {
   status: string;
 }
 
+export interface PaginatedTenantResponse {
+  data: TenantResponse[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface TenantQueryParams {
+  propertyId: string;
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+}
+
 export const tenantService = {
   async createTenant(data: CreateTenantRequest): Promise<TenantResponse> {
     try {
@@ -35,10 +51,18 @@ export const tenantService = {
     }
   },
 
-  async getTenantsByProperty(propertyId: string): Promise<TenantResponse[]> {
+  async getTenantsByProperty(propertyId: string, params?: Omit<TenantQueryParams, 'propertyId'>): Promise<PaginatedTenantResponse> {
     try {
       const api = getApi();
-      const response = await api.get<TenantResponse[]>('/tenants', { params: { propertyId } });
+      const response = await api.get<PaginatedTenantResponse>('/tenants', {
+        params: {
+          propertyId,
+          page: params?.page,
+          limit: params?.limit,
+          search: params?.search,
+          status: params?.status
+        }
+      });
       return response.data;
     } catch (error) {
       throw handleApiError(error);

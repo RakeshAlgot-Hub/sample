@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,9 @@ import {
   Alert,
   Modal,
   Pressable,
+  TextInput,
 } from 'react-native';
-import { Plus, Edit2, Trash2, User } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, User, Search } from 'lucide-react-native';
 import { AddTenantModal } from '@/components/AddTenantModal';
 import { EditTenantModal } from '@/components/EditTenantModal';
 import { usePropertyStore } from '@/store/property';
@@ -29,43 +30,80 @@ export default function MembersScreen() {
   const [tenantToDelete, setTenantToDelete] = useState<TenantResponse | null>(null);
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [search, setSearch] = useState('');
+  const [searchDebounce, setSearchDebounce] = useState('');
   const { getSelectedProperty } = usePropertyStore();
   const property = getSelectedProperty();
 
-  // Zustand stores for units and rooms
   const { units, fetchUnits } = useUnitStore();
   const { rooms, fetchRooms } = useRoomStore();
 
-  // Fetch tenants, units, and rooms for the selected property
-  const fetchAllData = async () => {
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchDebounce(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const fetchAllData = useCallback(async (pageNum = 1, isRefresh = false) => {
     if (!property) return;
-    setLoading(true);
+
+    if (pageNum === 1) {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
       const [tenantData] = await Promise.all([
-        tenantService.getTenantsByProperty(property.id),
-        fetchUnits(property.id),
-        fetchRooms(property.id),
+        tenantService.getTenantsByProperty(property.id, {
+          page: pageNum,
+          limit: 20,
+          search: searchDebounce
+        }),
+        pageNum === 1 ? fetchUnits(property.id) : Promise.resolve(),
+        pageNum === 1 ? fetchRooms(property.id) : Promise.resolve(),
       ]);
-      setTenants(tenantData);
+
+      if (pageNum === 1) {
+        setTenants(tenantData.data);
+      } else {
+        setTenants(prev => [...prev, ...tenantData.data]);
+      }
+
+      setHasMore(pageNum < tenantData.totalPages);
     } catch {
-      setTenants([]);
+      if (pageNum === 1) {
+        setTenants([]);
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
     }
-  };
+  }, [property, searchDebounce, fetchUnits, fetchRooms]);
 
   useEffect(() => {
-    fetchAllData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [property]);
+    setPage(1);
+    setHasMore(true);
+    fetchAllData(1);
+  }, [property, searchDebounce]);
 
   const handleDeleteConfirm = async () => {
     if (!tenantToDelete) return;
     setDeleting(true);
     try {
       await tenantService.deleteTenant(tenantToDelete.id);
-      await fetchAllData();
+      setPage(1);
+      setHasMore(true);
+      await fetchAllData(1);
       setDeleteModalVisible(false);
       setTenantToDelete(null);
     } catch (e) {
@@ -73,6 +111,26 @@ export default function MembersScreen() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore && !loading) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchAllData(nextPage);
+    }
+  };
+
+  const handleRefresh = () => {
+    setPage(1);
+    setHasMore(true);
+    fetchAllData(1, true);
+  };
+
+  const handleSuccess = () => {
+    setPage(1);
+    setHasMore(true);
+    fetchAllData(1);
   };
 
   const renderEmptyState = () => (
@@ -100,129 +158,122 @@ export default function MembersScreen() {
     </View>
   );
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid':
-        return Colors.success;
-      case 'pending':
-        return Colors.warning;
-      case 'overdue':
-        return Colors.danger;
-      default:
-        return Colors.neutral[500];
-    }
-  };
-
-  const getStatusBgColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid':
-        return Colors.successLight;
-      case 'pending':
-        return Colors.warningLight;
-      case 'overdue':
-        return Colors.dangerLight;
-      default:
-        return Colors.neutral[100];
-    }
-  };
-
   return (
     <View style={styles.container}>
-      {property && tenants.length > 0 && (
-        <View style={styles.header}>
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>Tenants</Text>
-            <Text style={styles.headerSubtitle}>
-              {tenants.length} {tenants.length === 1 ? 'tenant' : 'tenants'}
-            </Text>
+      {property && (
+        <>
+          <View style={styles.header}>
+            <View style={styles.headerInfo}>
+              <Text style={styles.headerTitle}>Tenants</Text>
+              <Text style={styles.headerSubtitle}>
+                {tenants.length} {tenants.length === 1 ? 'tenant' : 'tenants'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setShowAddTenant(true)}>
+              <Plus size={20} color={Colors.background.paper} />
+              <Text style={styles.addButtonText}>Add Tenant</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setShowAddTenant(true)}>
-            <Plus size={20} color={Colors.background.paper} />
-            <Text style={styles.addButtonText}>Add Tenant</Text>
-          </TouchableOpacity>
-        </View>
+
+          <View style={styles.searchContainer}>
+            <Search size={20} color={Colors.text.secondary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by name or phone..."
+              placeholderTextColor={Colors.text.hint}
+              value={search}
+              onChangeText={setSearch}
+            />
+          </View>
+        </>
       )}
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Loading tenants...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={tenants}
-          keyExtractor={(item) => item.id}
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={renderEmptyState()}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => {
-            // Find the unit for this tenant
-            const unit = units.find((u) => u.id === item.unitId);
-            // Find the room for this unit
-            const room = unit ? rooms.find((r) => r.id === unit.roomId) : undefined;
-            // Get the room number
-            const roomNumber = room?.roomNumber || '-';
-            return (
-              <View style={styles.tenantCard}>
-                <View style={styles.tenantHeader}>
-                  <View style={styles.avatarContainer}>
-                    <Text style={styles.avatarText}>
-                      {item.fullName
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')
-                        .toUpperCase()
-                        .slice(0, 2)}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.tenantName}>{item.fullName}</Text>
-                    <Text style={styles.tenantPhone}>{item.phoneNumber}</Text>
-                    <Text style={styles.bedInfo}>
-                      Room No: <Text style={styles.bedInfoValue}>{roomNumber}</Text>
-                    </Text>
-                  </View>
-                  <View style={styles.iconActions}>
-                    <TouchableOpacity
-                      style={styles.iconButton}
-                      onPress={() => {
-                        setEditTenant(item);
-                        setShowEditTenant(true);
-                      }}>
-                      <Edit2 size={18} color={Colors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.iconButton}
-                      onPress={() => {
-                        setTenantToDelete(item);
-                        setDeleteModalVisible(true);
-                      }}>
-                      <Trash2 size={18} color={Colors.danger} />
-                    </TouchableOpacity>
-                  </View>
+      <FlatList
+        data={tenants}
+        keyExtractor={(item) => item.id}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Loading tenants...</Text>
+          </View>
+        ) : renderEmptyState()}
+        showsVerticalScrollIndicator={false}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+            </View>
+          ) : null
+        }
+        renderItem={({ item }) => {
+          const unit = units.find((u) => u.id === item.unitId);
+          const room = unit ? rooms.find((r) => r.id === unit.roomId) : undefined;
+          const roomNumber = room?.roomNumber || '-';
+          return (
+            <View style={styles.tenantCard}>
+              <View style={styles.tenantHeader}>
+                <View style={styles.avatarContainer}>
+                  <Text style={styles.avatarText}>
+                    {item.fullName
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2)}
+                  </Text>
                 </View>
-                <View style={styles.divider} />
-                <View style={styles.tenantDetails}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Check-in</Text>
-                    <Text style={styles.detailValue}>{item.checkInDate ? item.checkInDate.split('T')[0] : '-'}</Text>
-                  </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.tenantName}>{item.fullName}</Text>
+                  <Text style={styles.tenantPhone}>{item.phoneNumber}</Text>
+                  <Text style={styles.bedInfo}>
+                    Room No: <Text style={styles.bedInfoValue}>{roomNumber}</Text>
+                  </Text>
+                </View>
+                <View style={styles.iconActions}>
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => {
+                      setEditTenant(item);
+                      setShowEditTenant(true);
+                    }}>
+                    <Edit2 size={18} color={Colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => {
+                      setTenantToDelete(item);
+                      setDeleteModalVisible(true);
+                    }}>
+                    <Trash2 size={18} color={Colors.danger} />
+                  </TouchableOpacity>
                 </View>
               </View>
-            );
-          }}
-        />
-      )
-    }
+              <View style={styles.divider} />
+              <View style={styles.tenantDetails}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Check-in</Text>
+                  <Text style={styles.detailValue}>{item.checkInDate ? item.checkInDate.split('T')[0] : '-'}</Text>
+                </View>
+              </View>
+            </View>
+          );
+        }}
+      />
+
       {property && (
         <AddTenantModal
           visible={showAddTenant}
           onClose={() => setShowAddTenant(false)}
           propertyId={property.id}
-          onSuccess={fetchAllData}
+          onSuccess={handleSuccess}
         />
       )}
       {property && editTenant && (
@@ -233,7 +284,7 @@ export default function MembersScreen() {
           tenant={editTenant}
           onSuccess={() => {
             setShowEditTenant(false);
-            fetchAllData();
+            handleSuccess();
           }}
         />
       )}
@@ -322,6 +373,21 @@ const styles = StyleSheet.create({
     color: Colors.background.paper,
     fontWeight: '600',
     fontSize: 15,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background.paper,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.light,
+    gap: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.text.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -416,9 +482,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.background.paper,
   },
-  tenantInfo: {
-    flex: 1,
-  },
   tenantName: {
     fontSize: 16,
     fontWeight: '600',
@@ -428,16 +491,6 @@ const styles = StyleSheet.create({
   tenantPhone: {
     fontSize: 14,
     color: Colors.text.secondary,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'capitalize',
   },
   divider: {
     height: 1,
@@ -461,46 +514,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: Colors.text.primary,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  editButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background.paper,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    gap: 6,
-  },
-  editButtonText: {
-    color: Colors.primary,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  deleteButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background.paper,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.danger,
-    gap: 6,
-  },
-  deleteButtonText: {
-    color: Colors.danger,
-    fontWeight: '600',
-    fontSize: 14,
   },
   modalOverlay: {
     flex: 1,
@@ -595,5 +608,9 @@ const styles = StyleSheet.create({
   iconButton: {
     padding: 6,
     borderRadius: 16,
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
 });

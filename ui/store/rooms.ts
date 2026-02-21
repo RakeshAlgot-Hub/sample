@@ -27,8 +27,8 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const rooms = await roomService.getRooms(propertyId);
-      set({ rooms, isLoading: false });
+      const response = await roomService.getRooms(propertyId);
+      set({ rooms: response.data, isLoading: false });
     } catch (error: any) {
       const errorMessage = error.message || 'Failed to fetch rooms';
       set({ isLoading: false, error: errorMessage });

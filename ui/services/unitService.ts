@@ -20,6 +20,23 @@ export interface UnitResponse {
   updatedAt: string;
 }
 
+export interface PaginatedUnitResponse {
+  data: UnitResponse[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface UnitQueryParams {
+  propertyId: string;
+  page?: number;
+  limit?: number;
+  status?: 'available' | 'occupied';
+  roomId?: string;
+  buildingId?: string;
+}
+
 export const unitService = {
   async createUnits(data: CreateUnitsRequest): Promise<UnitResponse[]> {
     try {
@@ -31,11 +48,18 @@ export const unitService = {
     }
   },
 
-  async getUnits(propertyId: string): Promise<UnitResponse[]> {
+  async getUnits(propertyId: string, params?: Omit<UnitQueryParams, 'propertyId'>): Promise<PaginatedUnitResponse> {
     try {
       const api = getApi();
-      const response = await api.get<UnitResponse[]>('/units', {
-        params: { propertyId },
+      const response = await api.get<PaginatedUnitResponse>('/units', {
+        params: {
+          propertyId,
+          page: params?.page,
+          limit: params?.limit,
+          status: params?.status,
+          roomId: params?.roomId,
+          buildingId: params?.buildingId
+        },
       });
       return response.data;
     } catch (error) {

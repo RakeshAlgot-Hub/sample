@@ -77,9 +77,9 @@ export function EditTenantModal({
   const handleOpenBedSelect = async () => {
     setLoading(true);
     try {
-      const units = await unitService.getUnits(propertyId);
+      const response = await unitService.getUnits(propertyId);
       setAvailableUnits(
-        units.filter((u) => u.status === 'available' || u.id === initialTenant.unitId)
+        response.data.filter((u) => u.status === 'available' || u.id === initialTenant.unitId)
       );
       setShowBedSelect(true);
     } finally {

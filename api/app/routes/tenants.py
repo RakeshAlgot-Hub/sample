@@ -3,7 +3,8 @@ from app.utils.helpers import get_current_user
 from app.database.mongodb import db
 from datetime import datetime
 from bson import ObjectId
-
+from typing import Optional
+from fastapi import Query
 router = APIRouter()
 
 @router.post("/tenants", status_code=status.HTTP_201_CREATED)
@@ -51,16 +52,40 @@ async def create_tenant_endpoint(tenant: dict, current_user=Depends(get_current_
     return tenant_doc
 
 
+
+
 @router.get("/tenants", status_code=status.HTTP_200_OK)
-async def get_tenants(propertyId: str, current_user=Depends(get_current_user)):
+async def get_tenants(
+    propertyId: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    current_user=Depends(get_current_user)
+):
     tenants_collection = db["tenants"]
-    tenants_cursor = tenants_collection.find({"propertyId": propertyId})
+    query = {"propertyId": propertyId}
+    if status:
+        query["status"] = status
+    if search:
+        query["$or"] = [
+            {"fullName": {"$regex": search, "$options": "i"}},
+            {"documentId": {"$regex": search, "$options": "i"}},
+            {"phoneNumber": {"$regex": search, "$options": "i"}}
+        ]
+    total = await tenants_collection.count_documents(query)
+    cursor = tenants_collection.find(query).skip((page - 1) * limit).limit(limit)
     tenants = []
-    async for tenant in tenants_cursor:
+    async for tenant in cursor:
         tenant["id"] = str(tenant["_id"])
         tenant.pop("_id", None)
         tenants.append(tenant)
-    return tenants
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "results": tenants
+    }
 
 
 @router.delete("/tenants/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
