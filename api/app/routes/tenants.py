@@ -9,6 +9,11 @@ router = APIRouter()
 
 @router.post("/tenants", status_code=status.HTTP_201_CREATED)
 async def create_tenant_endpoint(tenant: dict, current_user=Depends(get_current_user)):
+    # Ownership check
+    properties_collection = db["properties"]
+    property = await properties_collection.find_one({"_id": tenant["propertyId"]})
+    if not property or property.get("ownerId") != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Not your property")
     required = [
         "propertyId", "unitId", "fullName", "documentId", "phoneNumber", "checkInDate", "depositAmount", "status"
     ]
@@ -63,6 +68,11 @@ async def get_tenants(
     status: Optional[str] = Query(None),
     current_user=Depends(get_current_user)
 ):
+    # Ownership check
+    properties_collection = db["properties"]
+    property = await properties_collection.find_one({"_id": propertyId})
+    if not property or property.get("ownerId") != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Not your property")
     tenants_collection = db["tenants"]
     query = {"propertyId": propertyId}
     if status:
@@ -91,6 +101,14 @@ async def get_tenants(
 @router.delete("/tenants/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_tenant(tenant_id: str, current_user=Depends(get_current_user)):
     tenants_collection = db["tenants"]
+    tenant = await tenants_collection.find_one({"_id": ObjectId(tenant_id)})
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    # Ownership check
+    properties_collection = db["properties"]
+    property = await properties_collection.find_one({"_id": tenant["propertyId"]})
+    if not property or property.get("ownerId") != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Not your property")
     result = await tenants_collection.delete_one({"_id": ObjectId(tenant_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -99,6 +117,14 @@ async def delete_tenant(tenant_id: str, current_user=Depends(get_current_user)):
 @router.patch("/tenants/{tenant_id}", status_code=status.HTTP_200_OK)
 async def update_tenant(tenant_id: str, data: dict, current_user=Depends(get_current_user)):
     tenants_collection = db["tenants"]
+    tenant = await tenants_collection.find_one({"_id": ObjectId(tenant_id)})
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    # Ownership check
+    properties_collection = db["properties"]
+    property = await properties_collection.find_one({"_id": tenant["propertyId"]})
+    if not property or property.get("ownerId") != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Not your property")
     update_fields = {k: v for k, v in data.items() if k in [
         "propertyId", "unitId", "fullName", "documentId", "phoneNumber", "checkInDate", "depositAmount", "status"
     ]}

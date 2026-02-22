@@ -79,7 +79,16 @@ export default function MembersScreen() {
       }
 
       setHasMore(pageNum < (tenantData.totalPages || 1));
-    } catch {
+    } catch (error: any) {
+      // Stop repeated requests on 403/429
+      if (error && error.stopRetry) {
+        setHasMore(false);
+        setLoading(false);
+        setLoadingMore(false);
+        setRefreshing(false);
+        setTenants([]);
+        return;
+      }
       if (pageNum === 1) {
         setTenants([]);
       }

@@ -64,7 +64,12 @@ export const dashboardService = {
       const res = await api.get('/dashboard/tenants', { params: { propertyId } });
       return res.data;
     } catch (error) {
-      throw handleApiError(error);
+      const apiError = handleApiError(error);
+      // Stop repeated requests on 403/429
+      if (apiError.statusCode === 403 || apiError.statusCode === 429) {
+        throw { ...apiError, stopRetry: true };
+      }
+      throw apiError;
     }
   },
 };

@@ -25,12 +25,16 @@ export const useRoomStore = create<RoomState>((set, get) => ({
 
   fetchRooms: async (propertyId: string) => {
     set({ isLoading: true, error: null });
-
     try {
       const response = await roomService.getRooms(propertyId);
       set({ rooms: response.data, isLoading: false });
     } catch (error: any) {
       const errorMessage = error.message || 'Failed to fetch rooms';
+      // Stop repeated requests on 403/429
+      if (error.statusCode === 403 || error.statusCode === 429) {
+        set({ isLoading: false, error: errorMessage });
+        return;
+      }
       set({ isLoading: false, error: errorMessage });
       throw error;
     }

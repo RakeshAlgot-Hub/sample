@@ -143,7 +143,7 @@ export default function AddRoomScreen() {
   const validateRoomNumber = () => {
     // Use roomStore.rooms for validation
     const { rooms } = useRoomStore.getState();
-    const exists = rooms.some((r: any) => r && r.roomNumber === roomNumber.trim());
+    const exists = Array.isArray(rooms) && rooms.some((r: any) => r && r.roomNumber === roomNumber.trim());
     if (exists) {
       Alert.alert('Error', 'Room number already exists in this property');
       return false;

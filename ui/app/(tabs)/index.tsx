@@ -75,6 +75,16 @@ export default function DashboardScreen() {
       setPropertyStats(propStats);
       setRecentTenants(tenants);
     } catch (err: any) {
+      // Stop repeated requests on 403/429
+      if (err && err.stopRetry) {
+        setStats(null);
+        setPropertyStats([]);
+        setRecentTenants([]);
+        setError(err.message || 'Access forbidden or rate limited.');
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
       setError(err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);

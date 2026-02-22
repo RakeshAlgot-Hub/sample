@@ -1,3 +1,4 @@
+
 import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { LogOut, Calendar, Mail } from 'lucide-react-native';
 import { useAuthStore } from '@/store/auth';
@@ -6,16 +7,30 @@ import { Header } from '@/components/Header';
 import { useTheme } from '@/contexts/ThemeContext';
 
 export default function AccountScreen() {
-  const { user, logout, isLoading } = useAuthStore();
+  const { user, logout, isLoading, error, clearError } = useAuthStore();
   const router = useRouter();
   const { colors, fonts, spacing, borderRadius, shadows } = useTheme();
 
+  // Passive error banner for auth/user errors
+  const renderPassiveError = () => {
+    if (!error) return null;
+    return (
+      <View style={{ backgroundColor: '#fdecea', padding: 12, borderRadius: 8, margin: 12, flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={{ color: '#b71c1c', flex: 1 }}>{error}</Text>
+        <TouchableOpacity onPress={clearError} style={{ marginLeft: 8 }}>
+          <Text style={{ color: '#b71c1c', fontWeight: 'bold' }}>Dismiss</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   if (!user) {
     return (
-      <View style={[styles.page, { backgroundColor: colors.background.default }]}>
+      <View style={[styles.page, { backgroundColor: colors.background.default }]}> 
         <Header title="Account" showBack />
+        {renderPassiveError()}
         <View style={styles.content}>
-          <Text style={[styles.emptyStateText, { color: colors.text.secondary, fontSize: fonts.size.md, fontWeight: fonts.weight.medium }]}>
+          <Text style={[styles.emptyStateText, { color: colors.text.secondary, fontSize: fonts.size.md, fontWeight: fonts.weight.medium }]}> 
             No user data available.
           </Text>
         </View>
@@ -32,15 +47,16 @@ export default function AccountScreen() {
     : null;
 
   return (
-    <View style={[styles.page, { backgroundColor: colors.background.default }]}>
+    <View style={[styles.page, { backgroundColor: colors.background.default }]}> 
       <Header title="Account" showBack />
+      {renderPassiveError()}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { padding: spacing.base }]}
         showsVerticalScrollIndicator={false}>
-        <View style={[styles.profileCard, { backgroundColor: colors.background.paper, borderRadius: borderRadius.xl, borderColor: colors.border.light, ...shadows.md }]}>
+        <View style={[styles.profileCard, { backgroundColor: colors.background.paper, borderRadius: borderRadius.xl, borderColor: colors.border.light, ...shadows.md }]}> 
           <View style={styles.avatarSection}>
-            <View style={[styles.avatarContainer, { backgroundColor: colors.primary, borderColor: colors.primary, borderRadius: borderRadius.full }]}>
+            <View style={[styles.avatarContainer, { backgroundColor: colors.primary, borderColor: colors.primary, borderRadius: borderRadius.full }]}> 
               <Image
                 source={require('@/assets/images/icon.png')}
                 style={[styles.avatar, { borderRadius: borderRadius.full }]}
@@ -48,31 +64,31 @@ export default function AccountScreen() {
             </View>
           </View>
 
-          <View style={[styles.infoSection, { gap: spacing.base }]}>
-            <Text style={[styles.displayName, { fontSize: fonts.size.xxxl, fontWeight: fonts.weight.bold, color: colors.text.primary }]}>
+          <View style={[styles.infoSection, { gap: spacing.base }]}> 
+            <Text style={[styles.displayName, { fontSize: fonts.size.xxxl, fontWeight: fonts.weight.bold, color: colors.text.primary }]}> 
               {user.name}
             </Text>
 
-            <View style={[styles.detailRow, { gap: spacing.md }]}>
+            <View style={[styles.detailRow, { gap: spacing.md }]}> 
               <Mail size={16} color={colors.text.secondary} />
               <View style={styles.detailContent}>
-                <Text style={[styles.detailLabel, { fontSize: fonts.size.xs, fontWeight: fonts.weight.semiBold, color: colors.text.secondary }]}>
+                <Text style={[styles.detailLabel, { fontSize: fonts.size.xs, fontWeight: fonts.weight.semiBold, color: colors.text.secondary }]}> 
                   Email
                 </Text>
-                <Text style={[styles.detailValue, { fontSize: fonts.size.md, fontWeight: fonts.weight.medium, color: colors.text.primary }]}>
+                <Text style={[styles.detailValue, { fontSize: fonts.size.md, fontWeight: fonts.weight.medium, color: colors.text.primary }]}> 
                   {user.email}
                 </Text>
               </View>
             </View>
 
             {joinedDate && (
-              <View style={[styles.detailRow, { gap: spacing.md }]}>
+              <View style={[styles.detailRow, { gap: spacing.md }]}> 
                 <Calendar size={16} color={colors.text.secondary} />
                 <View style={styles.detailContent}>
-                  <Text style={[styles.detailLabel, { fontSize: fonts.size.xs, fontWeight: fonts.weight.semiBold, color: colors.text.secondary }]}>
+                  <Text style={[styles.detailLabel, { fontSize: fonts.size.xs, fontWeight: fonts.weight.semiBold, color: colors.text.secondary }]}> 
                     Member Since
                   </Text>
-                  <Text style={[styles.detailValue, { fontSize: fonts.size.md, fontWeight: fonts.weight.medium, color: colors.text.primary }]}>
+                  <Text style={[styles.detailValue, { fontSize: fonts.size.md, fontWeight: fonts.weight.medium, color: colors.text.primary }]}> 
                     {joinedDate}
                   </Text>
                 </View>
@@ -95,7 +111,7 @@ export default function AccountScreen() {
             ) : (
               <>
                 <LogOut size={18} color={colors.background.paper} />
-                <Text style={[styles.logoutText, { color: colors.background.paper, fontSize: fonts.size.md, fontWeight: fonts.weight.semiBold }]}>
+                <Text style={[styles.logoutText, { color: colors.background.paper, fontSize: fonts.size.md, fontWeight: fonts.weight.semiBold }]}> 
                   Sign Out
                 </Text>
               </>

@@ -5,9 +5,10 @@ import uuid
 from datetime import timezone
 properties_collection = db["properties"]
 
-async def get_all_properties():
+async def get_all_properties(owner_id=None):
     properties = []
-    async for prop in properties_collection.find():
+    query = {"ownerId": owner_id} if owner_id else {}
+    async for prop in properties_collection.find(query):
         prop["id"] = str(prop["_id"])
         prop.pop("_id", None)
         properties.append(prop)
@@ -62,25 +63,32 @@ async def update_property_service(property_id: str, property: dict):
     prop = await properties_collection.find_one({"_id": ObjectId(property_id)})
     return prop
 
+
 async def delete_property_service(property_id: str):
     from app.database.mongodb import db
-    from motor.motor_asyncio import AsyncIOMotorClient
-    import asyncio
+    # This function is now only for simple delete, cascade is top-level
+    result = await properties_collection.delete_one({"_id": ObjectId(property_id)})
+    return result.deleted_count > 0
 
-    async def cascade_delete_property(property_id: str, owner_id: str):
-        # Validate ownership
-        prop = await properties_collection.find_one({"_id": ObjectId(property_id)})
-        if not prop or prop.get("ownerId") != owner_id:
-            return False
-        # Start session for atomicity
-        client: AsyncIOMotorClient = db.client
-        async with await client.start_session() as s:
-            async with s.start_transaction():
-                # Delete child documents
-                await db["rooms"].delete_many({"propertyId": property_id}, session=s)
-                await db["units"].delete_many({"propertyId": property_id}, session=s)
-                await db["tenants"].delete_many({"propertyId": property_id}, session=s)
-                await db["payments"].delete_many({"propertyId": property_id}, session=s)
-                # Delete property
-                result = await properties_collection.delete_one({"_id": ObjectId(property_id)}, session=s)
-                return result.deleted_count > 0
+# Move cascade_delete_property to top-level for import
+from app.database.mongodb import db
+from motor.motor_asyncio import AsyncIOMotorClient
+import asyncio
+
+async def cascade_delete_property(property_id: str, owner_id: str):
+    # Validate ownership
+    prop = await properties_collection.find_one({"_id": ObjectId(property_id)})
+    if not prop or prop.get("ownerId") != owner_id:
+        return False
+    # Start session for atomicity
+    client: AsyncIOMotorClient = db.client
+    async with await client.start_session() as s:
+        async with s.start_transaction():
+            # Delete child documents
+            await db["rooms"].delete_many({"propertyId": property_id}, session=s)
+            await db["units"].delete_many({"propertyId": property_id}, session=s)
+            await db["tenants"].delete_many({"propertyId": property_id}, session=s)
+            await db["payments"].delete_many({"propertyId": property_id}, session=s)
+            # Delete property
+            result = await properties_collection.delete_one({"_id": ObjectId(property_id)}, session=s)
+            return result.deleted_count > 0

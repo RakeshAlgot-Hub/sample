@@ -34,7 +34,10 @@ export const propertyService = {
   async createProperty(data: CreatePropertyRequest): Promise<{ property: PropertyResponse, status: number }> {
     try {
       const api = getApi();
-      const response = await api.post<PropertyResponse>('/properties/', data);
+      // Attach ownerId from auth store if not present
+      const { user } = require('@/store/auth').useAuthStore.getState();
+      const payload = { ...data, ownerId: data['ownerId'] || (user ? user.id : undefined) };
+      const response = await api.post<PropertyResponse>('/properties/', payload);
       return { property: response.data, status: response.status };
     } catch (error) {
       throw handleApiError(error);

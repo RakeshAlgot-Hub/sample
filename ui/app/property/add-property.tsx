@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,20 +11,23 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { usePropertyStore } from '@/store/property';
 import { Plus, X, Check } from 'lucide-react-native';
-import { propertyService } from '@/services/propertyService';
 import { Header } from '@/components/Header';
 
 type PropertyType = 'Hostel' | 'Apartment';
 
 export default function AddPropertyScreen() {
   const router = useRouter();
-  const { addProperty } = usePropertyStore();
+  const { addProperty, updateProperty } = usePropertyStore();
+  const params = useLocalSearchParams<{ propertyId?: string }>();
+  const editPropertyId = params.propertyId;
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEdit, setIsEdit] = useState(false);
 
   const [name, setName] = useState('');
   const [type, setType] = useState<PropertyType>('Hostel');
@@ -33,6 +36,25 @@ export default function AddPropertyScreen() {
   const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([
     { id: '', name: '' },
   ]);
+
+  useEffect(() => {
+    if (editPropertyId) {
+      const { properties } = usePropertyStore.getState();
+      const property = properties.find((p) => p.id === editPropertyId);
+      if (property) {
+        setIsEdit(true);
+        setName(property.name);
+        setType(property.type);
+        setCity(property.city);
+        setAddress(property.address);
+        setBuildings(
+          property.buildings && property.buildings.length > 0
+            ? property.buildings
+            : [{ id: '', name: '' }]
+        );
+      }
+    }
+  }, [editPropertyId]);
   const addBuilding = () => {
     setBuildings([...buildings, { id: '', name: '' }]);
   };
@@ -70,21 +92,38 @@ export default function AddPropertyScreen() {
   const handleSave = async () => {
     setIsSubmitting(true);
     try {
-      const { property, status } = await addProperty(
-        name.trim(),
-        type,
-        city.trim(),
-        address.trim(),
-        buildings
-      );
-      if (status === 201) {
-        router.replace('/settings/properties');
-        Alert.alert('Success', 'Property added successfully');
+      if (isEdit && editPropertyId) {
+        const { status } = await updateProperty(
+          editPropertyId,
+          name.trim(),
+          type,
+          city.trim(),
+          address.trim(),
+          buildings
+        );
+        if (status === 200) {
+          router.replace('/settings/properties');
+          Alert.alert('Success', 'Property updated successfully');
+        } else {
+          Alert.alert('Error', 'Failed to update property');
+        }
       } else {
-        Alert.alert('Error', 'Failed to add property');
+        const { status } = await addProperty(
+          name.trim(),
+          type,
+          city.trim(),
+          address.trim(),
+          buildings
+        );
+        if (status === 201) {
+          router.replace('/settings/properties');
+          Alert.alert('Success', 'Property added successfully');
+        } else {
+          Alert.alert('Error', 'Failed to add property');
+        }
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to add property');
+      Alert.alert('Error', error.message || 'Failed to save property');
     } finally {
       setIsSubmitting(false);
     }
@@ -301,58 +340,60 @@ export default function AddPropertyScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <Header title="Add Property" showBack />
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Header title={isEdit ? 'Edit Property' : 'Add Property'} showBack />
 
-      {renderStepIndicator()}
+        {renderStepIndicator()}
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled">
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-      </ScrollView>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled">
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+          {step === 3 && renderStep3()}
+        </ScrollView>
 
-      <View style={styles.footer}>
-        {step > 1 && step < 3 && (
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => setStep(step - 1)}>
-            <Text style={styles.secondaryButtonText}>Back</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.footer}>
+          {step > 1 && step < 3 && (
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => setStep(step - 1)}>
+              <Text style={styles.secondaryButtonText}>Back</Text>
+            </TouchableOpacity>
+          )}
 
-        {step < 3 ? (
-          <TouchableOpacity
-            style={[
-              styles.primaryButton,
-              step === 1 ? styles.primaryButtonFull : {},
-            ]}
-            onPress={handleNext}
-            disabled={
-              (step === 1 && !canProceedFromStep1()) ||
-              (step === 2 && !canProceedFromStep2())
-            }>
-            <Text style={styles.primaryButtonText}>Next</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleSave}
-            disabled={isSubmitting}>
-            {isSubmitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Save Property</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-    </KeyboardAvoidingView>
+          {step < 3 ? (
+            <TouchableOpacity
+              style={[
+                styles.primaryButton,
+                step === 1 ? styles.primaryButtonFull : {},
+              ]}
+              onPress={handleNext}
+              disabled={
+                (step === 1 && !canProceedFromStep1()) ||
+                (step === 2 && !canProceedFromStep2())
+              }>
+              <Text style={styles.primaryButtonText}>Next</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.primaryButton, styles.primaryButtonFull]}
+              onPress={handleSave}
+              disabled={isSubmitting}>
+              {isSubmitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>{isEdit ? 'Update Property' : 'Save Property'}</Text>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -360,6 +401,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  keyboardView: {
+    flex: 1,
   },
   stepIndicator: {
     flexDirection: 'row',

@@ -26,6 +26,14 @@ interface PropertyState {
     address: string,
     buildings: Building[],
   ) => Promise<{ property: Property | null, status: number }>;
+  updateProperty: (
+    id: string,
+    name: string,
+    type: 'Hostel' | 'Apartment',
+    city: string,
+    address: string,
+    buildings: Building[],
+  ) => Promise<{ property: Property | null, status: number }>;
   deleteProperty: (id: string) => Promise<void>;
   selectProperty: (id: string) => void;
   getSelectedProperty: () => Property | null;
@@ -54,7 +62,7 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
       set({ selectedPropertyId: storedSelectedId, isInitialized: true });
       await get().fetchProperties();
     } catch (error) {
-      console.error('Failed to initialize properties:', error);
+      // In production, do not log errors to the console. UI will show passive error banner.
       set({ isInitialized: true });
     }
   },
@@ -123,6 +131,38 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
       }
     } catch (error: any) {
       const errorMessage = error.message || 'Failed to add property';
+      set({ isLoading: false, error: errorMessage });
+      return { property: null, status: 0 };
+    }
+  },
+
+  updateProperty: async (id, name, type, city, address, buildings) => {
+    set({ isLoading: true, error: null });
+    try {
+      const property = await propertyService.updateProperty(id, {
+        name,
+        type,
+        city,
+        address,
+        buildings,
+      });
+      // Ensure buildings are Building[]
+      let normalizedProperty = property;
+      if (property && Array.isArray(property.buildings) && typeof property.buildings[0] === 'string') {
+        normalizedProperty = {
+          ...property,
+          buildings: property.buildings.map((b: any, idx: number) =>
+            typeof b === 'string' ? { id: String(idx), name: b } : b
+          ),
+        };
+      }
+      set((state) => ({
+        properties: state.properties.map((p) => (p.id === id ? normalizedProperty : p)),
+        isLoading: false,
+      }));
+      return { property: normalizedProperty, status: 200 };
+    } catch (error: any) {
+      const errorMessage = error.message || 'Failed to update property';
       set({ isLoading: false, error: errorMessage });
       return { property: null, status: 0 };
     }
