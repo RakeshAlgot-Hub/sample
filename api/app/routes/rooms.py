@@ -14,13 +14,14 @@ router = APIRouter()
 @router.post("/rooms", status_code=status.HTTP_201_CREATED)
 async def create_room_endpoint(request: RoomCreateRequest, current_user=Depends(get_current_user)):
     # Ownership check
-    print("[ROOM CREATE] request:", request)
-    print("[ROOM CREATE] current_user:", current_user)
     properties_collection = db["properties"]
-    property = await properties_collection.find_one({"_id": request.propertyId})
-    print("[ROOM CREATE] property:", property)
+    from bson import ObjectId
+    try:
+        property_id = ObjectId(request.propertyId)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid propertyId format")
+    property = await properties_collection.find_one({"_id": property_id})
     if not property or property.get("ownerId") != current_user:
-        print("[ROOM CREATE] Forbidden: Not your property", property.get("ownerId") if property else None, current_user)
         raise HTTPException(status_code=403, detail="Forbidden: Not your property")
     room = await create_room_service(
         request.propertyId,
@@ -30,9 +31,7 @@ async def create_room_endpoint(request: RoomCreateRequest, current_user=Depends(
         request.shareType
     )
     if not room:
-        print("[ROOM CREATE] Property not found for id:", request.propertyId)
         raise HTTPException(status_code=404, detail="Property not found")
-    print("[ROOM CREATE] Room created:", room)
     return room
 
 
@@ -50,7 +49,12 @@ async def get_rooms(
 ):
     # Ownership check
     properties_collection = db["properties"]
-    property = await properties_collection.find_one({"_id": propertyId})
+    from bson import ObjectId
+    try:
+        property_id = ObjectId(propertyId)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid propertyId format")
+    property = await properties_collection.find_one({"_id": property_id})
     if not property or property.get("ownerId") != current_user:
         raise HTTPException(status_code=403, detail="Forbidden: Not your property")
     rooms_collection = db["rooms"]

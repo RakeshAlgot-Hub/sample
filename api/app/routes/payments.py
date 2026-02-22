@@ -45,21 +45,32 @@ async def get_payments(
         unit.pop("_id", None)
         units.append(unit)
     payments = []
+    rooms_collection = db["rooms"]
     for tenant in tenants:
         unit = next((u for u in units if u["id"] == tenant["unitId"]), None)
+        print(f"Mapping tenant {tenant['id']} to unit {unit['id'] if unit else 'None'}")
+        room_number = "N/A"
+        if unit and "roomId" in unit:
+            room = await rooms_collection.find_one({"_id": ObjectId(unit["roomId"])} )
+            if room and "roomNumber" in room:
+                room_number = room["roomNumber"]
+        print(f"roomNumber for tenant {tenant['id']}: {room_number}")
         check_in_date = datetime.fromisoformat(tenant["checkInDate"])
         due_date = check_in_date.replace(month=check_in_date.month % 12 + 1)
-        payments.append({
+        payment = {
             "id": tenant["id"],
             "tenantId": tenant["id"],
             "tenantName": tenant["fullName"],
             "unitId": tenant["unitId"],
-            "unitName": unit["name"] if unit and "name" in unit else "N/A",
+            "unitName": room_number,
             "amount": float(tenant.get("depositAmount", 0)),
             "dueDate": due_date.date().isoformat(),
             "status": tenant.get("status"),
             "paidDate": None
-        })
+        }
+        print(f"Payment generated: {payment}")
+        payments.append(payment)
+    print("Payments generated:", payments)
     return {
         "total": total,
         "page": page,

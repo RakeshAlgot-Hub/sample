@@ -4,6 +4,7 @@ from app.database.mongodb import db
 from contextlib import asynccontextmanager
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
@@ -38,6 +39,7 @@ async def lifespan(app):
     await db["tenants"].create_index("createdAt")
     yield
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 app = FastAPI(lifespan=lifespan)
 enforce_https = os.getenv("ENFORCE_HTTPS", "False").lower() == "true"
 if enforce_https:

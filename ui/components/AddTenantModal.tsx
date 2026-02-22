@@ -64,16 +64,18 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
     if (!selectedUnit) return;
     setLoading(true);
     try {
+      console.log(tenant)
       // 1. Create tenant in backend
       const tenantRes = await tenantService.createTenant({
         propertyId,
         unitId: selectedUnit.id,
         fullName: tenant.fullName,
-        documentId: tenant.documentId, // using documentId as documentId
+        documentId: tenant.documentId,
         phoneNumber: tenant.phoneNumber,
         checkInDate: tenant.checkInDate,
         depositAmount: tenant.depositAmount,
         status: 'paid',
+        address: tenant.address,
       });
       // 2. Update unit with tenantId and status
       await unitService.updateUnit(selectedUnit.id, { status: 'occupied', currentTenantId: tenantRes.id });

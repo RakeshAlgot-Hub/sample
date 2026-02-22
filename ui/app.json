@@ -41,6 +41,13 @@
           "cameraPermission": "Allow TenantTracker to access your camera for document scanning."
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow TenantTracker to access your photos to upload tenant profile pictures.",
+          "cameraPermission": "Allow TenantTracker to access your camera to take tenant profile pictures."
+        }
+      ],
       "@react-native-community/datetimepicker"
     ],
     "experiments": {

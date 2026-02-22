@@ -8,8 +8,11 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Image,
+  Alert,
 } from 'react-native';
-import { ArrowRight, Info } from 'lucide-react-native';
+import { ArrowRight, Info, Camera, ImageIcon, X } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { UnitResponse } from '@/services/unitService';
 import { Colors } from '@/constants/Colors';
 import { Fonts, Spacing, BorderRadius } from '@/constants/Theme';
@@ -20,6 +23,7 @@ export interface TenantForm {
   address: string;
   documentId: string;
   profilePictureUrl: string;
+  profilePictureFile?: any;
   checkInDate: string;
   depositAmount: string;
 }
@@ -55,7 +59,6 @@ export function Step2TenantDetails({
     'phoneNumber',
     'address',
     'documentId',
-    'profilePictureUrl',
     'checkInDate',
     'depositAmount',
   ];
@@ -84,6 +87,47 @@ export function Step2TenantDetails({
   };
 
   const bedInfo = getBedInfo();
+
+  const pickImage = async (fromCamera: boolean) => {
+    try {
+      let result;
+      if (fromCamera) {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Camera permission is required to take photos');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Photo library permission is required to select photos');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+      }
+
+      if (!result.canceled && result.assets[0]) {
+        handleChange('profilePictureUrl', result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const removeImage = () => {
+    handleChange('profilePictureUrl', '');
+  };
 
   return (
     <View style={styles.container}>
@@ -195,22 +239,37 @@ export function Step2TenantDetails({
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Profile Picture *</Text>
-            <TextInput
-              style={[
-                styles.input,
-                !tenant.profilePictureUrl &&
-                  touched.profilePictureUrl &&
-                  styles.inputError,
-              ]}
-              value={tenant.profilePictureUrl}
-              onChangeText={(v) => handleChange('profilePictureUrl', v)}
-              editable={!loading}
-              placeholder="Paste profile picture URL"
-              placeholderTextColor={Colors.text.hint}
-            />
-            {!tenant.profilePictureUrl && touched.profilePictureUrl && (
-              <Text style={styles.errorText}>Profile picture URL is required</Text>
+            <Text style={styles.label}>Profile Picture (Optional)</Text>
+            {tenant.profilePictureUrl ? (
+              <View style={styles.imagePreviewContainer}>
+                <Image
+                  source={{ uri: tenant.profilePictureUrl }}
+                  style={styles.imagePreview}
+                />
+                <TouchableOpacity
+                  style={styles.removeImageButton}
+                  onPress={removeImage}
+                  disabled={loading}>
+                  <X size={20} color={Colors.background.paper} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.imagePickerButtons}>
+                <TouchableOpacity
+                  style={styles.imagePickerButton}
+                  onPress={() => pickImage(true)}
+                  disabled={loading}>
+                  <Camera size={24} color={Colors.primary} />
+                  <Text style={styles.imagePickerButtonText}>Camera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.imagePickerButton}
+                  onPress={() => pickImage(false)}
+                  disabled={loading}>
+                  <ImageIcon size={24} color={Colors.primary} />
+                  <Text style={styles.imagePickerButtonText}>Gallery</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
 
@@ -440,5 +499,47 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: Colors.neutral[300],
+  },
+  imagePreviewContainer: {
+    alignItems: 'center',
+    position: 'relative',
+  },
+  imagePreview: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: Colors.background.elevated,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 0,
+    right: '35%',
+    backgroundColor: Colors.danger,
+    borderRadius: 20,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePickerButtons: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  imagePickerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.background.paper,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.base,
+  },
+  imagePickerButtonText: {
+    fontSize: Fonts.size.base,
+    fontWeight: Fonts.weight.semiBold,
+    color: Colors.primary,
   },
 });

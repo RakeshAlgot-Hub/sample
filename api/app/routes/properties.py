@@ -19,10 +19,7 @@ async def create_property(property: dict, current_user=Depends(get_current_user)
     # If ownerId is not provided, use current_user
     if "ownerId" not in property or not property["ownerId"]:
         property["ownerId"] = current_user
-    print("[PROPERTY CREATE] current_user:", current_user)
-    print("[PROPERTY CREATE] property dict before save:", property)
     result = await create_property_service(property)
-    print("[PROPERTY CREATE] created property:", result)
     return result
 
 @router.get("/{property_id}", status_code=status.HTTP_200_OK)

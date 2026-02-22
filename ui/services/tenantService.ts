@@ -10,6 +10,7 @@ export interface CreateTenantRequest {
   checkInDate: string;
   depositAmount: string;
   status: string;
+  address?: string;
 }
 
 export interface TenantResponse {
@@ -22,6 +23,8 @@ export interface TenantResponse {
   checkInDate: string;
   depositAmount: string;
   status: string;
+  profilePictureUrl?: string;
+  address?: string;
 }
 
 export interface PaginatedTenantResponse {
@@ -44,7 +47,11 @@ export const tenantService = {
   async createTenant(data: CreateTenantRequest): Promise<TenantResponse> {
     try {
       const api = getApi();
-      const response = await api.post<TenantResponse>('/tenants', data);
+      const response = await api.post<TenantResponse>('/tenants', data, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       return response.data;
     } catch (error) {
       throw handleApiError(error);

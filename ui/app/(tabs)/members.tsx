@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -6,14 +7,12 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
   TextInput,
+  Image,
 } from 'react-native';
-import { Plus, Edit2, Trash2, User, Search } from 'lucide-react-native';
+import { Plus, User, Search } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { AddTenantModal } from '@/components/AddTenantModal';
-import { EditTenantModal } from '@/components/EditTenantModal';
 import { usePropertyStore } from '@/store/property';
 import { tenantService, TenantResponse } from '@/services/tenantService';
 
@@ -23,16 +22,12 @@ import { useRoomStore } from '@/store/rooms';
 
 
 export default function MembersScreen() {
+  const router = useRouter();
   const [showAddTenant, setShowAddTenant] = useState(false);
-  const [showEditTenant, setShowEditTenant] = useState(false);
-  const [editTenant, setEditTenant] = useState<TenantResponse | null>(null);
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [tenantToDelete, setTenantToDelete] = useState<TenantResponse | null>(null);
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [search, setSearch] = useState('');
@@ -105,22 +100,15 @@ export default function MembersScreen() {
     fetchAllData(1);
   }, [property, searchDebounce]);
 
-  const handleDeleteConfirm = async () => {
-    if (!tenantToDelete) return;
-    setDeleting(true);
-    try {
-      await tenantService.deleteTenant(tenantToDelete.id);
+  // Refresh tenant list when screen regains focus (after delete or edit)
+  useFocusEffect(
+    useCallback(() => {
       setPage(1);
       setHasMore(true);
-      await fetchAllData(1);
-      setDeleteModalVisible(false);
-      setTenantToDelete(null);
-    } catch (e) {
-      Alert.alert('Error', 'Failed to delete tenant');
-    } finally {
-      setDeleting(false);
-    }
-  };
+      fetchAllData(1);
+    }, [property, searchDebounce])
+  );
+
 
   const handleLoadMore = () => {
     if (!loadingMore && hasMore && !loading) {
@@ -179,12 +167,6 @@ export default function MembersScreen() {
                 {Array.isArray(tenants) ? tenants.length : 0} {Array.isArray(tenants) && tenants.length === 1 ? 'tenant' : 'tenants'}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setShowAddTenant(true)}>
-              <Plus size={20} color={Colors.background.paper} />
-              <Text style={styles.addButtonText}>Add Tenant</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.searchContainer}>
@@ -228,17 +210,32 @@ export default function MembersScreen() {
           const room = unit && Array.isArray(rooms) ? rooms.find((r) => r.id === unit.roomId) : undefined;
           const roomNumber = room?.roomNumber || '-';
           return (
-            <View style={styles.tenantCard}>
+            <TouchableOpacity
+              style={styles.tenantCard}
+              onPress={() => {
+                router.push({
+                  pathname: '/details/tenant-detail',
+                  params: { tenant: JSON.stringify(item) }
+                });
+              }}
+              activeOpacity={0.7}>
               <View style={styles.tenantHeader}>
                 <View style={styles.avatarContainer}>
-                  <Text style={styles.avatarText}>
-                    {item.fullName
-                      .split(' ')
-                      .map((n) => n[0])
-                      .join('')
-                      .toUpperCase()
-                      .slice(0, 2)}
-                  </Text>
+                  {item.profilePictureUrl ? (
+                    <Image
+                      source={{ uri: item.profilePictureUrl }}
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <Text style={styles.avatarText}>
+                      {item.fullName
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')
+                        .toUpperCase()
+                        .slice(0, 2)}
+                    </Text>
+                  )}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.tenantName}>{item.fullName}</Text>
@@ -246,24 +243,6 @@ export default function MembersScreen() {
                   <Text style={styles.bedInfo}>
                     Room No: <Text style={styles.bedInfoValue}>{roomNumber}</Text>
                   </Text>
-                </View>
-                <View style={styles.iconActions}>
-                  <TouchableOpacity
-                    style={styles.iconButton}
-                    onPress={() => {
-                      setEditTenant(item);
-                      setShowEditTenant(true);
-                    }}>
-                    <Edit2 size={18} color={Colors.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.iconButton}
-                    onPress={() => {
-                      setTenantToDelete(item);
-                      setDeleteModalVisible(true);
-                    }}>
-                    <Trash2 size={18} color={Colors.danger} />
-                  </TouchableOpacity>
                 </View>
               </View>
               <View style={styles.divider} />
@@ -273,10 +252,19 @@ export default function MembersScreen() {
                   <Text style={styles.detailValue}>{item.checkInDate ? item.checkInDate.split('T')[0] : '-'}</Text>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />
+
+      {property && Array.isArray(tenants) && tenants.length > 0 && (
+        <TouchableOpacity
+          style={styles.floatingButton}
+          onPress={() => setShowAddTenant(true)}
+          activeOpacity={0.8}>
+          <Plus size={28} color={Colors.background.paper} strokeWidth={2.5} />
+        </TouchableOpacity>
+      )}
 
       {property && (
         <AddTenantModal
@@ -286,63 +274,17 @@ export default function MembersScreen() {
           onSuccess={handleSuccess}
         />
       )}
-      {property && editTenant && (
-        <EditTenantModal
-          visible={showEditTenant}
-          onClose={() => setShowEditTenant(false)}
-          propertyId={property.id}
-          tenant={editTenant}
-          onSuccess={() => {
-            setShowEditTenant(false);
-            handleSuccess();
-          }}
-        />
-      )}
-
-      <Modal
-        visible={deleteModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeleteModalVisible(false)}>
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => !deleting && setDeleteModalVisible(false)}>
-          <Pressable style={styles.deleteModal} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.deleteModalIcon}>
-              <Trash2 size={32} color={Colors.danger} />
-            </View>
-            <Text style={styles.deleteModalTitle}>Delete Tenant</Text>
-            <Text style={styles.deleteModalText}>
-              Are you sure you want to delete{' '}
-              <Text style={styles.deleteModalBold}>{tenantToDelete?.fullName}</Text>?
-              This action cannot be undone.
-            </Text>
-            <View style={styles.deleteModalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setDeleteModalVisible(false)}
-                disabled={deleting}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmDeleteButton}
-                onPress={handleDeleteConfirm}
-                disabled={deleting}>
-                {deleting ? (
-                  <ActivityIndicator size="small" color={Colors.background.paper} />
-                ) : (
-                  <Text style={styles.confirmDeleteButtonText}>Delete</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+    avatarImage: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: Colors.background.elevated,
+    },
   container: {
     flex: 1,
     backgroundColor: Colors.background.default,
@@ -369,20 +311,6 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: Colors.text.secondary,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 6,
-  },
-  addButtonText: {
-    color: Colors.background.paper,
-    fontWeight: '600',
-    fontSize: 15,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -525,80 +453,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.text.primary,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  deleteModal: {
-    backgroundColor: Colors.background.paper,
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
-  },
-  deleteModalIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.dangerLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  deleteModalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: Colors.text.primary,
-    marginBottom: 8,
-  },
-  deleteModalText: {
-    fontSize: 14,
-    color: Colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  deleteModalBold: {
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  deleteModalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: Colors.background.paper,
-    borderWidth: 1,
-    borderColor: Colors.border.medium,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  confirmDeleteButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: Colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  confirmDeleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.background.paper,
-  },
   bedInfo: {
     fontSize: 13,
     color: Colors.text.secondary,
@@ -609,18 +463,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.text.primary,
   },
-  iconActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 8,
-  },
-  iconButton: {
-    padding: 6,
-    borderRadius: 16,
-  },
   footerLoader: {
     paddingVertical: 20,
     alignItems: 'center',
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
