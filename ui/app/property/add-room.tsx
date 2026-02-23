@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { usePropertyStore } from '@/store/property';
 import { useRoomStore } from '@/store/rooms';
@@ -192,7 +193,7 @@ export default function AddRoomScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <Header title="Add Room" showBack />
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentPadding}>
@@ -381,7 +382,7 @@ export default function AddRoomScreen() {
           </View>
         </Pressable>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

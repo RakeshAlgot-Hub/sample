@@ -191,27 +191,28 @@ export default function DashboardScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          tintColor={Colors.primary}
-        />
-      }>
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Dashboard</Text>
-        <Text style={styles.subtitle}>
-          {new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </Text>
-      </View>
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={Colors.primary}
+          />
+        }>
+        <View style={styles.header}>
+          <Text style={styles.greeting}>Dashboard</Text>
+          <Text style={styles.subtitle}>
+            {new Date().toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </Text>
+        </View>
 
       <View style={styles.metricsGrid}>
         <View style={styles.metricRow}>
@@ -296,10 +297,11 @@ export default function DashboardScreen() {
         <QuickActions actions={quickActions} />
       </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Last updated: {new Date().toLocaleTimeString()}</Text>
-      </View>
-    </ScrollView>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Last updated: {new Date().toLocaleTimeString()}</Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -307,6 +309,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background.default,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     padding: 16,

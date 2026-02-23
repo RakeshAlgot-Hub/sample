@@ -47,7 +47,7 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
       });
       setLoading(true);
       unitService.getUnits(propertyId, { status: 'available' })
-        .then(response => setAvailableUnits(response.data))
+        .then(response => setAvailableUnits(response.data.result))
         .catch(() => setError('Failed to load beds'))
         .finally(() => setLoading(false));
     }

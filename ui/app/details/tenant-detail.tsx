@@ -81,7 +81,7 @@ export default function TenantDetailScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <Header
         title="Tenant Details"
         showBack
@@ -238,7 +238,7 @@ export default function TenantDetailScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { usePropertyStore } from '@/store/property';
 import { useRoomStore } from '@/store/rooms';
@@ -59,7 +60,7 @@ export default function ManageRoomsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <Header title="Manage Rooms" showBack />
 
       <ScrollView style={styles.content}>
@@ -152,7 +153,7 @@ export default function ManageRoomsScreen() {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
