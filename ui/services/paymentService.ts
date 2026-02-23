@@ -1,3 +1,4 @@
+
 import { getApi, handleApiError } from '@/lib/api';
 export interface PaymentData {
   id: string;
@@ -84,15 +85,32 @@ function joinTenantUnitPayments(tenants: any[], units: any[]): PaymentData[] {
 }
 
 export const paymentService = {
-  async updatePaymentStatus(tenantId: string, status: 'paid' | 'due'): Promise<void> {
+  async updatePaymentStatus(paymentId: string, status: 'paid' | 'due'): Promise<void> {
     try {
       const api = getApi();
-      await api.patch(`/tenants/${tenantId}`, { status });
+      await api.patch(`/payments/${paymentId}`, { status });
     } catch (error) {
       throw handleApiError(error);
     }
   },
-
+   async createPayment(data: {
+    propertyId: string;
+    tenantId: string;
+    unitId: string;
+    amount: number;
+    dueDate: string;
+    status: 'paid' | 'due';
+    paidDate?: string;
+    note?: string;
+  }): Promise<PaymentData> {
+    try {
+      const api = getApi();
+      const response = await api.post<PaymentData>('/payments', data);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
   async getPayments(propertyId: string, params?: Omit<PaymentQueryParams, 'propertyId'>): Promise<PaginatedPaymentResponse> {
     try {
       const api = getApi();

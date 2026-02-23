@@ -1,13 +1,21 @@
+from bson import ObjectId
+from app.database.mongodb import db
 from fastapi import APIRouter, status, HTTPException, Depends
 from app.utils.helpers import get_current_user
-from app.database.mongodb import db
-from bson import ObjectId
-from datetime import datetime
 from typing import Optional
 from fastapi import Query
+from app.services.payments_service import create_payment_service, get_payments_service
 
 router = APIRouter()
 
+# Create a payment document
+@router.post("/payments", status_code=status.HTTP_201_CREATED)
+async def create_payment(payment: dict, current_user=Depends(get_current_user)):
+    try:
+        payment_doc = await create_payment_service(payment)
+        return payment_doc
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 
@@ -20,75 +28,31 @@ async def get_payments(
     status: Optional[str] = Query(None),
     current_user=Depends(get_current_user)
 ):
-    tenants_collection = db["tenants"]
-    units_collection = db["units"]
-    query = {"propertyId": propertyId}
-    if status:
-        query["status"] = status
-    if search:
-        query["$or"] = [
-            {"fullName": {"$regex": search, "$options": "i"}},
-            {"documentId": {"$regex": search, "$options": "i"}},
-            {"phoneNumber": {"$regex": search, "$options": "i"}}
-        ]
-    total = await tenants_collection.count_documents(query)
-    tenants_cursor = tenants_collection.find(query).skip((page - 1) * limit).limit(limit)
-    tenants = []
-    async for tenant in tenants_cursor:
-        tenant["id"] = str(tenant["_id"])
-        tenant.pop("_id", None)
-        tenants.append(tenant)
-    units_cursor = units_collection.find({"propertyId": propertyId})
-    units = []
-    async for unit in units_cursor:
-        unit["id"] = str(unit["_id"])
-        unit.pop("_id", None)
-        units.append(unit)
-    payments = []
-    rooms_collection = db["rooms"]
-    for tenant in tenants:
-        unit = next((u for u in units if u["id"] == tenant["unitId"]), None)
-        print(f"Mapping tenant {tenant['id']} to unit {unit['id'] if unit else 'None'}")
-        room_number = "N/A"
-        if unit and "roomId" in unit:
-            room = await rooms_collection.find_one({"_id": ObjectId(unit["roomId"])} )
-            if room and "roomNumber" in room:
-                room_number = room["roomNumber"]
-        print(f"roomNumber for tenant {tenant['id']}: {room_number}")
-        check_in_date = datetime.fromisoformat(tenant["checkInDate"])
-        due_date = check_in_date.replace(month=check_in_date.month % 12 + 1)
-        payment = {
-            "id": tenant["id"],
-            "tenantId": tenant["id"],
-            "tenantName": tenant["fullName"],
-            "unitId": tenant["unitId"],
-            "unitName": room_number,
-            "amount": float(tenant.get("depositAmount", 0)),
-            "dueDate": due_date.date().isoformat(),
-            "status": tenant.get("status"),
-            "paidDate": None
-        }
-        print(f"Payment generated: {payment}")
-        payments.append(payment)
-    print("Payments generated:", payments)
-    return {
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "results": payments
-    }
+    result = get_payments_service(propertyId, page, limit, search, status)
+    if callable(getattr(result, "__await__", None)):
+        result = await result
+    return result
 
-@router.get("/payments/paid", status_code=status.HTTP_200_OK)
-async def get_paid_payments(propertyId: str, current_user=Depends(get_current_user)):
-    # The frontend determines paid status, so just return all payments
-    return await get_payments(propertyId, current_user)
 
-@router.get("/payments/due", status_code=status.HTTP_200_OK)
-async def get_due_payments(propertyId: str, current_user=Depends(get_current_user)):
-    # The frontend determines due status, so just return all payments
-    return await get_payments(propertyId, current_user)
-
-@router.get("/payments/upcoming", status_code=status.HTTP_200_OK)
-async def get_upcoming_payments(propertyId: str, current_user=Depends(get_current_user)):
-    # The frontend determines upcoming status, so just return all payments
-    return await get_payments(propertyId, current_user)
+# Update payment status
+@router.patch("/payments/{payment_id}", status_code=status.HTTP_200_OK)
+async def update_payment(payment_id: str, data: dict, current_user=Depends(get_current_user)):
+    payments_collection = db["payments"]
+    # Only allow status field
+    if set(data.keys()) != {"status"}:
+        raise HTTPException(status_code=400, detail="Only 'status' field can be updated.")
+    status_value = data["status"]
+    update_fields = {"status": status_value}
+    from datetime import datetime, timezone
+    if status_value == "paid":
+        update_fields["paidDate"] = datetime.now(timezone.utc).isoformat()
+    else:
+        update_fields["paidDate"] = None
+    update_fields["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    result = await payments_collection.update_one({"_id": ObjectId(payment_id)}, {"$set": update_fields})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    updated = await payments_collection.find_one({"_id": ObjectId(payment_id)})
+    updated["id"] = str(updated["_id"])
+    updated.pop("_id", None)
+    return updated

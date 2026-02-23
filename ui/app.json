@@ -8,10 +8,12 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
+    "platforms": ["ios", "android"],
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.tenanttracker.app",
-      "jsEngine": "hermes"
+      "jsEngine": "hermes",
+      "requireFullScreen": true
     },
     "android": {
       "adaptiveIcon": {
@@ -24,12 +26,8 @@
         "android.permission.RECORD_AUDIO"
       ],
       "jsEngine": "hermes",
-      "enableShrinkResourcesInReleaseBuilds": true
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "enableShrinkResourcesInReleaseBuilds": true,
+      "screenOrientation": "portrait"
     },
     "plugins": [
       "expo-router",
@@ -54,7 +52,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "https://portfolio-2zxo.onrender.com",
+      "apiUrl": "http://192.168.0.105:8000",
       "router": {},
       "eas": {
         "projectId": "545974f5-c944-4b85-8740-7376674822f1"

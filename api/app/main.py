@@ -7,11 +7,17 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
 import os
 from app.routes import rooms, auth, properties, units, tenants, units_update, dashboard, payments
 from app.utils.rate_limit import limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+
+# Ensure 'static' directory exists
+static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
 
 
 app = FastAPI()
@@ -39,7 +45,7 @@ async def lifespan(app):
     await db["tenants"].create_index("createdAt")
     yield
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 app = FastAPI(lifespan=lifespan)
 enforce_https = os.getenv("ENFORCE_HTTPS", "False").lower() == "true"
 if enforce_https:

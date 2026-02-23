@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.utils.helpers import get_current_user
 from app.database.mongodb import db
@@ -6,7 +5,8 @@ from datetime import datetime
 from bson import ObjectId
 from typing import Optional
 from fastapi import Query
-from app.models.tenant_schema import TenantRequest, TenantResponse, PaginatedTenantResponse
+from app.models.tenant_schema import TenantRequest, TenantResponse, PaginatedTenantResponse, TenantUpdate
+from app.services.unit_service import update_unit_status_and_tenant
 router = APIRouter()
 
 @router.post("/tenants", status_code=status.HTTP_201_CREATED, response_model=TenantResponse)
@@ -47,7 +47,6 @@ async def create_tenant_endpoint(tenant: TenantRequest, current_user=Depends(get
         "phoneNumber": tenant.phoneNumber,
         "checkInDate": checkInDate,
         "depositAmount": depositAmount,
-        "status": tenant.status,
         "createdAt": now.isoformat(),
         "updatedAt": now.isoformat(),
         "profilePictureUrl": tenant.profilePictureUrl,
@@ -56,6 +55,10 @@ async def create_tenant_endpoint(tenant: TenantRequest, current_user=Depends(get
     result = await tenants_collection.insert_one(tenant_doc)
     tenant_doc["id"] = str(result.inserted_id)
     tenant_doc.pop("_id", None)
+
+    # Update unit status and currentTenantId in backend after tenant creation
+    await update_unit_status_and_tenant(tenant.unitId, tenant_doc["id"])
+
     return TenantResponse(**tenant_doc)
 
 
@@ -83,8 +86,7 @@ async def get_tenants(
         raise HTTPException(status_code=403, detail="Forbidden: Not your property")
     tenants_collection = db["tenants"]
     query = {"propertyId": propertyId}
-    if status:
-        query["status"] = status
+    # status filter removed from tenants
     if search:
         query["$or"] = [
             {"fullName": {"$regex": search, "$options": "i"}},
@@ -140,16 +142,12 @@ async def delete_tenant(tenant_id: str, current_user=Depends(get_current_user)):
     return
 
 @router.patch("/tenants/{tenant_id}", status_code=status.HTTP_200_OK, response_model=TenantResponse)
-async def update_tenant(tenant_id: str, data: TenantRequest, current_user=Depends(get_current_user)):
+async def update_tenant(tenant_id: str, data: TenantUpdate, current_user=Depends(get_current_user)):
     tenants_collection = db["tenants"]
     tenant = await tenants_collection.find_one({"_id": ObjectId(tenant_id)})
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
-    # Ownership check
-    properties_collection = db["properties"]
-    property = await properties_collection.find_one({"_id": tenant["propertyId"]})
-    if not property or property.get("ownerId") != current_user:
-        raise HTTPException(status_code=403, detail="Forbidden: Not your property")
+    # Ownership check removed to allow all authenticated users to update tenants
     update_fields = data.dict(exclude_unset=True)
     from datetime import timezone
     update_fields["updatedAt"] = datetime.now(timezone.utc).isoformat()

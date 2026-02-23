@@ -41,6 +41,10 @@ export default function PaymentCard({ payment, status, onStatusChanged }: Paymen
     });
   };
 
+  // Fallbacks for missing data
+  const tenantName = payment.tenantName || 'Unknown Tenant';
+  const unitNumber = payment.unitName !== undefined && payment.unitName !== null ? `Unit ${payment.unitName}` : (payment.unitName || 'Unknown Unit');
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -55,8 +59,8 @@ export default function PaymentCard({ payment, status, onStatusChanged }: Paymen
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <View style={styles.header}> 
           <View style={styles.titleSection}> 
-            <Text style={styles.tenantName}>{payment.tenantName}</Text> 
-            <Text style={styles.unitName}>{payment.unitName}</Text> 
+            <Text style={styles.tenantName}>{tenantName}</Text> 
+            <Text style={styles.unitName}>{unitNumber}</Text> 
           </View> 
           <View style={[styles.badge, { backgroundColor: config.badgeColor }]}> 
             <Text style={styles.badgeText}>{config.badgeText}</Text> 
@@ -68,9 +72,9 @@ export default function PaymentCard({ payment, status, onStatusChanged }: Paymen
           onPress={async () => {
             // Toggle between due and paid
             const next = localStatus === 'due' ? 'paid' : 'due';
-            setLocalStatus(next);
             try {
-              await paymentService.updatePaymentStatus(payment.tenantId, next);
+              await paymentService.updatePaymentStatus(payment.id, next);
+              setLocalStatus(next);
               if (onStatusChanged) onStatusChanged();
             } catch (e) {
               // Optionally show error

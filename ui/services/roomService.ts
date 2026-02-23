@@ -21,11 +21,11 @@ export interface RoomResponse {
 }
 
 export interface PaginatedRoomResponse {
-  data: RoomResponse[];
+  results: RoomResponse[];
   total: number;
   page: number;
   limit: number;
-  totalPages: number;
+  totalPages?: number;
 }
 
 export interface RoomQueryParams {

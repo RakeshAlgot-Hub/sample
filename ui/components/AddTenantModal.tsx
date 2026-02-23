@@ -6,6 +6,7 @@ import { Step2TenantDetails, TenantForm } from './AddTenantStep2TenantDetails';
 import { Step3ReviewConfirm } from './AddTenantStep3ReviewConfirm';
 import { unitService, UnitResponse } from '@/services/unitService';
 import { tenantService } from '@/services/tenantService';
+import { paymentService } from '@/services/paymentService';
 import { Colors } from '@/constants/Colors';
 
 interface AddTenantModalProps {
@@ -47,7 +48,7 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
       });
       setLoading(true);
       unitService.getUnits(propertyId, { status: 'available' })
-        .then(response => setAvailableUnits(response.data.result))
+        .then(response => setAvailableUnits(response.data))
         .catch(() => setError('Failed to load beds'))
         .finally(() => setLoading(false));
     }
@@ -64,7 +65,11 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
     if (!selectedUnit) return;
     setLoading(true);
     try {
-      console.log(tenant)
+      // Calculate dueDate (1 month after checkInDate)
+      const checkInDate = new Date(tenant.checkInDate);
+      const dueDate = new Date(checkInDate);
+      dueDate.setMonth(checkInDate.getMonth() + 1);
+      const dueDateStr = dueDate.toISOString().split('T')[0];
       // 1. Create tenant in backend
       const tenantRes = await tenantService.createTenant({
         propertyId,
@@ -77,8 +82,18 @@ export function AddTenantModal({ visible, onClose, propertyId, onSuccess }: AddT
         status: 'paid',
         address: tenant.address,
       });
-      // 2. Update unit with tenantId and status
-      await unitService.updateUnit(selectedUnit.id, { status: 'occupied', currentTenantId: tenantRes.id });
+      if (!tenantRes || !tenantRes.id) {
+        throw new Error('Tenant creation failed');
+      }
+      await paymentService.createPayment({
+        propertyId,
+        tenantId: tenantRes.id,
+        unitId: selectedUnit.id,
+        amount: parseFloat(tenant.depositAmount || '0'),
+        dueDate: dueDateStr,
+        status: 'paid',
+      });
+
       setLoading(false);
       onSuccess();
       onClose();

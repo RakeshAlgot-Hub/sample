@@ -24,3 +24,11 @@ async def create_units_service(propertyId: str, buildingId: str, floorId: str, r
         unit_serializable = {k: (str(v) if isinstance(v, (ObjectId, datetime)) else v) for k, v in unit.items()}
         units.append(unit_serializable)
     return units
+
+async def update_unit_status_and_tenant(unit_id: str, tenant_id: str):
+    units_collection = db["units"]
+    now = datetime.now(timezone.utc)
+    await units_collection.update_one(
+        {"_id": ObjectId(unit_id)},
+        {"$set": {"status": "occupied", "currentTenantId": tenant_id, "updatedAt": now}}
+    )

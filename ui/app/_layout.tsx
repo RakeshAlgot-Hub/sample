@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useAuthStore } from '@/store/auth';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform, Text } from 'react-native';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
 export default function RootLayout() {
@@ -28,6 +28,22 @@ export default function RootLayout() {
       router.replace('/(tabs)');
     }
   }, [user, segments, isInitialized]);
+
+  if (Platform.OS === 'web') {
+    return (
+      <SafeAreaProvider>
+        <View style={styles.webBlocker}>
+          <Text style={styles.webBlockerTitle}>Mobile App Only</Text>
+          <Text style={styles.webBlockerText}>
+            TenantTracker is available exclusively on iOS and Android devices.
+          </Text>
+          <Text style={styles.webBlockerText}>
+            Please download the app from the App Store or Google Play.
+          </Text>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
   if (!isInitialized) {
     return (
@@ -62,5 +78,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
+  },
+  webBlocker: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#075E54',
+    padding: 24,
+  },
+  webBlockerTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  webBlockerText: {
+    fontSize: 16,
+    color: '#fff',
+    marginBottom: 12,
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });

@@ -27,7 +27,8 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await roomService.getRooms(propertyId);
-      set({ rooms: response.data, isLoading: false });
+      // Use 'results' field from backend response for rooms
+      set({ rooms: Array.isArray(response.results) ? response.results : [], isLoading: false });
     } catch (error: any) {
       const errorMessage = error.message || 'Failed to fetch rooms';
       // Stop repeated requests on 403/429
@@ -35,7 +36,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
         set({ isLoading: false, error: errorMessage });
         return;
       }
-      set({ isLoading: false, error: errorMessage });
+      set({ isLoading: false, error: errorMessage, rooms: [] });
       throw error;
     }
   },

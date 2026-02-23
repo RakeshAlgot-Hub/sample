@@ -15,6 +15,7 @@ import { useRoomStore } from '@/store/rooms';
 import { Plus, Trash2 } from 'lucide-react-native';
 import { Header } from '@/components/Header';
 
+
 export default function ManageRoomsScreen() {
   const router = useRouter();
   const { getSelectedProperty } = usePropertyStore();
@@ -68,7 +69,7 @@ export default function ManageRoomsScreen() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#075E54" />
           </View>
-        ) : rooms.length === 0 ? (
+        ) : (rooms || []).length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No Rooms Added</Text>
             <Text style={styles.emptyText}>
@@ -83,7 +84,7 @@ export default function ManageRoomsScreen() {
           </View>
         ) : (
           <View style={styles.roomsList}>
-            {rooms.map((room) => {
+            {(rooms || []).map((room) => {
               const building = property.buildings.find((b) => b.id === room.buildingId);
               const totalBeds = room.shareType || 1;
               const occupiedCount = typeof room.occupiedCount === 'number' ? room.occupiedCount : 0;
@@ -143,7 +144,7 @@ export default function ManageRoomsScreen() {
         )}
       </ScrollView>
 
-      {rooms.length > 0 && (
+      {(rooms || []).length > 0 && (
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.addRoomButton}
