@@ -219,7 +219,7 @@ export default function MembersScreen() {
                 });
               }}
               activeOpacity={0.7}>
-              <View style={styles.tenantHeader}>
+              <View style={styles.tenantRow}>
                 <View style={styles.avatarContainer}>
                   {item.profilePictureUrl ? (
                     <Image
@@ -237,19 +237,16 @@ export default function MembersScreen() {
                     </Text>
                   )}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tenantName}>{item.fullName}</Text>
-                  <Text style={styles.tenantPhone}>{item.phoneNumber}</Text>
-                  <Text style={styles.bedInfo}>
-                    Room No: <Text style={styles.bedInfoValue}>{roomNumber}</Text>
-                  </Text>
+                <View style={styles.tenantInfo}>
+                  <Text style={styles.tenantName} numberOfLines={1}>{item.fullName}</Text>
+                  <View style={styles.tenantMeta}>
+                    <Text style={styles.tenantMetaText}>Room {roomNumber}</Text>
+                    <Text style={styles.tenantMetaDot}>•</Text>
+                    <Text style={styles.tenantMetaText}>{item.phoneNumber}</Text>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.tenantDetails}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Check-in</Text>
-                  <Text style={styles.detailValue}>{item.checkInDate ? item.checkInDate.split('T')[0] : '-'}</Text>
+                <View style={styles.checkInBadge}>
+                  <Text style={styles.checkInText}>{item.checkInDate ? item.checkInDate.split('T')[0].split('-').slice(1).join('/') : '-'}</Text>
                 </View>
               </View>
             </TouchableOpacity>
@@ -279,12 +276,6 @@ export default function MembersScreen() {
 }
 
 const styles = StyleSheet.create({
-    avatarImage: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: Colors.background.elevated,
-    },
   container: {
     flex: 1,
     backgroundColor: Colors.background.default,
@@ -294,7 +285,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     backgroundColor: Colors.background.paper,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.light,
@@ -303,13 +294,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: Colors.text.primary,
     marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.text.secondary,
   },
   searchContainer: {
@@ -317,14 +308,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.background.paper,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.light,
-    gap: 12,
+    gap: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     color: Colors.text.primary,
   },
   loadingContainer: {
@@ -341,8 +332,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    padding: 16,
-    paddingBottom: 24,
+    padding: 10,
+    paddingBottom: 90,
   },
   emptyState: {
     flex: 1,
@@ -390,78 +381,68 @@ const styles = StyleSheet.create({
   },
   tenantCard: {
     backgroundColor: Colors.background.paper,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: Colors.border.light,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
-  tenantHeader: {
+  tenantRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    gap: 10,
   },
   avatarContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.background.elevated,
   },
   avatarText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.background.paper,
   },
+  tenantInfo: {
+    flex: 1,
+    gap: 3,
+  },
   tenantName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: Colors.text.primary,
-    marginBottom: 2,
   },
-  tenantPhone: {
-    fontSize: 14,
-    color: Colors.text.secondary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border.light,
-    marginBottom: 12,
-  },
-  tenantDetails: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  detailRow: {
+  tenantMeta: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 6,
   },
-  detailLabel: {
-    fontSize: 14,
+  tenantMetaText: {
+    fontSize: 11,
     color: Colors.text.secondary,
   },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.primary,
+  tenantMetaDot: {
+    fontSize: 11,
+    color: Colors.text.disabled,
   },
-  bedInfo: {
-    fontSize: 13,
+  checkInBadge: {
+    backgroundColor: Colors.background.elevated,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  checkInText: {
+    fontSize: 11,
+    fontWeight: '600',
     color: Colors.text.secondary,
-    marginTop: 2,
-    marginBottom: 2,
-  },
-  bedInfoValue: {
-    fontWeight: '600',
-    color: Colors.text.primary,
   },
   footerLoader: {
     paddingVertical: 20,
@@ -471,9 +452,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 24,
     right: 24,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',

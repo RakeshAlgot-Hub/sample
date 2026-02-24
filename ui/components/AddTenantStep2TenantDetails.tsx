@@ -214,286 +214,205 @@ export function Step2TenantDetails({
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.title}>Tenant Details</Text>
-          <Text style={styles.subtitle}>
-            Fill in the tenant information to complete registration
-          </Text>
+          {bedInfo && (
+            <View style={styles.bedInfoCompact}>
+              <Text style={styles.bedInfoText}>
+                Building {bedInfo.building} • Floor {bedInfo.floor} • Room {bedInfo.room} • Bed {bedInfo.bed}
+              </Text>
+              <TouchableOpacity onPress={onBack} disabled={loading}>
+                <Text style={styles.changeBedLink}>Change</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
-        {bedInfo && (
-          <View style={styles.bedInfoCard}>
-            <View style={styles.bedInfoHeader}>
-              <Info size={16} color={Colors.info} />
-              <Text style={styles.bedInfoTitle}>Selected Bed</Text>
-            </View>
-            <Text style={styles.bedInfoText}>
-              Building {bedInfo.building} • Floor {bedInfo.floor} • Room{' '}
-              {bedInfo.room} • Bed {bedInfo.bed}
-            </Text>
-            <TouchableOpacity
-              style={styles.changeBedButton}
-              onPress={onBack}
-              disabled={loading}>
-              <Text style={styles.changeBedText}>Change Bed</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Full Name *</Text>
-            <TextInput
-              style={[
-                styles.input,
-                !tenant.fullName && touched.fullName && styles.inputError,
-              ]}
-              value={tenant.fullName}
-              onChangeText={(v) => handleChange('fullName', v)}
-              editable={!loading}
-              placeholder="Enter full name"
-              placeholderTextColor={Colors.text.hint}
-            />
-            {!tenant.fullName && touched.fullName && (
-              <Text style={styles.errorText}>Full name is required</Text>
-            )}
-          </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phone Number *</Text>
-            <TextInput
-              style={[
-                styles.input,
-                !tenant.phoneNumber && touched.phoneNumber && styles.inputError,
-              ]}
-              value={tenant.phoneNumber}
-              onChangeText={(v) => handleChange('phoneNumber', v)}
-              editable={!loading}
-              placeholder="Enter phone number"
-              placeholderTextColor={Colors.text.hint}
-              keyboardType="phone-pad"
-            />
-            {!tenant.phoneNumber && touched.phoneNumber && (
-              <Text style={styles.errorText}>Phone number is required</Text>
-            )}
-          </View>
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Full Name *</Text>
+                <TextInput
+                  style={[styles.input, !tenant.fullName && touched.fullName && styles.inputError]}
+                  value={tenant.fullName}
+                  onChangeText={(v) => handleChange('fullName', v)}
+                  editable={!loading}
+                  placeholder="Full name"
+                  placeholderTextColor={Colors.text.hint}
+                />
+              </View>
+            </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Address *</Text>
-            <TextInput
-              style={[
-                styles.input,
-                styles.textArea,
-                !tenant.address && touched.address && styles.inputError,
-              ]}
-              value={tenant.address}
-              onChangeText={(v) => handleChange('address', v)}
-              editable={!loading}
-              placeholder="Enter full address"
-              placeholderTextColor={Colors.text.hint}
-              multiline
-              numberOfLines={3}
-            />
-            {!tenant.address && touched.address && (
-              <Text style={styles.errorText}>Address is required</Text>
-            )}
-          </View>
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Phone Number *</Text>
+                <TextInput
+                  style={[styles.input, !tenant.phoneNumber && touched.phoneNumber && styles.inputError]}
+                  value={tenant.phoneNumber}
+                  onChangeText={(v) => handleChange('phoneNumber', v)}
+                  editable={!loading}
+                  placeholder="Phone"
+                  placeholderTextColor={Colors.text.hint}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Document Id *</Text>
-            <TextInput
-              style={[
-                styles.input,
-                !tenant.documentId && touched.documentId && styles.inputError,
-              ]}
-              value={tenant.documentId}
-              onChangeText={(v) => handleChange('documentId', v)}
-              editable={!loading}
-              placeholder="Enter Document Id here ( e,g. Aadhar number, Passport number or URL to the document )"
-              placeholderTextColor={Colors.text.hint}
-            />
-            {!tenant.documentId && touched.documentId && (
-              <Text style={styles.errorText}>Document URL is required</Text>
-            )}
-          </View>
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Address *</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea, !tenant.address && touched.address && styles.inputError]}
+                  value={tenant.address}
+                  onChangeText={(v) => handleChange('address', v)}
+                  editable={!loading}
+                  placeholder="Full address"
+                  placeholderTextColor={Colors.text.hint}
+                  multiline
+                  numberOfLines={2}
+                />
+              </View>
+            </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Profile Picture (Optional)</Text>
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Document ID *</Text>
+                <TextInput
+                  style={[styles.input, !tenant.documentId && touched.documentId && styles.inputError]}
+                  value={tenant.documentId}
+                  onChangeText={(v) => handleChange('documentId', v)}
+                  editable={!loading}
+                  placeholder="Aadhar/Passport"
+                  placeholderTextColor={Colors.text.hint}
+                />
+              </View>
+            </View>
+
             {tenant.profilePictureUrl ? (
               <View style={styles.imagePreviewContainer}>
-                <Image
-                  source={{ uri: tenant.profilePictureUrl }}
-                  style={styles.imagePreview}
-                />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={removeImage}
-                  disabled={loading}>
-                  <X size={20} color={Colors.background.paper} />
+                <Image source={{ uri: tenant.profilePictureUrl }} style={styles.imagePreview} />
+                <TouchableOpacity style={styles.removeImageButton} onPress={removeImage} disabled={loading}>
+                  <X size={16} color={Colors.background.paper} />
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={styles.imagePickerButtons}>
-                <TouchableOpacity
-                  style={styles.imagePickerButton}
-                  onPress={() => pickImage(true)}
-                  disabled={loading}>
-                  <Camera size={24} color={Colors.primary} />
-                  <Text style={styles.imagePickerButtonText}>Camera</Text>
+              <View style={styles.imagePickerRow}>
+                <TouchableOpacity style={styles.imagePickerButtonCompact} onPress={() => pickImage(true)} disabled={loading}>
+                  <Camera size={18} color={Colors.primary} />
+                  <Text style={styles.imagePickerButtonTextCompact}>Camera</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.imagePickerButton}
-                  onPress={() => pickImage(false)}
-                  disabled={loading}>
-                  <ImageIcon size={24} color={Colors.primary} />
-                  <Text style={styles.imagePickerButtonText}>Gallery</Text>
+                <TouchableOpacity style={styles.imagePickerButtonCompact} onPress={() => pickImage(false)} disabled={loading}>
+                  <ImageIcon size={18} color={Colors.primary} />
+                  <Text style={styles.imagePickerButtonTextCompact}>Gallery</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Check-in Date *</Text>
-            <TouchableOpacity
-              style={[
-                styles.input,
-                !tenant.checkInDate && touched.checkInDate && styles.inputError,
-                { justifyContent: 'center' },
-              ]}
-              onPress={() => setShowDatePicker(true)}
-              disabled={loading}
-            >
-              <Text style={{ color: tenant.checkInDate ? Colors.text.primary : Colors.text.hint }}>
-                {tenant.checkInDate || 'Select date'}
-              </Text>
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={tenant.checkInDate ? new Date(tenant.checkInDate) : new Date()}
-                mode="date"
-                display="default"
-                onChange={(
-                  event: DateTimePickerEvent,
-                  date?: Date | undefined
-                ) => {
-                  setShowDatePicker(false);
-                  if (date) handleChange('checkInDate', date.toISOString().split('T')[0]);
-                }}
-              />
-            )}
-            {!tenant.checkInDate && touched.checkInDate && (
-              <Text style={styles.errorText}>Check-in date is required</Text>
-            )}
-          </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payment Information</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Deposit Amount *</Text>
-            <TextInput
-              style={[
-                styles.input,
-                !tenant.depositAmount && touched.depositAmount && styles.inputError,
-              ]}
-              value={tenant.depositAmount}
-              onChangeText={(v) => handleChange('depositAmount', v)}
-              editable={!loading}
-              placeholder="Enter deposit amount"
-              placeholderTextColor={Colors.text.hint}
-              keyboardType="decimal-pad"
-            />
-            {!tenant.depositAmount && touched.depositAmount && (
-              <Text style={styles.errorText}>Deposit amount is required</Text>
-            )}
-          </View>
-
-
-          {/* Rent Type Selection */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Rent Type *</Text>
-            <View style={{ flexDirection: 'row', gap: 16 }}>
-              {rentTypeOptions.map((opt) => (
+            <View style={styles.row}>
+              <View style={[styles.col, { flex: 1 }]}>
+                <Text style={styles.label}>Check-in Date *</Text>
                 <TouchableOpacity
-                  key={opt.value}
-                  style={{
-                    paddingVertical: 8,
-                    paddingHorizontal: 16,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: tenant.rentType === opt.value ? Colors.primary : Colors.border.medium,
-                    backgroundColor: tenant.rentType === opt.value ? Colors.primary : Colors.background.paper,
-                    marginRight: 8,
-                  }}
-                  onPress={() => handleChange('rentType', opt.value)}
-                  disabled={loading}
-                >
-                  <Text style={{ color: tenant.rentType === opt.value ? Colors.background.paper : Colors.text.primary }}>
-                    {opt.label}
+                  style={[styles.input, !tenant.checkInDate && touched.checkInDate && styles.inputError, { justifyContent: 'center' }]}
+                  onPress={() => setShowDatePicker(true)}
+                  disabled={loading}>
+                  <Text style={{ color: tenant.checkInDate ? Colors.text.primary : Colors.text.hint, fontSize: Fonts.size.sm }}>
+                    {tenant.checkInDate || 'Date'}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-            {!tenant.rentType && touched.rentType && (
-              <Text style={styles.errorText}>Rent type is required</Text>
-            )}
-          </View>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={tenant.checkInDate ? new Date(tenant.checkInDate) : new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={(event: DateTimePickerEvent, date?: Date | undefined) => {
+                      setShowDatePicker(false);
+                      if (date) handleChange('checkInDate', date.toISOString().split('T')[0]);
+                    }}
+                  />
+                )}
+              </View>
 
-          {/* Payment Status Selection */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Payment Status *</Text>
-            <View style={{ flexDirection: 'row', gap: 16 }}>
-              {['paid', 'due'].map((opt) => (
+              <View style={[styles.col, { flex: 1 }]}>
+                <Text style={styles.label}>Deposit Amount *</Text>
+                <TextInput
+                  style={[styles.input, !tenant.depositAmount && touched.depositAmount && styles.inputError]}
+                  value={tenant.depositAmount}
+                  onChangeText={(v) => handleChange('depositAmount', v)}
+                  editable={!loading}
+                  placeholder="Amount"
+                  placeholderTextColor={Colors.text.hint}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Rent Type *</Text>
+                <View style={styles.optionsRow}>
+                  {rentTypeOptions.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.optionButton, tenant.rentType === opt.value && styles.optionButtonActive]}
+                      onPress={() => handleChange('rentType', opt.value)}
+                      disabled={loading}>
+                      <Text style={[styles.optionText, tenant.rentType === opt.value && styles.optionTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Payment Status *</Text>
+                <View style={styles.optionsRow}>
+                  {['paid', 'due'].map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.optionButton, paymentStatus === opt && styles.optionButtonActive]}
+                      onPress={() => setPaymentStatus(opt as 'paid' | 'due')}
+                      disabled={loading}>
+                      <Text style={[styles.optionText, paymentStatus === opt && styles.optionTextActive]}>
+                        {opt === 'paid' ? 'Paid' : 'Due'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Next Due Date *</Text>
                 <TouchableOpacity
-                  key={opt}
-                  style={{
-                    paddingVertical: 8,
-                    paddingHorizontal: 16,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: paymentStatus === opt ? Colors.primary : Colors.border.medium,
-                    backgroundColor: paymentStatus === opt ? Colors.primary : Colors.background.paper,
-                    marginRight: 8,
-                  }}
-                  onPress={() => setPaymentStatus(opt as 'paid' | 'due')}
-                  disabled={loading}
-                >
-                  <Text style={{ color: paymentStatus === opt ? Colors.background.paper : Colors.text.primary }}>
-                    {opt === 'paid' ? 'Paid' : 'Due'}
+                  style={[styles.input, !tenant.nextDueDate && touched.nextDueDate && styles.inputError, { justifyContent: 'center' }]}
+                  onPress={() => setShowDatePicker(true)}
+                  disabled={loading}>
+                  <Text style={{ color: tenant.nextDueDate ? Colors.text.primary : Colors.text.hint, fontSize: Fonts.size.sm }}>
+                    {tenant.nextDueDate || 'Select date'}
                   </Text>
                 </TouchableOpacity>
-              ))}
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={tenant.nextDueDate ? new Date(tenant.nextDueDate) : new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={(event: DateTimePickerEvent, date?: Date | undefined) => {
+                      setShowDatePicker(false);
+                      if (date) handleChange('nextDueDate', date.toISOString().split('T')[0]);
+                    }}
+                  />
+                )}
+              </View>
             </View>
-          </View>
-
-          {/* Next Due Date Picker */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Next Due Date *</Text>
-            <TouchableOpacity
-              style={[
-                styles.input,
-                !tenant.nextDueDate && touched.nextDueDate && styles.inputError,
-                { justifyContent: 'center' },
-              ]}
-              onPress={() => setShowDatePicker(true)}
-              disabled={loading}
-            >
-              <Text style={{ color: tenant.nextDueDate ? Colors.text.primary : Colors.text.hint }}>
-                {tenant.nextDueDate || 'Select date'}
-              </Text>
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={tenant.nextDueDate ? new Date(tenant.nextDueDate) : new Date()}
-                mode="date"
-                display="default"
-                onChange={(
-                  event: DateTimePickerEvent,
-                  date?: Date | undefined
-                ) => {
-                  setShowDatePicker(false);
-                  if (date) handleChange('nextDueDate', date.toISOString().split('T')[0]);
-                }}
-              />
-            )}
-            {!tenant.nextDueDate && touched.nextDueDate && (
-              <Text style={styles.errorText}>Next due date is required</Text>
-            )}
           </View>
 
 
@@ -547,89 +466,111 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: Spacing.xl,
-  },
-  header: {
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xl,
     paddingBottom: Spacing.base,
   },
+  header: {
+    paddingHorizontal: Spacing.base,
+    paddingTop: Spacing.base,
+    paddingBottom: Spacing.sm,
+  },
   title: {
-    fontSize: Fonts.size.xxxl,
+    fontSize: Fonts.size.xl,
     fontWeight: Fonts.weight.bold,
     color: Colors.text.primary,
-    marginBottom: Spacing.xs,
+    marginBottom: 4,
   },
-  subtitle: {
-    fontSize: Fonts.size.base,
-    color: Colors.text.secondary,
-    lineHeight: 20,
-  },
-  bedInfoCard: {
-    backgroundColor: Colors.infoLight,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.base,
-    marginHorizontal: Spacing.xl,
-    marginBottom: Spacing.xl,
-    borderWidth: 1,
-    borderColor: Colors.info,
-  },
-  bedInfoHeader: {
+  bedInfoCompact: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  bedInfoTitle: {
-    fontSize: Fonts.size.base,
-    fontWeight: Fonts.weight.semiBold,
-    color: Colors.text.primary,
+    justifyContent: 'space-between',
+    marginTop: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: Colors.background.elevated,
+    borderRadius: BorderRadius.sm,
   },
   bedInfoText: {
-    fontSize: Fonts.size.sm,
+    fontSize: Fonts.size.xs,
     color: Colors.text.secondary,
-    marginBottom: Spacing.md,
+    flex: 1,
   },
-  changeBedButton: {
-    alignSelf: 'flex-start',
-  },
-  changeBedText: {
-    fontSize: Fonts.size.base,
+  changeBedLink: {
+    fontSize: Fonts.size.xs,
     fontWeight: Fonts.weight.semiBold,
-    color: Colors.info,
+    color: Colors.primary,
   },
   form: {
-    paddingHorizontal: Spacing.xl,
-    gap: Spacing.lg,
-  },
-  inputGroup: {
+    paddingHorizontal: Spacing.base,
     gap: Spacing.md,
   },
-  label: {
-    fontSize: Fonts.size.base,
-    fontWeight: Fonts.weight.semiBold,
+  section: {
+    backgroundColor: Colors.background.elevated,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: Fonts.size.sm,
+    fontWeight: Fonts.weight.bold,
     color: Colors.text.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: Spacing.xs,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  col: {
+    flex: 1,
+    gap: 4,
+  },
+  label: {
+    fontSize: Fonts.size.xs,
+    fontWeight: Fonts.weight.semiBold,
+    color: Colors.text.secondary,
   },
   input: {
     backgroundColor: Colors.background.paper,
     borderWidth: 1,
     borderColor: Colors.border.medium,
-    borderRadius: BorderRadius.md,
-    padding: 14,
-    fontSize: Fonts.size.base,
+    borderRadius: BorderRadius.sm,
+    padding: 10,
+    fontSize: Fonts.size.sm,
     color: Colors.text.primary,
   },
   inputError: {
     borderColor: Colors.danger,
   },
   textArea: {
-    minHeight: 80,
+    minHeight: 60,
     textAlignVertical: 'top',
   },
-  errorText: {
-    fontSize: Fonts.size.xs,
-    color: Colors.danger,
-    marginTop: Spacing.xs,
+  optionsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  optionButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border.medium,
+    backgroundColor: Colors.background.paper,
+    alignItems: 'center',
+  },
+  optionButtonActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  optionText: {
+    fontSize: Fonts.size.sm,
+    fontWeight: Fonts.weight.semiBold,
+    color: Colors.text.primary,
+  },
+  optionTextActive: {
+    color: Colors.background.paper,
   },
   footer: {
     flexDirection: 'row',
@@ -637,11 +578,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.paper,
     borderTopWidth: 1,
     borderTopColor: Colors.border.light,
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
   backButton: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: BorderRadius.md,
     backgroundColor: Colors.background.paper,
     borderWidth: 1,
@@ -650,14 +591,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backButtonText: {
-    fontSize: Fonts.size.md,
+    fontSize: Fonts.size.sm,
     fontWeight: Fonts.weight.semiBold,
     color: Colors.text.primary,
   },
   nextButton: {
     flex: 1,
     flexDirection: 'row',
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: BorderRadius.md,
     backgroundColor: Colors.primary,
     alignItems: 'center',
@@ -665,7 +606,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   nextButtonText: {
-    fontSize: Fonts.size.md,
+    fontSize: Fonts.size.sm,
     fontWeight: Fonts.weight.semiBold,
     color: Colors.background.paper,
   },
@@ -675,42 +616,45 @@ const styles = StyleSheet.create({
   imagePreviewContainer: {
     alignItems: 'center',
     position: 'relative',
+    marginTop: Spacing.sm,
   },
   imagePreview: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: Colors.background.elevated,
   },
   removeImageButton: {
     position: 'absolute',
-    top: 0,
-    right: '35%',
+    top: -4,
+    right: '38%',
     backgroundColor: Colors.danger,
-    borderRadius: 20,
-    width: 32,
-    height: 32,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  imagePickerButtons: {
+  imagePickerRow: {
     flexDirection: 'row',
-    gap: Spacing.md,
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
   },
-  imagePickerButton: {
+  imagePickerButtonCompact: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
+    gap: 6,
     backgroundColor: Colors.background.paper,
     borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.base,
+    borderColor: Colors.border.medium,
+    borderRadius: BorderRadius.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
-  imagePickerButtonText: {
-    fontSize: Fonts.size.base,
+  imagePickerButtonTextCompact: {
+    fontSize: Fonts.size.xs,
     fontWeight: Fonts.weight.semiBold,
     color: Colors.primary,
   },
