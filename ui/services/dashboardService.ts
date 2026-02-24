@@ -20,6 +20,7 @@ export interface PropertyStats {
   occupancyRate: number;
 }
 
+
 export interface TenantResponse {
   id: string;
   propertyId: string;
@@ -29,7 +30,11 @@ export interface TenantResponse {
   phoneNumber: string;
   checkInDate: string;
   depositAmount: string;
-  status: string;
+  rentType: 'monthly' | 'daywise';
+  nextDueDate: string;
+  status: 'stay' | 'vacate';
+  profilePictureUrl?: string;
+  address?: string;
 }
 
 

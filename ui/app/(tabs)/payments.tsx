@@ -180,7 +180,6 @@ export default function PaymentsScreen() {
           renderItem={({ item }) => (
             <PaymentCard
               payment={item}
-              status={activeTab}
               onStatusChanged={handleStatusChanged}
             />
           )}

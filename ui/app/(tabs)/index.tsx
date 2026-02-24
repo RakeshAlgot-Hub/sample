@@ -314,8 +314,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: 10,
+    paddingBottom: 18,
   },
   centerContainer: {
     flex: 1,
@@ -400,43 +400,43 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.family.semiBold,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   greeting: {
-    fontSize: Fonts.size.xxxl,
+    fontSize: Fonts.size.xl,
     fontWeight: Fonts.weight.bold,
     fontFamily: Fonts.family.bold,
     color: Colors.text.primary,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: Fonts.size.base,
+    fontSize: Fonts.size.sm,
     color: Colors.text.secondary,
     fontWeight: Fonts.weight.medium,
     fontFamily: Fonts.family.medium,
   },
   metricsGrid: {
-    gap: 12,
+    gap: 6,
   },
   metricRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 6,
   },
   metricItem: {
     flex: 1,
   },
   section: {
-    marginTop: 16,
+    marginTop: 10,
   },
   footer: {
-    marginTop: 24,
-    paddingTop: 16,
+    marginTop: 14,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: Colors.border.light,
     alignItems: 'center',
   },
   footerText: {
-    fontSize: Fonts.size.sm,
+    fontSize: Fonts.size.xs,
     color: Colors.text.secondary,
     fontFamily: Fonts.family.regular,
   },
