@@ -1,18 +1,12 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-import os
 
-mongoUrl = os.getenv("MONGO_URL")
+from app.config import settings
 
-if not mongoUrl:
-    raise RuntimeError("MONGO_URL environment variable is required")
+mongo_url = settings.MONGO_URL
+db_name = getattr(settings, "MONGO_DB_NAME", "project")
 
-client = AsyncIOMotorClient(mongoUrl)
-
-# Explicitly define database name here
-db = client["project"]
-
-print(f"[MongoDB] URI: {mongoUrl}")
-print(f"[MongoDB] DB Name: {db.name}")
+client = AsyncIOMotorClient(mongo_url)
+db = client[db_name]
 
 def getCollection(name: str):
     return db[name]

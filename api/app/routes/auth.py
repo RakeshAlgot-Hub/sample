@@ -21,11 +21,11 @@ async def login(request: Request, data: UserLogin):
 
 @router.post("/refresh", status_code=status.HTTP_200_OK, summary="Refresh access token", tags=["auth"], response_model=RefreshTokenResponse)
 async def refresh_token_endpoint(payload: RefreshTokenRequest):
-    return refresh_token_service(payload)
+    return await refresh_token_service(payload)
 
 @router.post("/logout", status_code=status.HTTP_200_OK, summary="Logout user", tags=["auth"], response_model=LogoutResponse)
 async def logout(payload: LogoutRequest):
-    return logout_user_service(payload)
+    return await logout_user_service(payload)
 
 
 

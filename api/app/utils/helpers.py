@@ -1,15 +1,23 @@
 from passlib.context import CryptContext
 from passlib.hash import argon2
+
 from jose import jwt
-from datetime import datetime, timedelta,timezone
-import os
+from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-SECRET_KEY = os.getenv("JWT_SECRET")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
-REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30  # 30 days
+from app.config import settings
+
+SECRET_KEY = settings.JWT_SECRET
+ALGORITHM = settings.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MINUTES
+
+if not SECRET_KEY or len(SECRET_KEY) < 32:
+	raise RuntimeError("JWT_SECRET must be set and at least 32 characters long for security.")
+
+if not SECRET_KEY or len(SECRET_KEY) < 32:
+	raise RuntimeError("JWT_SECRET must be set and at least 32 characters long for security.")
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -35,16 +43,18 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
 	return pwd_context.verify(plain, hashed)
 
+
 def create_access_token(data: dict, expires_delta: timedelta = None):
 	to_encode = data.copy()
-
 	expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-	to_encode.update({"exp": expire})
+	to_encode.update({"exp": expire, "type": "access"})
 	return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 
 def create_refresh_token(data: dict, expires_delta: timedelta = None):
 	to_encode = data.copy()
-
 	expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES))
-	to_encode.update({"exp": expire, "type": "refresh"})
+	# Add a unique jti (JWT ID) for refresh token rotation
+	import uuid
+	to_encode.update({"exp": expire, "type": "refresh", "jti": str(uuid.uuid4())})
 	return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

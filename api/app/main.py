@@ -9,22 +9,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 import os
-from app.routes import rooms, auth, properties, units, tenants, units_update, dashboard, payments
+from app.routes import health, rooms, auth, properties, units, tenants, units_update, dashboard, payments
 from app.utils.rate_limit import limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from app.utils.exception_handlers import add_global_exception_handlers
 
 # Ensure 'static' directory exists
 static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 if not os.path.exists(static_dir):
     os.makedirs(static_dir)
 
-
-app = FastAPI()
-
 # FastAPI lifespan event handler for startup tasks
-@asynccontextmanager
-async def lifespan(app):
+async def ensure_indexes():
     # Users: unique email, index on createdAt
     await db["users"].create_index("email", unique=True)
     await db["users"].create_index("createdAt")
@@ -43,10 +40,18 @@ async def lifespan(app):
     # Tenants: index on propertyId, createdAt
     await db["tenants"].create_index("propertyId")
     await db["tenants"].create_index("createdAt")
+    # Token blacklist: TTL index on createdAt (7 days)
+    await db["token_blacklist"].create_index("createdAt", expireAfterSeconds=60*60*24*7)
+
+@asynccontextmanager
+async def lifespan(app):
+    await ensure_indexes()
     yield
 
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+
 app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 enforce_https = os.getenv("ENFORCE_HTTPS", "False").lower() == "true"
 if enforce_https:
     app.add_middleware(HTTPSRedirectMiddleware)
@@ -74,27 +79,16 @@ app.add_middleware(
 )
 
 # Routers
-app.include_router(auth.router)
-app.include_router(properties.router)
-app.include_router(rooms.router)
-app.include_router(units.router)
-app.include_router(tenants.router)
-app.include_router(units_update.router)
-app.include_router(dashboard.router)
-app.include_router(payments.router)
+API_PREFIX = "/api/v1"
+app.include_router(health.router, prefix=API_PREFIX)
+app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(properties.router, prefix=API_PREFIX)
+app.include_router(rooms.router, prefix=API_PREFIX)
+app.include_router(units.router, prefix=API_PREFIX)
+app.include_router(tenants.router, prefix=API_PREFIX)
+app.include_router(units_update.router, prefix=API_PREFIX)
+app.include_router(dashboard.router, prefix=API_PREFIX)
+app.include_router(payments.router, prefix=API_PREFIX)
 
-@app.get("/")
-async def root():
-    return {"message": "Backend is running"}
-
-@app.get("/health")
-async def healthCheck():
-    return {"status": "ok"}
-
-# Global error handler (optional but recommended)
-@app.exception_handler(Exception)
-async def globalExceptionHandler(request: Request, exc: Exception):
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal Server Error"}
-    )
+# Register global exception handlers
+add_global_exception_handlers(app)

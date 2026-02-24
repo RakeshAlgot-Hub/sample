@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from app.models.user_schema import UserCreate, UserLogin, UserOut, AuthResponse
 from app.database.mongodb import AsyncIOMotorClient
+import asyncio
 
 users_collection = db["users"]
 
@@ -54,23 +55,28 @@ async def login_user_service(data: UserLogin):
     response = AuthResponse(accessToken=token, refreshToken=refresh_token, user=user_out)
     return JSONResponse(status_code=status.HTTP_200_OK, content=response.dict())
 
-def refresh_token_service(payload: dict):
+async def refresh_token_service(payload: dict):
     refresh_token = payload.get("refreshToken")
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh token")
-    if is_token_blacklisted(refresh_token):
+    if await is_token_blacklisted(refresh_token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is invalidated (blacklisted)")
     try:
         decoded = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         if decoded.get("type") != "refresh":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
         user_id = decoded.get("sub")
-        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        user = await users_collection.find_one({"_id": ObjectId(user_id)})
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        # Blacklist the used refresh token (rotation)
+        await blacklist_token(refresh_token)
+        # Issue new refresh token
+        new_refresh_token = create_refresh_token({"sub": user_id})
         token = create_access_token({"sub": user_id})
         response = {
             "accessToken": token,
+            "refreshToken": new_refresh_token,
             "user": {"id": user_id, "name": user["name"], "email": user["email"]}
         }
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response))
@@ -78,10 +84,39 @@ def refresh_token_service(payload: dict):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token refresh failed")
+    async def refresh_token_service(payload):
+        refresh_token = payload.refreshToken
+        if not refresh_token:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh token")
+        if await is_token_blacklisted(refresh_token):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is invalidated (blacklisted)")
+        try:
+            decoded = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+            if decoded.get("type") != "refresh":
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+            user_id = decoded.get("sub")
+            user = await users_collection.find_one({"_id": ObjectId(user_id)})
+            if not user:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            # Blacklist the used refresh token (rotation)
+            await blacklist_token(refresh_token)
+            # Issue new refresh token
+            new_refresh_token = create_refresh_token({"sub": user_id})
+            token = create_access_token({"sub": user_id})
+            response = {
+                "accessToken": token,
+                "refreshToken": new_refresh_token,
+                "user": {"id": user_id, "name": user["name"], "email": user["email"]}
+            }
+            return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response))
+        except JWTError:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token refresh failed")
 
-def logout_user_service(payload: dict):
+async def logout_user_service(payload: dict):
     refresh_token = payload.get("refreshToken")
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh token")
-    blacklist_token(refresh_token)
+    await blacklist_token(refresh_token)
     return {"success": True}

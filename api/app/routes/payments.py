@@ -36,7 +36,6 @@ async def get_payments(
     current_user=Depends(get_current_user)
 ):
     result = await get_payments_service(propertyId, page, limit, search, status)
-    print(result)
     return PaginatedPaymentResponse(**result)
 
 
