@@ -1,300 +1,337 @@
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TextInput } from 'react-native';
-import { useEffect, useState, useCallback } from 'react';
-import { Pressable } from 'react-native';
-import PaymentCard from '@/components/payments/PaymentCard';
-import { paymentService, PaymentData } from '@/services/paymentService';
-import { usePropertyStore } from '@/store/property';
-import { Colors } from '@/constants/Colors';
-import { Fonts, Spacing, BorderRadius } from '@/constants/Theme';
-import { Search } from 'lucide-react-native';
-
-type TabType = 'paid' | 'due';
-
+import { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
+import ScreenContainer from '@/components/ScreenContainer';
+import StatusBadge from '@/components/StatusBadge';
+import Card from '@/components/Card';
+import EmptyState from '@/components/EmptyState';
+import Skeleton from '@/components/Skeleton';
+import ApiErrorCard from '@/components/ApiErrorCard';
+import UpgradeModal from '@/components/UpgradeModal';
+import {
+  Filter,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Calendar,
+  Wallet,
+} from 'lucide-react-native';
+import { spacing, typography, radius, shadows } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { paymentService } from '@/services/apiClient';
+import type { Payment } from '@/services/apiTypes';
 
 export default function PaymentsScreen() {
-  const [activeTab, setActiveTab] = useState<TabType>('due');
-  const [payments, setPayments] = useState<PaymentData[]>([]);
+  const { colors } = useTheme();
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [search, setSearch] = useState('');
-  const [searchDebounce, setSearchDebounce] = useState('');
-  const selectedPropertyId = usePropertyStore((s) => s.selectedPropertyId);
+  const [page] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [hasMore] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setSearchDebounce(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  const loadPayments = useCallback(async (pageNum = 1, isRefresh = false) => {
-    if (!selectedPropertyId) {
-      setPayments([]);
-      setError('No property selected');
-      setLoading(false);
-      return;
-    }
-
-    if (pageNum === 1) {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-    } else {
-      setLoadingMore(true);
-    }
-
+  const fetchPayments = async () => {
     try {
+      setLoading(true);
       setError(null);
-      let data;
 
-      switch (activeTab) {
-        case 'paid':
-          data = await paymentService.getPaidPayments(selectedPropertyId, {
-            page: pageNum,
-            limit: 20,
-            search: searchDebounce
-          });
-          break;
-        case 'due':
-          data = await paymentService.getDuePayments(selectedPropertyId, {
-            page: pageNum,
-            limit: 20,
-            search: searchDebounce
-          });
-          break;
-      }
-
-      if (pageNum === 1) {
-        setPayments(Array.isArray(data.data) ? data.data : []);
-        console.log('[DEBUG] Payments loaded:', data.data);
+      const response = await paymentService.getPayments();
+      const data = response.data || [];
+      setPayments(data);
+      setTotal(response.meta?.total || data.length);
+    } catch (err: any) {
+      if (err?.code === 'upgrade_required') {
+        setShowUpgradeModal(true);
       } else {
-        setPayments(prev => Array.isArray(data.data) ? [...prev, ...data.data] : prev);
-        console.log('[DEBUG] Payments appended:', data.data);
-      }
-
-      setHasMore(pageNum < (data.totalPages || 1));
-    } catch (err) {
-      setError('Failed to load payments');
-      console.error(err);
-      if (pageNum === 1) {
-        setPayments([]);
+        setError(err?.message || 'Failed to load payments');
       }
     } finally {
       setLoading(false);
-      setLoadingMore(false);
-      setRefreshing(false);
     }
-  }, [activeTab, selectedPropertyId, searchDebounce]);
+  };
 
   useEffect(() => {
-    setPage(1);
-    setHasMore(true);
-    loadPayments(1);
-  }, [activeTab, selectedPropertyId, searchDebounce]);
+    fetchPayments();
+  }, []);
 
-  const handleLoadMore = () => {
-    if (!loadingMore && hasMore && !loading) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      loadPayments(nextPage);
+  const handleRetry = () => {
+    fetchPayments();
+  };
+
+  const computeStats = () => {
+    const collected = payments
+      .filter((p) => p.status === 'paid')
+      .reduce((sum, p) => {
+        const amount = typeof p.amount === 'string'
+          ? parseFloat(p.amount.replace(/[^0-9]/g, ''))
+          : p.amount;
+        return sum + amount;
+      }, 0);
+
+    const pending = payments
+      .filter((p) => p.status === 'due')
+      .reduce((sum, p) => {
+        const amount = typeof p.amount === 'string'
+          ? parseFloat(p.amount.replace(/[^0-9]/g, ''))
+          : p.amount;
+        return sum + amount;
+      }, 0);
+
+    const overdue = payments
+      .filter((p) => p.status === 'overdue')
+      .reduce((sum, p) => {
+        const amount = typeof p.amount === 'string'
+          ? parseFloat(p.amount.replace(/[^0-9]/g, ''))
+          : p.amount;
+        return sum + amount;
+      }, 0);
+
+    return {
+      collected: `₹${collected.toLocaleString()}`,
+      pending: `₹${pending.toLocaleString()}`,
+      overdue: `₹${overdue.toLocaleString()}`,
+    };
+  };
+
+  const stats = computeStats();
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return <CheckCircle size={20} color={colors.success[500]} />;
+      case 'due':
+        return <Clock size={20} color={colors.primary[500]} />;
+      case 'overdue':
+        return <AlertCircle size={20} color={colors.danger[500]} />;
     }
   };
 
-  const handleRefresh = () => {
-    setPage(1);
-    setHasMore(true);
-    loadPayments(1, true);
-  };
-
-  const handleStatusChanged = () => {
-    setPage(1);
-    setHasMore(true);
-    loadPayments(1);
-  };
-
-  const tabConfig = {
-    paid: { label: 'Paid', count: Array.isArray(payments) ? payments.length : 0 },
-    due: { label: 'Due', count: Array.isArray(payments) ? payments.length : 0 },
-  };
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyTitle}>No {activeTab} payments</Text>
-      <Text style={styles.emptySubtitle}>
-        {activeTab === 'paid' && 'All payments have been processed'}
-        {activeTab === 'due' && 'No overdue payments'}
-      </Text>
-    </View>
-  );
-
   return (
-    <View style={styles.container}>
-      <View style={styles.tabContainer}>
-        {(['paid', 'due'] as TabType[]).map((tab) => (
-          <Pressable
-            key={tab}
-            style={[
-              styles.tab,
-              activeTab === tab && styles.tabActive,
-            ]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text
-              style={[
-                styles.tabLabel,
-                activeTab === tab && styles.tabLabelActive,
-              ]}
-            >
-              {tabConfig[tab].label}
-            </Text>
-          </Pressable>
-        ))}
+    <ScreenContainer edges={['top']}>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Payments</Text>
+        <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[100] }]} activeOpacity={0.7}>
+          <Filter size={20} color={colors.primary[500]} />
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.searchContainer}>
-        <Search size={20} color={Colors.text.secondary} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by tenant name..."
-          placeholderTextColor={Colors.text.hint}
-          value={search}
-          onChangeText={setSearch}
-        />
-      </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        {loading ? (
+          <>
+            <View style={styles.statsContainer}>
+              <Skeleton height={80} count={3} />
+            </View>
+            <Skeleton height={150} count={2} />
+          </>
+        ) : error ? (
+          <ApiErrorCard error={error} onRetry={handleRetry} />
+        ) : payments.length === 0 ? (
+          <EmptyState
+            icon={Wallet}
+            title="No Payments Yet"
+            subtitle="Payment history will appear here once tenants start making payments"
+          />
+        ) : (
+          <>
+            <View style={styles.statsContainer}>
+              <Card style={styles.statCard}>
+                <Text style={[styles.statLabel, { color: colors.text.secondary }]}>Collected</Text>
+                <Text style={[styles.statAmount, styles.collected, { color: colors.success[500] }]}>
+                  {stats.collected}
+                </Text>
+              </Card>
+              <Card style={styles.statCard}>
+                <Text style={[styles.statLabel, { color: colors.text.secondary }]}>Pending</Text>
+                <Text style={[styles.statAmount, styles.pending, { color: colors.primary[500] }]}>
+                  {stats.pending}
+                </Text>
+              </Card>
+              <Card style={styles.statCard}>
+                <Text style={[styles.statLabel, { color: colors.text.secondary }]}>Overdue</Text>
+                <Text style={[styles.statAmount, styles.overdue, { color: colors.danger[500] }]}>
+                  {stats.overdue}
+                </Text>
+              </Card>
+            </View>
 
-      {loading && page === 1 ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={payments}
-          renderItem={({ item }) => (
-            <PaymentCard
-              payment={item}
-              onStatusChanged={handleStatusChanged}
-            />
-          )}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={renderEmptyState()}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          ListFooterComponent={
-            loadingMore ? (
-              <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color={Colors.primary} />
-              </View>
-            ) : null
-          }
-        />
-      )}
-    </View>
+            <View style={styles.paymentsSection}>
+              <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>All Payments</Text>
+
+              {payments.map((payment, index) => (
+                <Card key={index} style={styles.paymentCard}>
+                  <View style={styles.paymentHeader}>
+                    <View style={styles.statusIconContainer}>
+                      {getStatusIcon(payment.status)}
+                    </View>
+                    <View style={styles.paymentInfo}>
+                      <Text style={[styles.tenantName, { color: colors.text.primary }]}>{payment.tenantName}</Text>
+                      <Text style={[styles.propertyName, { color: colors.text.secondary }]}>{payment.property}</Text>
+                      <Text style={[styles.bedNumber, { color: colors.text.tertiary }]}>Bed: {payment.bed}</Text>
+                    </View>
+                    <View style={styles.amountContainer}>
+                      <Text style={[styles.amount, { color: colors.text.primary }]}>{payment.amount}</Text>
+                      <StatusBadge status={payment.status} />
+                    </View>
+                  </View>
+
+                  <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
+
+                  <View style={styles.paymentFooter}>
+                    <View style={styles.dateRow}>
+                      <Calendar size={14} color={colors.text.secondary} />
+                      <Text style={[styles.dateLabel, { color: colors.text.secondary }]}>Due:</Text>
+                      <Text style={[styles.dateValue, { color: colors.text.primary }]}>{payment.dueDate}</Text>
+                    </View>
+                    {payment.date && (
+                      <View style={styles.methodRow}>
+                        <Text style={[styles.methodLabel, { color: colors.text.secondary }]}>Paid via:</Text>
+                        <Text style={[styles.methodValue, { color: colors.primary[500] }]}>{payment.method}</Text>
+                      </View>
+                    )}
+                  </View>
+                </Card>
+              ))}
+            </View>
+          </>
+        )}
+      </ScrollView>
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onSelectPlan={() => setShowUpgradeModal(false)}
+      />
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.default,
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxxl,
   },
-  tabContainer: {
+  header: {
     flexDirection: 'row',
-    backgroundColor: Colors.background.paper,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.medium,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
-    gap: Spacing.sm,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.base,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.neutral[100],
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
   },
-  tabActive: {
-    backgroundColor: Colors.primary,
-    borderBottomColor: Colors.primary,
+  headerTitle: {
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.bold,
   },
-  tabLabel: {
-    fontSize: Fonts.size.sm,
-    fontWeight: Fonts.weight.semiBold,
-    color: Colors.text.secondary,
+  filterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
-  tabLabelActive: {
-    color: Colors.background.paper,
+  statsContainer: {
+    flexDirection: 'row',
+    marginBottom: spacing.xl,
+    gap: spacing.sm,
   },
-  searchContainer: {
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  statLabel: {
+    fontSize: typography.fontSize.xs,
+    marginBottom: spacing.sm,
+  },
+  statAmount: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+  },
+  collected: {
+  },
+  pending: {
+  },
+  overdue: {
+  },
+  paymentsSection: {
+    marginBottom: spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.md,
+  },
+  paymentCard: {
+    marginBottom: spacing.md,
+  },
+  paymentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.background.paper,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
-    gap: 12,
+    marginBottom: spacing.lg,
   },
-  searchInput: {
+  statusIconContainer: {
+    marginRight: spacing.md,
+  },
+  paymentInfo: {
     flex: 1,
-    fontSize: 16,
-    color: Colors.text.primary,
   },
-  listContent: {
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.md,
+  tenantName: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.xs,
   },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  propertyName: {
+    fontSize: typography.fontSize.sm,
+    marginBottom: 2,
+  },
+  bedNumber: {
+    fontSize: typography.fontSize.xs,
+  },
+  amountContainer: {
+    alignItems: 'flex-end',
+  },
+  amount: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
+  },
+  divider: {
+    height: 1,
+    marginBottom: spacing.md,
+  },
+  paymentFooter: {
+    gap: spacing.sm,
+  },
+  dateRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  dateLabel: {
+    fontSize: typography.fontSize.sm,
+    marginLeft: spacing.sm,
+    marginRight: spacing.xs,
+  },
+  dateValue: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  methodRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.base,
   },
-  errorText: {
-    fontSize: Fonts.size.md,
-    color: Colors.danger,
-    fontWeight: Fonts.weight.semiBold,
-    textAlign: 'center',
+  methodLabel: {
+    fontSize: typography.fontSize.sm,
+    marginRight: spacing.xs,
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.base,
-    paddingVertical: 64,
-  },
-  emptyTitle: {
-    fontSize: Fonts.size.lg,
-    fontWeight: Fonts.weight.semiBold,
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
-  },
-  emptySubtitle: {
-    fontSize: Fonts.size.md,
-    color: Colors.text.secondary,
-    textAlign: 'center',
-  },
-  footerLoader: {
-    paddingVertical: 20,
-    alignItems: 'center',
+  methodValue: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

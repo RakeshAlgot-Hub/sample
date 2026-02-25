@@ -1,103 +1,70 @@
 import { useEffect } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { useAuthStore } from '@/store/auth';
-import { View, ActivityIndicator, StyleSheet, Platform, Text } from 'react-native';
-import { ThemeProvider } from '@/contexts/ThemeContext';
+import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 
-export default function RootLayout() {
-  useFrameworkReady();
-  const { user, isInitialized, initialize } = useAuthStore();
+function RootNavigator() {
+  const { isDark, colors } = useTheme();
+  const { isAuthenticated, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    initialize();
-  }, []);
+    if (loading) return;
 
-  useEffect(() => {
-    if (!isInitialized) return;
+    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'property-detail' || segments[0] === 'subscription';
 
-    const inAuthGroup = segments[0] === '(auth)';
-
-    if (!user && !inAuthGroup) {
-      router.replace('/(auth)/login');
-    } else if (user && inAuthGroup) {
-      router.replace('/(tabs)');
+    if (!isAuthenticated && inAuthGroup) {
+      router.replace('/');
+    } else if (isAuthenticated && !inAuthGroup) {
+      router.replace('/(tabs)/dashboard');
     }
-  }, [user, segments, isInitialized]);
+  }, [isAuthenticated, loading, segments]);
 
-  if (Platform.OS === 'web') {
+  if (loading) {
     return (
-      <SafeAreaProvider>
-        <View style={styles.webBlocker}>
-          <Text style={styles.webBlockerTitle}>Mobile App Only</Text>
-          <Text style={styles.webBlockerText}>
-            TenantTracker is available exclusively on iOS and Android devices.
-          </Text>
-          <Text style={styles.webBlockerText}>
-            Please download the app from the App Store or Google Play.
-          </Text>
-        </View>
-      </SafeAreaProvider>
-    );
-  }
-
-  if (!isInitialized) {
-    return (
-      <SafeAreaProvider>
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" color="#075E54" />
-        </View>
-      </SafeAreaProvider>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background.primary }]}>
+        <ActivityIndicator size="large" color={colors.primary[500]} />
+      </View>
     );
   }
 
   return (
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="property-detail" />
+        <Stack.Screen name="subscription" />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+    </>
+  );
+}
+
+export default function RootLayout() {
+  useFrameworkReady();
+
+  return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="property" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="logout" />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
+        <AuthProvider>
+          <RootNavigator />
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  loading: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  webBlocker: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#075E54',
-    padding: 24,
-  },
-  webBlockerTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  webBlockerText: {
-    fontSize: 16,
-    color: '#fff',
-    marginBottom: 12,
-    textAlign: 'center',
-    lineHeight: 24,
   },
 });

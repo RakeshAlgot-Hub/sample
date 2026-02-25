@@ -1,2 +1,0 @@
-# Team
-To Learn

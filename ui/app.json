@@ -1,65 +1,24 @@
 {
   "expo": {
-    "name": "TenantTracker",
-    "slug": "tenant-tracker",
+    "name": "bolt-expo-nativewind",
+    "slug": "bolt-expo-nativewind",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "platforms": [
-      "ios",
-      "android"
-    ],
     "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.tenanttracker.app",
-      "jsEngine": "hermes",
-      "requireFullScreen": true
+      "supportsTablet": true
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#075E54"
-      },
-      "package": "com.tenanttracker.app",
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
-      ],
-      "jsEngine": "hermes",
-      "enableShrinkResourcesInReleaseBuilds": true,
-      "screenOrientation": "portrait"
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [
-      "expo-router",
-      "expo-font",
-      "expo-web-browser",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow TenantTracker to access your camera for document scanning."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow TenantTracker to access your photos to upload tenant profile pictures.",
-          "cameraPermission": "Allow TenantTracker to access your camera to take tenant profile pictures."
-        }
-      ],
-      "@react-native-community/datetimepicker"
-    ],
+    "plugins": ["expo-router", "expo-font", "expo-web-browser"],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "apiUrl": "http://192.168.0.105:8000/api/v1",
-      "router": {},
-      "eas": {
-        "projectId": "5f3247db-b5d0-48e0-a8d5-19e2e72c37b7"
-      }
     }
   }
 }
