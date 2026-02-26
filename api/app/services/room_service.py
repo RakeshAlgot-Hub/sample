@@ -2,7 +2,8 @@ from app.models.room_schema import Room
 from app.database.mongodb import getCollection
 from datetime import datetime,timezone
 import uuid
-
+from app.services.bed_service import create_bed_service
+from app.models.bed_schema import BedCreate
 class RoomService:
     async def is_property_owner(self, user_id: str, property_id: str) -> bool:
         from app.database.mongodb import db
@@ -37,6 +38,18 @@ class RoomService:
         if not room_data.get("updatedAt"):
             room_data["updatedAt"] = now
         await self.collection.insert_one(room_data)
+        # Auto-create beds for this room
+        number_of_beds = room_data.get("numberOfBeds", 0)
+        property_id = room_data["propertyId"]
+        room_id = room_data["id"]
+        for i in range(1, number_of_beds + 1):
+            bed = BedCreate(
+                propertyId=property_id,
+                roomId=room_id,
+                bedNumber=str(i),
+                status="available"
+            )
+            await create_bed_service(bed)
         return Room(**room_data)
 
     async def update_room(self, room_id: str, room_data: dict):

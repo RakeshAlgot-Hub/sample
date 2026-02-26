@@ -96,7 +96,7 @@ export default function TenantsScreen() {
     if (limitReached) {
       setShowUpgradeModal(true);
     } else {
-      // FAB action placeholder
+      router.push('/add-tenant');
     }
   };
 

@@ -1,3 +1,5 @@
+import uuid
+
 from app.database.mongodb import db
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
@@ -33,9 +35,10 @@ async def register_user_service(user: UserCreate):
         "deviceType": None,
         "osVersion": None,
         "appVersion": None,
+        "id": str(uuid.uuid4())
     }
     result = await users_collection.insert_one(user_doc)
-    user_id = str(result.inserted_id)
+    user_id = user_doc["id"]
     import time
     access_token = create_access_token({"sub": user_id})
     refresh_token = create_refresh_token({"sub": user_id})
@@ -59,10 +62,10 @@ async def login_user_service(data: UserLogin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deleted")
     await users_collection.update_one({"_id": user["_id"]}, {"$set": {"lastLogin": datetime.now(timezone.utc)}})
     import time
-    access_token = create_access_token({"sub": str(user["_id"])})
-    refresh_token = create_refresh_token({"sub": str(user["_id"])})
+    access_token = create_access_token({"sub": user["id"]})
+    refresh_token = create_refresh_token({"sub": user["id"]})
     expires_at = int(time.time()) + 60 * 60 * 24 * 7  # 7 days expiry, adjust as needed
-    user_out = UserOut(id=str(user["_id"]), name=user["name"], email=user["email"])
+    user_out = UserOut(id=user["id"], name=user["name"], email=user["email"])
     response = {
         "user": user_out.dict(),
         "tokens": {
@@ -84,7 +87,7 @@ async def refresh_token_service(payload: dict):
         if decoded.get("type") != "refresh":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
         user_id = decoded.get("sub")
-        user = await users_collection.find_one({"_id": ObjectId(user_id)})
+        user = await users_collection.find_one({"id": user_id})
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         # Blacklist the used refresh token (rotation)
@@ -102,35 +105,36 @@ async def refresh_token_service(payload: dict):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token refresh failed")
-    async def refresh_token_service(payload):
-        refresh_token = payload.refreshToken
-        if not refresh_token:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh token")
-        if await is_token_blacklisted(refresh_token):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is invalidated (blacklisted)")
-        try:
-            decoded = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
-            if decoded.get("type") != "refresh":
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
-            user_id = decoded.get("sub")
-            user = await users_collection.find_one({"_id": ObjectId(user_id)})
-            if not user:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-            # Blacklist the used refresh token (rotation)
-            await blacklist_token(refresh_token)
-            # Issue new refresh token
-            new_refresh_token = create_refresh_token({"sub": user_id})
-            token = create_access_token({"sub": user_id})
-            response = {
-                "accessToken": token,
-                "refreshToken": new_refresh_token,
-                "user": {"id": user_id, "name": user["name"], "email": user["email"]}
-            }
-            return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response))
-        except JWTError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-        except Exception:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token refresh failed")
+
+async def refresh_token_service(payload):
+    refresh_token = payload.refreshToken
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh token")
+    if await is_token_blacklisted(refresh_token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is invalidated (blacklisted)")
+    try:
+        decoded = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if decoded.get("type") != "refresh":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+        user_id = decoded.get("sub")
+        user = await users_collection.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        # Blacklist the used refresh token (rotation)
+        await blacklist_token(refresh_token)
+        # Issue new refresh token
+        new_refresh_token = create_refresh_token({"sub": user_id})
+        token = create_access_token({"sub": user_id})
+        response = {
+            "accessToken": token,
+            "refreshToken": new_refresh_token,
+            "user": {"id": user_id, "name": user["name"], "email": user["email"]}
+        }
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response))
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token refresh failed")
 
 async def logout_user_service(payload: dict):
     refresh_token = payload.get("refreshToken")

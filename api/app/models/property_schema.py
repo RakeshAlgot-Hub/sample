@@ -15,6 +15,4 @@ class PropertyCreate(PropertyBase):
 class PropertyOut(PropertyBase):
     id: str
 
-# MongoDB document schema (for internal use)
-class PropertyInDB(PropertyBase):
-    _id: str
+
