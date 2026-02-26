@@ -16,6 +16,7 @@ import EmptyState from '@/components/EmptyState';
 import Skeleton from '@/components/Skeleton';
 import ApiErrorCard from '@/components/ApiErrorCard';
 import UpgradeModal from '@/components/UpgradeModal';
+import FAB from '@/components/FAB';
 import {
   Filter,
   CheckCircle,
@@ -76,6 +77,10 @@ export default function PaymentsScreen() {
 
   const handleRetry = () => {
     fetchPayments();
+  };
+
+  const handleFabPress = () => {
+    router.push('/add-payment');
   };
 
   const computeStats = () => {
@@ -252,6 +257,7 @@ export default function PaymentsScreen() {
           </>
         )}
       </ScrollView>
+      <FAB onPress={handleFabPress} />
       <UpgradeModal
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}

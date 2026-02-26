@@ -71,10 +71,13 @@ API_PREFIX = "/api/v1"
 
 app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
+
+from app.routes import payment
 app.include_router(property.router, prefix=API_PREFIX)
 app.include_router(room.router, prefix=API_PREFIX)
 app.include_router(tenant.router, prefix=API_PREFIX)
 app.include_router(bed.router, prefix=API_PREFIX)
+app.include_router(payment.router, prefix=API_PREFIX)
 
 
 # Register global exception handlers
