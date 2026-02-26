@@ -1,11 +1,11 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from app.database.mongodb import db
 from app.models.bed_schema import BedCreate, BedUpdate, BedOut
 
 async def create_bed_service(bed: BedCreate) -> BedOut:
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     doc = bed.model_dump()
     doc["createdAt"] = now
     doc["updatedAt"] = now
@@ -29,7 +29,7 @@ async def update_bed_service(bed_id: str, bed_update: BedUpdate) -> Optional[Bed
     update_data = {k: v for k, v in bed_update.model_dump(exclude_unset=True).items()}
     if not update_data:
         return await get_bed_service(bed_id)
-    update_data["updatedAt"] = datetime.utcnow().isoformat()
+    update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result = await db["beds"].find_one_and_update(
         {"id": bed_id},
         {"$set": update_data},

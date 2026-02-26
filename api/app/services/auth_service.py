@@ -45,7 +45,7 @@ async def register_user_service(user: UserCreate):
     expires_at = int(time.time()) + 60 * 60 * 24 * 7  # 7 days expiry, adjust as needed
     user_out = UserOut(id=user_id, name=user_doc["name"], email=user_doc["email"])
     response = {
-        "user": user_out.dict(),
+        "user": user_out.model_dump(),
         "tokens": {
             "accessToken": access_token,
             "refreshToken": refresh_token,
@@ -67,7 +67,7 @@ async def login_user_service(data: UserLogin):
     expires_at = int(time.time()) + 60 * 60 * 24 * 7  # 7 days expiry, adjust as needed
     user_out = UserOut(id=user["id"], name=user["name"], email=user["email"])
     response = {
-        "user": user_out.dict(),
+        "user": user_out.model_dump(),
         "tokens": {
             "accessToken": access_token,
             "refreshToken": refresh_token,

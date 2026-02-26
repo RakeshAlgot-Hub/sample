@@ -21,7 +21,7 @@ def create_payment(payment_data: PaymentCreate) -> Payment:
         id=str(uuid4()),
         createdAt=now,
         updatedAt=now,
-        **payment_data.dict()
+        **payment_data.model_dump()
     )
     payments_db.append(payment)
     return payment

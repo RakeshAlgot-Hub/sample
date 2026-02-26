@@ -2,11 +2,10 @@ import uuid
 from app.database.mongodb import db
 from app.models.property_schema import PropertyCreate, PropertyOut
 from typing import List
-
-from datetime import datetime
+from datetime import datetime, timezone
 
 async def create_property_service(property: PropertyCreate) -> PropertyOut:
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     doc = property.model_dump()
     doc["createdAt"] = now
     doc["updatedAt"] = now
