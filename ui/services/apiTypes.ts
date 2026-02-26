@@ -163,3 +163,14 @@ export interface ResetPasswordRequest {
 export interface ResetPasswordResponse {
   message: string;
 }
+
+export interface Room {
+  id: string;
+  propertyId: string;
+  roomNumber: string;
+  floor: string;
+  price: number;
+  numberOfBeds: number;
+  createdAt: string;
+  updatedAt: string;
+}

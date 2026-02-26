@@ -66,9 +66,15 @@ app.add_middleware(
 
 # Routers
 API_PREFIX = "/api/v1"
+
+
+from app.routes import room, tenant, payment
 app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(property.router, prefix=API_PREFIX)
+app.include_router(room.router, prefix=API_PREFIX)
+app.include_router(tenant.router, prefix=API_PREFIX)
+app.include_router(payment.router, prefix=API_PREFIX)
 
 
 # Register global exception handlers

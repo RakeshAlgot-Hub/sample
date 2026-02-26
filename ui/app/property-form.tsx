@@ -17,11 +17,13 @@ import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 import { propertyService } from '@/services/apiClient';
+import { useAuth } from '@/context/AuthContext';
 
 export default function PropertyFormScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { refreshProperties } = useProperty();
+  const { user } = useAuth();
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,12 +34,19 @@ export default function PropertyFormScreen() {
       setError('Property name and address are required');
       return;
     }
-
+    if (!user?.id) {
+      setError('Owner not found. Please log in again.');
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-
-      await propertyService.createProperty({ name, address });
+      await propertyService.createProperty({
+        name,
+        address,
+        ownerId: user.id,
+        active: true,
+      });
       await refreshProperties();
       router.back();
     } catch (err: any) {
@@ -69,6 +78,7 @@ export default function PropertyFormScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled">
           <View style={styles.logoContainer}>
+            {/* Do not show ownerId or property id in the form UI */}
             <View style={[styles.logoCircle, { backgroundColor: colors.primary[50] }]}>
               <Building2 size={48} color={colors.primary[500]} />
             </View>

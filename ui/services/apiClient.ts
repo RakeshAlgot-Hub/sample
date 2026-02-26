@@ -6,6 +6,7 @@ import {
   Subscription,
   Usage,
   PlanLimits,
+  Room,
   ApiResponse,
   PaginatedResponse,
   LoginCredentials,
@@ -315,5 +316,30 @@ export const subscriptionService = {
     plan: 'free' | 'pro' | 'premium'
   ): Promise<ApiResponse<Subscription>> {
     return await request<Subscription>('POST', '/subscription/upgrade', { plan }, true) as ApiResponse<Subscription>;
+  },
+};
+
+export const roomService = {
+  async getRooms(): Promise<PaginatedResponse<Room>> {
+    return await request<Room>('GET', '/rooms', undefined, true) as PaginatedResponse<Room>;
+  },
+
+  async getRoomById(id: string): Promise<ApiResponse<Room>> {
+    return await request<Room>('GET', `/rooms/${id}`, undefined, true) as ApiResponse<Room>;
+  },
+
+  async createRoom(data: Partial<Room>): Promise<ApiResponse<Room>> {
+    return await request<Room>('POST', '/rooms', data, true) as ApiResponse<Room>;
+  },
+
+  async updateRoom(
+    id: string,
+    data: Partial<Room>
+  ): Promise<ApiResponse<Room>> {
+    return await request<Room>('PATCH', `/rooms/${id}`, data, true) as ApiResponse<Room>;
+  },
+
+  async deleteRoom(id: string): Promise<ApiResponse<{ success: boolean }>> {
+    return await request<{ success: boolean }>('DELETE', `/rooms/${id}`, undefined, true) as ApiResponse<{ success: boolean }>;
   },
 };
