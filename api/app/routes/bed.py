@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from app.models.bed_schema import BedCreate, BedUpdate, BedOut
 from app.services.bed_service import (
@@ -8,35 +8,36 @@ from app.services.bed_service import (
     update_bed_service,
     delete_bed_service,
 )
+from app.utils.helpers import get_current_user
 
 router = APIRouter(prefix="/beds", tags=["beds"])
 
 @router.get("/", response_model=List[BedOut])
 @router.get("", response_model=List[BedOut])
-async def list_beds():
+async def list_beds(user_id: str = Depends(get_current_user)):
     return await list_beds_service()
 
 @router.post("/", response_model=BedOut, status_code=status.HTTP_201_CREATED)
 @router.post("", response_model=BedOut, status_code=status.HTTP_201_CREATED)
-async def create_bed(bed: BedCreate):
+async def create_bed(bed: BedCreate, user_id: str = Depends(get_current_user)):
     return await create_bed_service(bed)
 
 @router.get("/{bed_id}", response_model=BedOut)
-async def get_bed(bed_id: str):
+async def get_bed(bed_id: str, user_id: str = Depends(get_current_user)):
     bed = await get_bed_service(bed_id)
     if not bed:
         raise HTTPException(status_code=404, detail="Bed not found")
     return bed
 
 @router.patch("/{bed_id}", response_model=BedOut)
-async def update_bed(bed_id: str, bed_update: BedUpdate):
+async def update_bed(bed_id: str, bed_update: BedUpdate, user_id: str = Depends(get_current_user)):
     bed = await update_bed_service(bed_id, bed_update)
     if not bed:
         raise HTTPException(status_code=404, detail="Bed not found")
     return bed
 
 @router.delete("/{bed_id}", response_model=dict)
-async def delete_bed(bed_id: str):
+async def delete_bed(bed_id: str, user_id: str = Depends(get_current_user)):
     success = await delete_bed_service(bed_id)
     if not success:
         raise HTTPException(status_code=404, detail="Bed not found")

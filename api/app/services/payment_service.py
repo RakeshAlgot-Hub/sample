@@ -2,42 +2,45 @@ from typing import List, Optional
 from datetime import datetime, timezone
 from uuid import uuid4
 from ..models.payment_schema import Payment, PaymentCreate
+from app.database.mongodb import getCollection
 
-# In-memory storage for demonstration (replace with DB integration)
-payments_db: List[Payment] = []
+payments_collection = getCollection("payments")
 
-def get_payments() -> List[Payment]:
-    return payments_db
+import asyncio
 
-def get_payment_by_id(payment_id: str) -> Optional[Payment]:
-    for payment in payments_db:
-        if payment.id == payment_id:
-            return payment
+async def get_payments() -> List[Payment]:
+    cursor = payments_collection.find()
+    payments = await cursor.to_list(length=100)
+    return [Payment(**p) for p in payments]
+
+async def get_payment_by_id(payment_id: str) -> Optional[Payment]:
+    payment = await payments_collection.find_one({"id": payment_id})
+    if payment:
+        return Payment(**payment)
     return None
 
-def create_payment(payment_data: PaymentCreate) -> Payment:
+async def create_payment(payment_data: PaymentCreate) -> Payment:
     now = datetime.now(timezone.utc)
-    payment = Payment(
-        id=str(uuid4()),
-        createdAt=now,
-        updatedAt=now,
-        **payment_data.model_dump()
-    )
-    payments_db.append(payment)
-    return payment
+    payment_dict = payment_data.model_dump()
+    payment_dict["id"] = str(uuid4())
+    payment_dict["createdAt"] = now
+    payment_dict["updatedAt"] = now
+    await payments_collection.insert_one(payment_dict)
+    return Payment(**payment_dict)
 
-def get_payment_stats():
+async def get_payment_stats():
+    payments = await payments_collection.find().to_list(length=100)
     collected = sum(
-        float(p.amount.replace('₹', '').replace(',', ''))
-        for p in payments_db if p.status == 'paid'
+        float(p["amount"].replace('₹', '').replace(',', ''))
+        for p in payments if p["status"] == 'paid'
     )
     pending = sum(
-        float(p.amount.replace('₹', '').replace(',', ''))
-        for p in payments_db if p.status == 'due'
+        float(p["amount"].replace('₹', '').replace(',', ''))
+        for p in payments if p["status"] == 'due'
     )
     overdue = sum(
-        float(p.amount.replace('₹', '').replace(',', ''))
-        for p in payments_db if p.status == 'overdue'
+        float(p["amount"].replace('₹', '').replace(',', ''))
+        for p in payments if p["status"] == 'overdue'
     )
     return {
         'collected': f'₹{collected:,.0f}',
