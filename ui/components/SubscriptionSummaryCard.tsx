@@ -1,19 +1,52 @@
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Card from '@/components/Card';
 import { Crown, Building2, Users, ArrowRight } from 'lucide-react-native';
 import { spacing, typography, radius } from '@/theme';
-import { planConfig, getUsagePercentage } from '@/config/planConfig';
 import { useTheme } from '@/context/ThemeContext';
+import { subscriptionService } from '@/services/apiClient';
+import type { Subscription, Usage, PlanLimits } from '@/services/apiTypes';
 
 export default function SubscriptionSummaryCard() {
   const { colors } = useTheme();
   const router = useRouter();
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [usage, setUsage] = useState<Usage | null>(null);
+  const [limits, setLimits] = useState<PlanLimits | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSubscriptionData();
+  }, []);
+
+  const fetchSubscriptionData = async () => {
+    try {
+      setLoading(true);
+
+      const [subscriptionRes, usageRes] = await Promise.all([
+        subscriptionService.getSubscription(),
+        subscriptionService.getUsage(),
+      ]);
+
+      const subscriptionData = subscriptionRes.data;
+      setSubscription(subscriptionData);
+      setUsage(usageRes.data);
+
+      const limitsRes = await subscriptionService.getLimits(subscriptionData.plan);
+      setLimits(limitsRes.data);
+    } catch (error) {
+      console.error('Failed to fetch subscription data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatPlanName = (plan: string) => {
     return plan.charAt(0).toUpperCase() + plan.slice(1);
@@ -23,13 +56,28 @@ export default function SubscriptionSummaryCard() {
     return value === 999 ? '∞' : value;
   };
 
+  const calculateProgressPercentage = (used: number, limit: number) => {
+    if (limit === 999) return 10;
+    return Math.min((used / limit) * 100, 100);
+  };
+
+  if (loading || !subscription || !usage || !limits) {
+    return (
+      <Card style={styles.card}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={colors.primary[500]} />
+        </View>
+      </Card>
+    );
+  }
+
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
         <View style={[styles.planBadge, { backgroundColor: colors.warning[50] }]}>
           <Crown size={16} color={colors.warning[600]} />
           <Text style={[styles.planText, { color: colors.warning[700] }]}>
-            {formatPlanName(planConfig.currentPlan)} Plan
+            {formatPlanName(subscription.plan)} Plan
           </Text>
         </View>
         <TouchableOpacity
@@ -47,7 +95,7 @@ export default function SubscriptionSummaryCard() {
             <Building2 size={16} color={colors.primary[500]} />
             <Text style={[styles.usageLabel, { color: colors.text.secondary }]}>Properties</Text>
             <Text style={[styles.usageValue, { color: colors.text.primary }]}>
-              {planConfig.usage.properties} / {formatLimit(planConfig.limits.properties)}
+              {usage.properties} / {formatLimit(limits.properties)}
             </Text>
           </View>
           <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
@@ -55,9 +103,9 @@ export default function SubscriptionSummaryCard() {
               style={[
                 styles.progressFill,
                 {
-                  width: `${getUsagePercentage('properties')}%`,
+                  width: `${calculateProgressPercentage(usage.properties, limits.properties)}%`,
                   backgroundColor:
-                    planConfig.usage.properties > planConfig.limits.properties
+                    usage.properties > limits.properties
                       ? colors.danger[500]
                       : colors.primary[500],
                 },
@@ -71,7 +119,7 @@ export default function SubscriptionSummaryCard() {
             <Users size={16} color={colors.success[500]} />
             <Text style={[styles.usageLabel, { color: colors.text.secondary }]}>Tenants</Text>
             <Text style={[styles.usageValue, { color: colors.text.primary }]}>
-              {planConfig.usage.tenants} / {formatLimit(planConfig.limits.tenants)}
+              {usage.tenants} / {formatLimit(limits.tenants)}
             </Text>
           </View>
           <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
@@ -79,9 +127,9 @@ export default function SubscriptionSummaryCard() {
               style={[
                 styles.progressFill,
                 {
-                  width: `${getUsagePercentage('tenants')}%`,
+                  width: `${calculateProgressPercentage(usage.tenants, limits.tenants)}%`,
                   backgroundColor:
-                    planConfig.usage.tenants > planConfig.limits.tenants
+                    usage.tenants > limits.tenants
                       ? colors.danger[500]
                       : colors.success[500],
                 },
@@ -91,7 +139,7 @@ export default function SubscriptionSummaryCard() {
         </View>
       </View>
 
-      {planConfig.currentPlan === 'free' && (
+      {subscription.plan === 'free' && (
         <TouchableOpacity
           style={[styles.upgradeButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}
           onPress={() => router.push('/subscription')}
@@ -106,6 +154,11 @@ export default function SubscriptionSummaryCard() {
 const styles = StyleSheet.create({
   card: {
     marginBottom: spacing.md,
+  },
+  loadingContainer: {
+    paddingVertical: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   header: {
     flexDirection: 'row',

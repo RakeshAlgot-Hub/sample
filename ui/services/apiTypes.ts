@@ -185,3 +185,21 @@ export interface Bed {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface RazorpayCheckoutSession {
+  razorpayOrderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+}
+
+export interface VerifyPaymentRequest {
+  payment_id: string;
+  order_id: string;
+  signature: string;
+}
+
+export interface VerifyPaymentResponse {
+  success: boolean;
+  subscription: Subscription;
+}

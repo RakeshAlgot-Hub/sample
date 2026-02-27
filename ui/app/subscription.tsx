@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import ScreenContainer from '@/components/ScreenContainer';
 import Card from '@/components/Card';
 import UpgradeModal from '@/components/UpgradeModal';
@@ -28,12 +29,20 @@ import type { Subscription, Usage, PlanLimits } from '@/services/apiTypes';
 
 type Plan = 'free' | 'pro' | 'premium';
 
+interface PlanComparison {
+  id: Plan;
+  name: string;
+  popular?: boolean;
+  limits?: PlanLimits;
+}
+
 export default function SubscriptionScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [limits, setLimits] = useState<PlanLimits | null>(null);
+  const [allLimits, setAllLimits] = useState<Record<Plan, PlanLimits>>({} as Record<Plan, PlanLimits>);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -43,9 +52,12 @@ export default function SubscriptionScreen() {
       setLoading(true);
       setError(null);
 
-      const [subscriptionRes, usageRes] = await Promise.all([
+      const [subscriptionRes, usageRes, freeLimitsRes, proLimitsRes, premiumLimitsRes] = await Promise.all([
         subscriptionService.getSubscription(),
         subscriptionService.getUsage(),
+        subscriptionService.getLimits('free'),
+        subscriptionService.getLimits('pro'),
+        subscriptionService.getLimits('premium'),
       ]);
 
       const subscriptionData = subscriptionRes.data;
@@ -56,6 +68,12 @@ export default function SubscriptionScreen() {
 
       const limitsRes = await subscriptionService.getLimits(subscriptionData.plan);
       setLimits(limitsRes.data);
+
+      setAllLimits({
+        free: freeLimitsRes.data,
+        pro: proLimitsRes.data,
+        premium: premiumLimitsRes.data,
+      });
     } catch (err: any) {
       if (err?.code === 'upgrade_required') {
         setShowUpgradeModal(true);
@@ -67,9 +85,11 @@ export default function SubscriptionScreen() {
     }
   };
 
-  useEffect(() => {
-    fetchSubscriptionData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchSubscriptionData();
+    }, [])
+  );
 
   const handleRetry = () => {
     fetchSubscriptionData();
@@ -87,45 +107,26 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const comparisonPlans = [
-    {
-      id: 'free' as const,
-      name: 'Free',
-      price: '₹0',
-      features: [
-        'Up to 2 properties',
-        'Up to 20 tenants',
-        '50 SMS credits/month',
-        'Basic reporting',
-      ],
-    },
-    {
-      id: 'pro' as const,
-      name: 'Pro',
-      price: '₹999',
-      popular: true,
-      features: [
-        'Up to 10 properties',
-        'Up to 100 tenants',
-        '500 SMS credits/month',
-        'Advanced reporting',
-        'Priority support',
-      ],
-    },
-    {
-      id: 'premium' as const,
-      name: 'Premium',
-      price: '₹2,499',
-      features: [
-        'Unlimited properties',
-        'Unlimited tenants',
-        'Unlimited SMS credits',
-        'Custom reporting',
-        '24/7 support',
-        'White-label option',
-      ],
-    },
-  ];
+  const buildComparisonPlans = (): PlanComparison[] => {
+    return [
+      {
+        id: 'free' as const,
+        name: 'Free',
+        limits: allLimits.free,
+      },
+      {
+        id: 'pro' as const,
+        name: 'Pro',
+        popular: true,
+        limits: allLimits.pro,
+      },
+      {
+        id: 'premium' as const,
+        name: 'Premium',
+        limits: allLimits.premium,
+      },
+    ];
+  };
 
   const currentPlan = subscription?.plan || 'free';
   const isLocked = currentPlan === 'free';
@@ -174,11 +175,14 @@ export default function SubscriptionScreen() {
               <Text style={[styles.currentPlanName, { color: colors.text.primary }]}>
                 {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}
               </Text>
-              <Text style={[styles.currentPlanPrice, { color: colors.text.secondary }]}>
-                {currentPlan === 'free'
-                  ? 'Free forever'
-                  : `${currentPlan === 'pro' ? '₹999' : '₹2,499'}/month`}
+              <Text style={[styles.currentPlanStatus, { color: colors.text.secondary }]}>
+                Status: {subscription.status}
               </Text>
+              {subscription.currentPeriodStart && subscription.currentPeriodEnd && (
+                <Text style={[styles.currentPlanPeriod, { color: colors.text.tertiary }]}>
+                  Period: {new Date(subscription.currentPeriodStart).toLocaleDateString()} - {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                </Text>
+              )}
             </Card>
 
             <View style={styles.section}>
@@ -281,7 +285,7 @@ export default function SubscriptionScreen() {
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>Compare Plans</Text>
 
-              {comparisonPlans.map((plan) => (
+              {buildComparisonPlans().map((plan) => (
                 <View key={plan.id} style={styles.comparisonCardWrapper}>
                   {isLocked && plan.id !== 'free' && (
                     <View style={styles.lockedOverlay}>
@@ -303,21 +307,29 @@ export default function SubscriptionScreen() {
                       </View>
                     )}
                     <Text style={[styles.comparisonPlanName, { color: colors.text.primary }]}>{plan.name}</Text>
-                    <View style={styles.priceRow}>
-                      <Text style={[styles.comparisonPrice, { color: colors.primary[500] }]}>{plan.price}</Text>
-                      {plan.id !== 'free' && (
-                        <Text style={[styles.pricePeriod, { color: colors.text.secondary }]}>/month</Text>
-                      )}
-                    </View>
 
-                    <View style={styles.featuresContainer}>
-                      {plan.features.map((feature, index) => (
-                        <View key={index} style={styles.featureRow}>
+                    {plan.limits && (
+                      <View style={styles.featuresContainer}>
+                        <View style={styles.featureRow}>
                           <Check size={16} color={colors.success[500]} />
-                          <Text style={[styles.featureText, { color: colors.text.primary }]}>{feature}</Text>
+                          <Text style={[styles.featureText, { color: colors.text.primary }]}>
+                            {formatLimit(plan.limits.properties)} {plan.limits.properties === 999 ? 'properties' : plan.limits.properties === 1 ? 'property' : 'properties'}
+                          </Text>
                         </View>
-                      ))}
-                    </View>
+                        <View style={styles.featureRow}>
+                          <Check size={16} color={colors.success[500]} />
+                          <Text style={[styles.featureText, { color: colors.text.primary }]}>
+                            {formatLimit(plan.limits.tenants)} {plan.limits.tenants === 999 ? 'tenants' : plan.limits.tenants === 1 ? 'tenant' : 'tenants'}
+                          </Text>
+                        </View>
+                        <View style={styles.featureRow}>
+                          <Check size={16} color={colors.success[500]} />
+                          <Text style={[styles.featureText, { color: colors.text.primary }]}>
+                            {formatLimit(plan.limits.smsCredits)} SMS {plan.limits.smsCredits === 999 ? 'credits' : 'credits/month'}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
 
                     {currentPlan === plan.id && (
                       <View style={[styles.currentBadge, { backgroundColor: colors.success[100] }]}>
@@ -387,8 +399,12 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     marginBottom: spacing.xs,
   },
-  currentPlanPrice: {
+  currentPlanStatus: {
     fontSize: typography.fontSize.md,
+    marginBottom: spacing.xs,
+  },
+  currentPlanPeriod: {
+    fontSize: typography.fontSize.sm,
   },
   section: {
     marginBottom: spacing.xl,

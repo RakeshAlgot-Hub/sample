@@ -12,3 +12,7 @@ ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS")
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 FROM_EMAIL = os.environ.get("FROM_EMAIL")
 ENV = os.environ.get("ENV", "production")
+
+# Razorpay
+RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET")

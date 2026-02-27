@@ -13,13 +13,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Wallet, ChevronLeft, ChevronDown, Calendar } from 'lucide-react-native';
+import { Wallet, ChevronLeft, ChevronDown } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 import { paymentService, tenantService } from '@/services/apiClient';
 import type { Tenant, Payment } from '@/services/apiTypes';
 import EmptyState from '@/components/EmptyState';
+import DatePicker from '@/components/DatePicker';
 
 const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Other'];
 const PAYMENT_STATUSES = [
@@ -42,10 +43,10 @@ export default function AddPaymentScreen() {
   const [availableTenants, setAvailableTenants] = useState<TenantWithLatestPayment[]>([]);
   const [selectedTenant, setSelectedTenant] = useState<TenantWithLatestPayment | null>(null);
   const [amount, setAmount] = useState('');
-  const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dueDate, setDueDate] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
   const [method, setMethod] = useState('Cash');
-  const [status, setStatus] = useState<'paid' | 'due' | 'overdue'>('paid');
+  const [status, setStatus] = useState<'paid' | 'due' | 'overdue'>('due');
 
   const [loading, setLoading] = useState(false);
   const [fetchingTenants, setFetchingTenants] = useState(true);
@@ -62,6 +63,12 @@ export default function AddPaymentScreen() {
       fetchTenants();
     }
   }, [selectedPropertyId]);
+
+  useEffect(() => {
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    setDueDate(nextMonth.toISOString());
+  }, []);
 
   const fetchTenants = async () => {
     if (!selectedPropertyId) return;
@@ -98,6 +105,10 @@ export default function AddPaymentScreen() {
         if (prefilledTenantId) {
           const prefilled = tenantsWithPayments.find(t => t.id === prefilledTenantId);
           if (prefilled) {
+            if (prefilled.latestPayment && prefilled.latestPayment.status !== 'paid') {
+              router.replace(`/edit-payment?paymentId=${prefilled.latestPayment.id}`);
+              return;
+            }
             setSelectedTenant(prefilled);
             const rentAmount = prefilled.rent.replace(/[^0-9]/g, '');
             setAmount(rentAmount);
@@ -112,15 +123,33 @@ export default function AddPaymentScreen() {
   };
 
   const handleTenantSelect = (tenant: TenantWithLatestPayment) => {
+    if (tenant.latestPayment && tenant.latestPayment.status !== 'paid') {
+      setShowTenantPicker(false);
+      router.replace(`/edit-payment?paymentId=${tenant.latestPayment.id}`);
+      return;
+    }
+
     setSelectedTenant(tenant);
     const rentAmount = tenant.rent.replace(/[^0-9]/g, '');
     setAmount(rentAmount);
     setShowTenantPicker(false);
   };
 
+  const handleStatusChange = (newStatus: 'paid' | 'due' | 'overdue') => {
+    setStatus(newStatus);
+    if (newStatus !== 'paid') {
+      setPaymentDate('');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedTenant || !amount || !dueDate || !method || !status) {
       setError('All required fields must be filled');
+      return;
+    }
+
+    if (status === 'paid' && !paymentDate) {
+      setError('Payment date is required when status is Paid');
       return;
     }
 
@@ -146,9 +175,9 @@ export default function AddPaymentScreen() {
         property: selectedPropertyId,
         bed: selectedTenant.bedId,
         amount: `₹${amountNum.toLocaleString()}`,
-        dueDate,
-        date: paymentDate || null,
-        method: paymentDate ? method : null,
+        dueDate: dueDate.split('T')[0],
+        date: status === 'paid' && paymentDate ? paymentDate.split('T')[0] : null,
+        method: status === 'paid' ? method : null,
         status,
       });
 
@@ -161,15 +190,20 @@ export default function AddPaymentScreen() {
   };
 
   const isFormValid = () => {
-    return (
+    const baseValid =
       selectedTenant &&
       amount.trim() &&
       dueDate &&
       method &&
       status &&
       !isNaN(parseFloat(amount)) &&
-      parseFloat(amount) > 0
-    );
+      parseFloat(amount) > 0;
+
+    if (status === 'paid') {
+      return baseValid && paymentDate;
+    }
+
+    return baseValid;
   };
 
   if (!selectedPropertyId) {
@@ -314,78 +348,13 @@ export default function AddPaymentScreen() {
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Due Date *</Text>
-              <View style={styles.dateInputContainer}>
-                <Calendar size={20} color={colors.text.tertiary} style={styles.dateIcon} />
-                <TextInput
-                  style={[
-                    styles.dateInput,
-                    {
-                      backgroundColor: colors.white,
-                      color: colors.text.primary,
-                      borderColor: colors.border.medium,
-                    },
-                  ]}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.text.tertiary}
-                  value={dueDate}
-                  onChangeText={setDueDate}
-                  editable={!loading}
-                />
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Payment Date</Text>
-              <View style={styles.dateInputContainer}>
-                <Calendar size={20} color={colors.text.tertiary} style={styles.dateIcon} />
-                <TextInput
-                  style={[
-                    styles.dateInput,
-                    {
-                      backgroundColor: colors.white,
-                      color: colors.text.primary,
-                      borderColor: colors.border.medium,
-                    },
-                  ]}
-                  placeholder="YYYY-MM-DD (optional)"
-                  placeholderTextColor={colors.text.tertiary}
-                  value={paymentDate}
-                  onChangeText={setPaymentDate}
-                  editable={!loading}
-                />
-              </View>
-              <Text style={[styles.helperText, { color: colors.text.tertiary }]}>
-                Leave empty if not yet paid
-              </Text>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Payment Method *</Text>
-              <TouchableOpacity
-                style={[
-                  styles.pickerButton,
-                  {
-                    backgroundColor: colors.white,
-                    borderColor: colors.border.medium,
-                  },
-                ]}
-                onPress={() => setShowMethodPicker(true)}
-                activeOpacity={0.7}
-                disabled={loading}>
-                <Text
-                  style={[
-                    styles.pickerButtonText,
-                    {
-                      color: method ? colors.text.primary : colors.text.tertiary,
-                    },
-                  ]}>
-                  {method || 'Select Method'}
-                </Text>
-                <ChevronDown size={20} color={colors.text.tertiary} />
-              </TouchableOpacity>
-            </View>
+            <DatePicker
+              value={dueDate}
+              onChange={setDueDate}
+              label="Due Date"
+              disabled={loading}
+              required
+            />
 
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.text.primary }]}>Status *</Text>
@@ -412,6 +381,44 @@ export default function AddPaymentScreen() {
                 <ChevronDown size={20} color={colors.text.tertiary} />
               </TouchableOpacity>
             </View>
+
+            {status === 'paid' && (
+              <>
+                <DatePicker
+                  value={paymentDate}
+                  onChange={setPaymentDate}
+                  label="Payment Date"
+                  disabled={loading}
+                  required
+                />
+
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Payment Method *</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerButton,
+                      {
+                        backgroundColor: colors.white,
+                        borderColor: colors.border.medium,
+                      },
+                    ]}
+                    onPress={() => setShowMethodPicker(true)}
+                    activeOpacity={0.7}
+                    disabled={loading}>
+                    <Text
+                      style={[
+                        styles.pickerButtonText,
+                        {
+                          color: method ? colors.text.primary : colors.text.tertiary,
+                        },
+                      ]}>
+                      {method || 'Select Method'}
+                    </Text>
+                    <ChevronDown size={20} color={colors.text.tertiary} />
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
 
             <TouchableOpacity
               style={[
@@ -574,7 +581,7 @@ export default function AddPaymentScreen() {
                     { borderBottomColor: colors.border.light },
                   ]}
                   onPress={() => {
-                    setStatus(s.value as 'paid' | 'due' | 'overdue');
+                    handleStatusChange(s.value as 'paid' | 'due' | 'overdue');
                     setShowStatusPicker(false);
                   }}
                   activeOpacity={0.7}>
@@ -713,10 +720,6 @@ const styles = StyleSheet.create({
   pickerButtonText: {
     fontSize: typography.fontSize.md,
   },
-  helperText: {
-    fontSize: typography.fontSize.xs,
-    marginTop: spacing.xs,
-  },
   infoContainer: {
     borderRadius: radius.md,
     borderWidth: 1,
@@ -727,23 +730,6 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
-  },
-  dateInputContainer: {
-    position: 'relative',
-  },
-  dateIcon: {
-    position: 'absolute',
-    left: spacing.lg,
-    top: spacing.md,
-    zIndex: 1,
-  },
-  dateInput: {
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    paddingLeft: 48,
-    fontSize: typography.fontSize.md,
-    borderWidth: 1,
   },
   submitButton: {
     borderRadius: radius.md,

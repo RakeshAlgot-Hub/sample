@@ -21,6 +21,7 @@ import {
   Bed as BedIcon,
   Plus,
   Edit,
+  CheckCircle,
 } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -140,6 +141,32 @@ export default function TenantDetailScreen() {
       month: 'short',
       year: 'numeric',
     });
+  };
+
+  const formatDateYYYYMMMDD = (dateString: string) => {
+    const date = new Date(dateString);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const year = date.getFullYear();
+    const month = months[date.getMonth()];
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const calculateNextDueDate = (lastDueDate: string): string => {
+    const lastDue = new Date(lastDueDate);
+    const nextDue = new Date(lastDue);
+    nextDue.setMonth(nextDue.getMonth() + 1);
+    return nextDue.toISOString();
+  };
+
+  const handleMarkAsPaid = async () => {
+    if (!latestPayment) return;
+
+    router.push(`/edit-payment?paymentId=${latestPayment.id}`);
+  };
+
+  const handleGenerateDue = () => {
+    router.push(`/add-payment?tenantId=${tenantId}`);
   };
 
   if (loading) {
@@ -314,19 +341,44 @@ export default function TenantDetailScreen() {
                 <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
                   Payment History
                 </Text>
-                <TouchableOpacity
-                  style={[styles.addButton, { backgroundColor: colors.primary[500] }]}
-                  onPress={handleAddPayment}
-                  activeOpacity={0.7}>
-                  {latestPayment && latestPayment.status !== 'paid' ? (
-                    <Edit size={16} color={colors.white} />
-                  ) : (
+                {latestPayment && latestPayment.status === 'due' ? (
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.success[500] }]}
+                    onPress={handleMarkAsPaid}
+                    activeOpacity={0.7}>
+                    <CheckCircle size={16} color={colors.white} />
+                    <Text style={[styles.actionButtonText, { color: colors.white }]}>
+                      Mark as Paid
+                    </Text>
+                  </TouchableOpacity>
+                ) : !latestPayment ? (
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.primary[500] }]}
+                    onPress={handleGenerateDue}
+                    activeOpacity={0.7}>
                     <Plus size={16} color={colors.white} />
-                  )}
-                  <Text style={[styles.addButtonText, { color: colors.white }]}>
-                    {latestPayment && latestPayment.status !== 'paid' ? 'Edit' : 'Add'}
-                  </Text>
-                </TouchableOpacity>
+                    <Text style={[styles.actionButtonText, { color: colors.white }]}>
+                      Generate Due
+                    </Text>
+                  </TouchableOpacity>
+                ) : latestPayment.status === 'paid' ? (
+                  <View style={[styles.nextDueContainer, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}>
+                    <Calendar size={14} color={colors.primary[600]} />
+                    <Text style={[styles.nextDueText, { color: colors.primary[700] }]}>
+                      Next Due: {formatDateYYYYMMMDD(calculateNextDueDate(latestPayment.dueDate))}
+                    </Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.warning[500] }]}
+                    onPress={handleMarkAsPaid}
+                    activeOpacity={0.7}>
+                    <Edit size={16} color={colors.white} />
+                    <Text style={[styles.actionButtonText, { color: colors.white }]}>
+                      Edit Overdue
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {payments.length === 0 ? (
@@ -538,6 +590,32 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
   },
   paymentDetailValue: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    gap: spacing.xs,
+    ...shadows.sm,
+  },
+  actionButtonText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  nextDueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.xs,
+  },
+  nextDueText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },

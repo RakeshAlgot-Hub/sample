@@ -23,6 +23,9 @@ import {
   ResetPasswordRequest,
   ResetPasswordResponse,
   ApiError,
+  RazorpayCheckoutSession,
+  VerifyPaymentRequest,
+  VerifyPaymentResponse,
 } from './apiTypes';
 import { tokenStorage } from './tokenStorage';
 
@@ -324,6 +327,18 @@ export const subscriptionService = {
     plan: 'free' | 'pro' | 'premium'
   ): Promise<ApiResponse<Subscription>> {
     return await request<Subscription>('POST', '/subscription/upgrade', { plan }, true) as ApiResponse<Subscription>;
+  },
+
+  async createCheckoutSession(
+    plan: 'free' | 'pro' | 'premium'
+  ): Promise<ApiResponse<RazorpayCheckoutSession>> {
+    return await request<RazorpayCheckoutSession>('POST', '/subscription/create-checkout-session', { plan }, true) as ApiResponse<RazorpayCheckoutSession>;
+  },
+
+  async verifyPayment(
+    data: VerifyPaymentRequest
+  ): Promise<ApiResponse<VerifyPaymentResponse>> {
+    return await request<VerifyPaymentResponse>('POST', '/subscription/verify-payment', data, true) as ApiResponse<VerifyPaymentResponse>;
   },
 };
 
