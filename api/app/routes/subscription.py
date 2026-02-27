@@ -60,7 +60,10 @@ async def create_checkout_session(
     plan_limits = SubscriptionService.get_plan_limits(plan)
     amount = plan_limits['price'] * 100
     currency = 'INR'
-    receipt = f"sub_{user_id}_{plan}"
+    # Ensure receipt is <= 40 chars for Razorpay
+    base_receipt = f"sub_{plan}"
+    user_part = user_id[:40 - len(base_receipt) - 1]  # leave room for underscore
+    receipt = f"{base_receipt}_{user_part}"
     order_doc = await RazorpayService.create_order(user_id, plan, amount, currency, receipt)
     return {
         "data": {
