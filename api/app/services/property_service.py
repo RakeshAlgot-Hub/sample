@@ -19,9 +19,10 @@ async def create_property_service(property: PropertyCreate) -> PropertyOut:
     return PropertyOut(**doc)
 
 async def list_properties_service() -> List[PropertyOut]:
-    properties = []
-    async for doc in db["properties"].find():
-        doc["id"] = str(doc["_id"])
-        doc["ownerId"] = str(doc["ownerId"])
-        properties.append(PropertyOut(**doc))
-    return properties
+    async def list_properties_service(user_id: str) -> List[PropertyOut]:
+        properties = []
+        async for doc in db["properties"].find({"ownerId": ObjectId(user_id)}):
+            doc["id"] = str(doc["_id"])
+            doc["ownerId"] = str(doc["ownerId"])
+            properties.append(PropertyOut(**doc))
+        return properties

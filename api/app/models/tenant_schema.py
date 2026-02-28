@@ -2,9 +2,10 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 
 class BillingConfig(BaseModel):
-    frequency: Literal['monthly', 'quarterly', 'yearly']
+    status: Literal['paid', 'due', 'overdue']
+    billingCycle: Literal['monthly', 'day-wise']
     anchorDate: str
-    autoGenerate: bool
+    method: Optional[str] = None
 
 class Tenant(BaseModel):
     id: Optional[str] = None

@@ -49,9 +49,7 @@ export default function AddTenantScreen() {
   const [showBedPicker, setShowBedPicker] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  const [billingFrequency, setBillingFrequency] = useState<BillingFrequency>('monthly');
-  const [billingAnchorDate, setBillingAnchorDate] = useState('');
-  const [autoGeneratePayments, setAutoGeneratePayments] = useState(true);
+  // Billing settings removed
   const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
 
   useEffect(() => {
@@ -71,7 +69,7 @@ export default function AddTenantScreen() {
   }, [selectedRoom]);
 
   useEffect(() => {
-    setBillingAnchorDate(joinDate);
+    // Billing anchor date logic removed
   }, [joinDate]);
 
   const fetchRooms = async () => {
@@ -109,62 +107,34 @@ export default function AddTenantScreen() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!name || !email || !phone || !rent || !joinDate || !selectedRoom || !selectedBed) {
-      setError('All fields are required');
+  const handleNext = () => {
+    if (!name || !phone || !rent || !joinDate || !selectedRoom || !selectedBed) {
+      setError('All fields except email are required');
       return;
     }
-
-    if (!billingFrequency || !billingAnchorDate) {
-      setError('Billing settings are required');
-      return;
-    }
-
     const rentNum = parseFloat(rent);
     if (isNaN(rentNum) || rentNum <= 0) {
       setError('Please enter a valid rent amount');
       return;
     }
-
     if (!selectedPropertyId) {
       setError('No property selected');
       return;
     }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const billingConfig: BillingConfig = {
-        frequency: billingFrequency,
-        anchorDate: billingAnchorDate,
-        autoGenerate: autoGeneratePayments,
-      };
-
-      await tenantService.createTenant({
-        propertyId: selectedPropertyId,
-        roomId: selectedRoom.id,
-        bedId: selectedBed.id,
+    // Pass tenant details to billing setup screen
+    router.push({
+      pathname: '/add-payment',
+      params: {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
-        rent: `₹${rentNum.toLocaleString()}`,
-        status: 'paid',
+        rent: rentNum.toString(),
         joinDate,
-        billingConfig,
-      });
-
-      router.back();
-    } catch (err: any) {
-      if (err?.code === 'TENANT_LIMIT_REACHED') {
-        setShowUpgradeModal(true);
-        setError('Tenant limit reached. Please upgrade your plan.');
-      } else {
-        setError(err?.message || 'Failed to create tenant');
-      }
-    } finally {
-      setLoading(false);
-    }
+        propertyId: selectedPropertyId,
+        roomId: selectedRoom.id,
+        bedId: selectedBed.id,
+      },
+    });
   };
 
   const isFormValid = () => {
@@ -297,7 +267,7 @@ export default function AddTenantScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Email *</Text>
+              <Text style={[styles.label, { color: colors.text.primary }]}>Email (optional)</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -434,60 +404,7 @@ export default function AddTenantScreen() {
               required
             />
 
-            <View style={[styles.billingSection, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}>
-              <Text style={[styles.billingSectionTitle, { color: colors.text.primary }]}>Billing Settings *</Text>
-
-              <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Billing Frequency *</Text>
-                <TouchableOpacity
-                  style={[
-                    styles.pickerButton,
-                    {
-                      backgroundColor: colors.white,
-                      borderColor: colors.border.medium,
-                      opacity: autoGeneratePayments ? 1 : 0.5,
-                    },
-                  ]}
-                  onPress={() => autoGeneratePayments && setShowFrequencyPicker(true)}
-                  activeOpacity={0.7}
-                  disabled={loading || !autoGeneratePayments}>
-                  <Text
-                    style={[
-                      styles.pickerButtonText,
-                      {
-                        color: colors.text.primary,
-                      },
-                    ]}>
-                    {billingFrequency.charAt(0).toUpperCase() + billingFrequency.slice(1)}
-                  </Text>
-                  <ChevronDown size={20} color={colors.text.tertiary} />
-                </TouchableOpacity>
-              </View>
-
-              <DatePicker
-                value={billingAnchorDate}
-                onChange={setBillingAnchorDate}
-                label="Billing Anchor Date"
-                disabled={loading || !autoGeneratePayments}
-                required
-              />
-
-              <View style={[styles.toggleContainer, { backgroundColor: colors.white, borderColor: colors.border.medium }]}>
-                <View style={styles.toggleLabel}>
-                  <Text style={[styles.label, { color: colors.text.primary }]}>Enable Auto-Generate Payments</Text>
-                  <Text style={[styles.toggleHint, { color: colors.text.secondary }]}>
-                    Automatically generate due payment every billing cycle
-                  </Text>
-                </View>
-                <Switch
-                  value={autoGeneratePayments}
-                  onValueChange={setAutoGeneratePayments}
-                  disabled={loading}
-                  trackColor={{ false: colors.border.medium, true: colors.primary[200] }}
-                  thumbColor={autoGeneratePayments ? colors.primary[500] : colors.text.tertiary}
-                />
-              </View>
-            </View>
+            {/* Billing settings removed */}
 
             <TouchableOpacity
               style={[
@@ -497,14 +414,14 @@ export default function AddTenantScreen() {
                   opacity: loading || !isFormValid() ? 0.6 : 1,
                 },
               ]}
-              onPress={handleSubmit}
+              onPress={handleNext}
               activeOpacity={0.8}
               disabled={loading || !isFormValid()}>
               {loading ? (
                 <ActivityIndicator color={colors.white} size="small" />
               ) : (
-                <Text style={[styles.submitButtonText, { color: colors.white }]}>
-                  Add Tenant
+                <Text style={[styles.submitButtonText, { color: colors.white }]}> 
+                  Next
                 </Text>
               )}
             </TouchableOpacity>
@@ -647,36 +564,7 @@ export default function AddTenantScreen() {
             </View>
 
             <ScrollView style={styles.modalScrollView}>
-              {(['monthly', 'quarterly', 'yearly'] as BillingFrequency[]).map((freq, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.modalOption,
-                    { borderBottomColor: colors.border.light },
-                  ]}
-                  onPress={() => {
-                    setBillingFrequency(freq);
-                    setShowFrequencyPicker(false);
-                  }}
-                  activeOpacity={0.7}>
-                  <Text
-                    style={[
-                      styles.modalOptionText,
-                      {
-                        color:
-                          billingFrequency === freq
-                            ? colors.primary[500]
-                            : colors.text.primary,
-                        fontWeight:
-                          billingFrequency === freq
-                            ? typography.fontWeight.semibold
-                            : typography.fontWeight.regular,
-                      },
-                    ]}>
-                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {/* Billing frequency selection removed */}
             </ScrollView>
 
             <TouchableOpacity

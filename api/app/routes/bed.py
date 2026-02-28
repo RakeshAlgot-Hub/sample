@@ -11,11 +11,15 @@ from app.services.bed_service import (
 from app.utils.helpers import get_current_user
 
 router = APIRouter(prefix="/beds", tags=["beds"])
+from app.database.mongodb import db
 
 @router.get("/", response_model=List[BedOut])
 @router.get("", response_model=List[BedOut])
 async def list_beds(user_id: str = Depends(get_current_user)):
-    return await list_beds_service()
+    beds = []
+    async for doc in db["beds"].find({"ownerId": user_id}):
+        beds.append(BedOut(**doc))
+    return beds
 
 @router.post("/", response_model=BedOut, status_code=status.HTTP_201_CREATED)
 @router.post("", response_model=BedOut, status_code=status.HTTP_201_CREATED)

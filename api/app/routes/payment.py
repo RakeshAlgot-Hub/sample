@@ -15,7 +15,11 @@ async def update_payment(payment_id: str, payment_update: PaymentUpdate = Body(.
 
 @router.get("/", response_model=List[Payment])
 async def list_payments(user_id: str = Depends(get_current_user)):
-    return await payment_service.get_payments()
+    cursor = payment_service.payments_collection.find({"ownerId": user_id})
+    payments = await cursor.to_list(length=100)
+    for p in payments:
+        p["id"] = str(p["_id"])
+    return [payment_service.Payment(**p) for p in payments]
 
 @router.get("/{payment_id}", response_model=Payment)
 async def get_payment(payment_id: str, user_id: str = Depends(get_current_user)):

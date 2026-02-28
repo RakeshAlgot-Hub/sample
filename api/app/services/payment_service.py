@@ -11,11 +11,7 @@ payments_collection = getCollection("payments")
 import asyncio
 
 async def get_payments() -> List[Payment]:
-    cursor = payments_collection.find()
-    payments = await cursor.to_list(length=100)
-    for p in payments:
-        p["id"] = str(p["_id"])
-    return [Payment(**p) for p in payments]
+    raise NotImplementedError("get_payments now requires user_id argument")
 
 async def get_payment_by_id(payment_id: str) -> Optional[Payment]:
     payment = await payments_collection.find_one({"_id": ObjectId(payment_id)})

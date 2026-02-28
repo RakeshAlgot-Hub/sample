@@ -23,7 +23,7 @@ import EmptyState from '@/components/EmptyState';
 import DatePicker from '@/components/DatePicker';
 
 const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Other'];
-const PAYMENT_STATUSES = [
+export const PAYMENT_STATUSES = [
   { value: 'paid', label: 'Paid' },
   { value: 'due', label: 'Due' },
   { value: 'overdue', label: 'Overdue' },
@@ -36,154 +36,105 @@ interface TenantWithLatestPayment extends Tenant {
 export default function AddPaymentScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { tenantId: prefilledTenantId } = useLocalSearchParams<{ tenantId?: string }>();
+  const params = useLocalSearchParams();
   const { selectedPropertyId } = useProperty();
 
-  const [tenants, setTenants] = useState<TenantWithLatestPayment[]>([]);
-  const [availableTenants, setAvailableTenants] = useState<TenantWithLatestPayment[]>([]);
-  const [selectedTenant, setSelectedTenant] = useState<TenantWithLatestPayment | null>(null);
-  const [amount, setAmount] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [name, setName] = useState(typeof params.name === 'string' ? params.name : '');
+  const [email, setEmail] = useState(typeof params.email === 'string' ? params.email : '');
+  const [phone, setPhone] = useState(typeof params.phone === 'string' ? params.phone : '');
+  const [rent, setRent] = useState(typeof params.rent === 'string' ? params.rent : ''); // Rent remains unchanged
+  const [joinDate, setJoinDate] = useState(typeof params.joinDate === 'string' ? params.joinDate : '');
+  const [roomId] = useState(typeof params.roomId === 'string' ? params.roomId : '');
+  const [bedId] = useState(typeof params.bedId === 'string' ? params.bedId : '');
+  const [propertyId] = useState(typeof params.propertyId === 'string' ? params.propertyId : selectedPropertyId);
+  const [amount, setAmount] = useState(params.rent || '');
+    // Removed dueDate state
   const [paymentDate, setPaymentDate] = useState('');
   const [method, setMethod] = useState('Cash');
-  const [status, setStatus] = useState<'paid' | 'due' | 'overdue'>('due');
+    const [status, setStatus] = useState<'paid' | 'due'>('paid');
+  // Billing settings
+    const [billingCycle, setBillingCycle] = useState<'monthly' | 'day-wise'>('monthly');
+    // Set anchorDate to today's date by default, editable
+    function getTodayISO() {
+      const d = new Date();
+      return d.toISOString().split('T')[0];
+    }
+    const [anchorDate, setAnchorDate] = useState(() => {
+      if (params.joinDate && typeof params.joinDate === 'string') return params.joinDate;
+      return getTodayISO();
+    });
+  const [autoGeneratePayments, setAutoGeneratePayments] = useState(true);
 
   const [loading, setLoading] = useState(false);
-  const [fetchingTenants, setFetchingTenants] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [showTenantPicker, setShowTenantPicker] = useState(false);
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
-
-  const isPrefilled = !!prefilledTenantId;
-
-  useEffect(() => {
-    if (selectedPropertyId) {
-      fetchTenants();
-    }
-  }, [selectedPropertyId]);
+  const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
 
   useEffect(() => {
-    const nextMonth = new Date();
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    setDueDate(nextMonth.toISOString());
-  }, []);
-
-  const fetchTenants = async () => {
-    if (!selectedPropertyId) return;
-
-    try {
-      setFetchingTenants(true);
-      const [tenantsRes, paymentsRes] = await Promise.all([
-        tenantService.getTenants(),
-        paymentService.getPayments(),
-      ]);
-
-      if (tenantsRes.data && paymentsRes.data) {
-        const filteredTenants = tenantsRes.data.filter(t => t.propertyId === selectedPropertyId);
-        const filteredPayments = paymentsRes.data.filter(p => p.propertyId === selectedPropertyId);
-
-        const tenantsWithPayments: TenantWithLatestPayment[] = filteredTenants.map(tenant => {
-          const tenantPayments = filteredPayments
-            .filter(p => p.tenantId === tenant.id)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-          return {
-            ...tenant,
-            latestPayment: tenantPayments[0],
-          };
-        });
-
-        setTenants(tenantsWithPayments);
-
-        const available = tenantsWithPayments.filter(t =>
-          !t.latestPayment || t.latestPayment.status !== 'paid'
-        );
-        setAvailableTenants(available);
-
-        if (prefilledTenantId) {
-          const prefilled = tenantsWithPayments.find(t => t.id === prefilledTenantId);
-          if (prefilled) {
-            if (prefilled.latestPayment && prefilled.latestPayment.status !== 'paid') {
-              router.replace(`/edit-payment?paymentId=${prefilled.latestPayment.id}`);
-              return;
-            }
-            setSelectedTenant(prefilled);
-            const rentAmount = prefilled.rent.replace(/[^0-9]/g, '');
-            setAmount(rentAmount);
-          }
-        }
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load tenants');
-    } finally {
-      setFetchingTenants(false);
+    if (joinDate) {
+      setAnchorDate(joinDate);
+      // Removed setDueDate
     }
-  };
+  }, [joinDate]);
 
-  const handleTenantSelect = (tenant: TenantWithLatestPayment) => {
-    if (tenant.latestPayment && tenant.latestPayment.status !== 'paid') {
-      setShowTenantPicker(false);
-      router.replace(`/edit-payment?paymentId=${tenant.latestPayment.id}`);
-      return;
-    }
-
-    setSelectedTenant(tenant);
-    const rentAmount = tenant.rent.replace(/[^0-9]/g, '');
-    setAmount(rentAmount);
-    setShowTenantPicker(false);
-  };
+  // Calculate due date based on billingCycle and anchorDate
+  useEffect(() => {
+    // Removed due date calculation effect
+  }, [anchorDate, billingCycle, status]);
 
   const handleStatusChange = (newStatus: 'paid' | 'due' | 'overdue') => {
-    setStatus(newStatus);
+    if (newStatus === 'paid' || newStatus === 'due') {
+      setStatus(newStatus);
+    }
     if (newStatus !== 'paid') {
       setPaymentDate('');
     }
   };
 
   const handleSubmit = async () => {
-    if (!selectedTenant || !amount || !dueDate || !method || !status) {
+    // Only send tenant + status + billingCycle + anchorDate
+    if (!name || !phone || !rent || !joinDate || !roomId || !bedId || !propertyId || !anchorDate || !billingCycle) {
       setError('All required fields must be filled');
       return;
     }
-
-    if (status === 'paid' && !paymentDate) {
-      setError('Payment date is required when status is Paid');
+    const rentNum = parseFloat(typeof rent === 'string' ? rent : '');
+    if (isNaN(rentNum) || rentNum <= 0) {
+      setError('Please enter a valid rent');
       return;
     }
-
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      setError('Please enter a valid amount greater than 0');
-      return;
-    }
-
-    if (!selectedPropertyId) {
-      setError('No property selected');
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
-
-      await paymentService.recordPayment({
-        tenantId: selectedTenant.id,
-        propertyId: selectedPropertyId,
-        tenantName: selectedTenant.name,
-        property: selectedPropertyId,
-        bed: selectedTenant.bedId,
-        amount: `₹${amountNum.toLocaleString()}`,
-        dueDate: dueDate.split('T')[0],
-        date: status === 'paid' && paymentDate ? paymentDate.split('T')[0] : null,
-        method: status === 'paid' ? method : null,
+      const payload = {
+        tenant: {
+          propertyId,
+          roomId,
+          bedId,
+          name: typeof name === 'string' ? name.trim() : '',
+          email: typeof email === 'string' ? email.trim() : '',
+          phone: typeof phone === 'string' ? phone.trim() : '',
+          rent: rent,
+          joinDate,
+        },
         status,
+        billingCycle,
+        anchorDate,
+      };
+      // Call backend to create tenant
+      await tenantService.createTenant({
+        ...payload.tenant,
+        billingConfig: {
+          status,
+          billingCycle,
+          anchorDate: typeof anchorDate === 'string' ? anchorDate : (Array.isArray(anchorDate) ? anchorDate[0] : ''),
+          method,
+        },
       });
-
-      router.back();
+      setLoading(false);
+      router.replace('/tenants'); // Navigate to tenant list after success
     } catch (err: any) {
-      setError(err?.message || 'Failed to record payment');
+      setError(err?.message || 'Failed to create tenant');
     } finally {
       setLoading(false);
     }
@@ -191,18 +142,11 @@ export default function AddPaymentScreen() {
 
   const isFormValid = () => {
     const baseValid =
-      selectedTenant &&
-      amount.trim() &&
-      dueDate &&
+      typeof amount === 'string' && amount.trim() &&
       method &&
       status &&
-      !isNaN(parseFloat(amount)) &&
-      parseFloat(amount) > 0;
-
-    if (status === 'paid') {
-      return baseValid && paymentDate;
-    }
-
+      !isNaN(parseFloat(typeof amount === 'string' ? amount : '')) &&
+      parseFloat(typeof amount === 'string' ? amount : '') > 0;
     return baseValid;
   };
 
@@ -234,27 +178,7 @@ export default function AddPaymentScreen() {
     );
   }
 
-  if (fetchingTenants) {
-    return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background.primary }]}
-        edges={['top', 'bottom']}>
-        <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.7}>
-            <ChevronLeft size={24} color={colors.text.primary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Record Payment</Text>
-          <View style={styles.placeholder} />
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary[500]} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // Removed fetchingTenants block
 
   return (
     <SafeAreaView
@@ -293,133 +217,58 @@ export default function AddPaymentScreen() {
                 <Text style={[styles.errorText, { color: colors.danger[700] }]}>{error}</Text>
               </View>
             )}
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Tenant *</Text>
-              <TouchableOpacity
-                style={[
-                  styles.pickerButton,
-                  {
-                    backgroundColor: isPrefilled ? colors.background.tertiary : colors.white,
-                    borderColor: colors.border.medium,
-                    opacity: isPrefilled ? 0.6 : 1,
-                  },
-                ]}
-                onPress={() => !isPrefilled && setShowTenantPicker(true)}
-                activeOpacity={0.7}
-                disabled={loading || isPrefilled || availableTenants.length === 0}>
-                <Text
-                  style={[
-                    styles.pickerButtonText,
-                    {
-                      color: selectedTenant ? colors.text.primary : colors.text.tertiary,
-                    },
-                  ]}>
-                  {selectedTenant ? selectedTenant.name : 'Select Tenant'}
-                </Text>
-                {!isPrefilled && <ChevronDown size={20} color={colors.text.tertiary} />}
-              </TouchableOpacity>
-              {availableTenants.length === 0 && !isPrefilled && (
-                <View style={[styles.infoContainer, { backgroundColor: colors.warning[50], borderColor: colors.warning[200] }]}>
-                  <Text style={[styles.infoText, { color: colors.warning[700] }]}>
-                    All tenants have paid their latest rent
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Amount *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.white,
-                    color: colors.text.primary,
-                    borderColor: colors.border.medium,
-                  },
-                ]}
-                placeholder="e.g., 5000"
-                keyboardType="numeric"
-                placeholderTextColor={colors.text.tertiary}
-                value={amount}
-                onChangeText={setAmount}
-                editable={!loading}
-              />
-            </View>
-
-            <DatePicker
-              value={dueDate}
-              onChange={setDueDate}
-              label="Due Date"
-              disabled={loading}
-              required
-            />
-
+            {/* Status */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.text.primary }]}>Status *</Text>
               <TouchableOpacity
-                style={[
-                  styles.pickerButton,
-                  {
-                    backgroundColor: colors.white,
-                    borderColor: colors.border.medium,
-                  },
-                ]}
+                style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]} 
                 onPress={() => setShowStatusPicker(true)}
                 activeOpacity={0.7}
                 disabled={loading}>
-                <Text
-                  style={[
-                    styles.pickerButtonText,
-                    {
-                      color: status ? colors.text.primary : colors.text.tertiary,
-                    },
-                  ]}>
-                  {PAYMENT_STATUSES.find(s => s.value === status)?.label || 'Select Status'}
+                <Text style={[styles.pickerButtonText, { color: colors.text.primary }]}> 
+                  {status === 'paid' ? 'Paid' : 'Due'}
                 </Text>
                 <ChevronDown size={20} color={colors.text.tertiary} />
               </TouchableOpacity>
             </View>
-
-            {status === 'paid' && (
-              <>
-                <DatePicker
-                  value={paymentDate}
-                  onChange={setPaymentDate}
-                  label="Payment Date"
-                  disabled={loading}
-                  required
-                />
-
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.text.primary }]}>Payment Method *</Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.pickerButton,
-                      {
-                        backgroundColor: colors.white,
-                        borderColor: colors.border.medium,
-                      },
-                    ]}
-                    onPress={() => setShowMethodPicker(true)}
-                    activeOpacity={0.7}
-                    disabled={loading}>
-                    <Text
-                      style={[
-                        styles.pickerButtonText,
-                        {
-                          color: method ? colors.text.primary : colors.text.tertiary,
-                        },
-                      ]}>
-                      {method || 'Select Method'}
-                    </Text>
-                    <ChevronDown size={20} color={colors.text.tertiary} />
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-
+            {/* Billing Cycle */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.text.primary }]}>Billing Cycle *</Text>
+              <TouchableOpacity
+                style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]} 
+                onPress={() => setShowFrequencyPicker(true)}
+                activeOpacity={0.7}
+                disabled={loading}>
+                <Text style={[styles.pickerButtonText, { color: colors.text.primary }]}> 
+                  {billingCycle.charAt(0).toUpperCase() + billingCycle.slice(1)}
+                </Text>
+                <ChevronDown size={20} color={colors.text.tertiary} />
+              </TouchableOpacity>
+            </View>
+            {/* Payment Method */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.text.primary }]}>Payment Method *</Text>
+              <TouchableOpacity
+                style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]} 
+                onPress={() => setShowMethodPicker(true)}
+                activeOpacity={0.7}
+                disabled={loading}>
+                <Text style={[styles.pickerButtonText, { color: colors.text.primary }]}> 
+                  {method}
+                </Text>
+                <ChevronDown size={20} color={colors.text.tertiary} />
+              </TouchableOpacity>
+            </View>
+            {/* Anchor Date */}
+            <DatePicker
+              value={typeof anchorDate === 'string' ? anchorDate : (Array.isArray(anchorDate) ? anchorDate[0] : '')}
+              onChange={setAnchorDate}
+              label="Anchor Date"
+              disabled={loading}
+              required
+            />
+            {/* Next Due Date (not editable, boxed) */}
+            {/* Next Due Date removed from UI */}
             <TouchableOpacity
               style={[
                 styles.submitButton,
@@ -435,7 +284,7 @@ export default function AddPaymentScreen() {
                 <ActivityIndicator color={colors.white} size="small" />
               ) : (
                 <Text style={[styles.submitButtonText, { color: colors.white }]}>
-                  Record Payment
+                  Add Tenant
                 </Text>
               )}
             </TouchableOpacity>
@@ -443,65 +292,7 @@ export default function AddPaymentScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal
-        visible={showTenantPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTenantPicker(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
-              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
-                Select Tenant
-              </Text>
-            </View>
-
-            <ScrollView style={styles.modalScrollView}>
-              {availableTenants.map((tenant, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.modalOption,
-                    { borderBottomColor: colors.border.light },
-                  ]}
-                  onPress={() => handleTenantSelect(tenant)}
-                  activeOpacity={0.7}>
-                  <View style={styles.modalOptionContent}>
-                    <Text
-                      style={[
-                        styles.modalOptionText,
-                        {
-                          color:
-                            selectedTenant?.id === tenant.id
-                              ? colors.primary[500]
-                              : colors.text.primary,
-                          fontWeight:
-                            selectedTenant?.id === tenant.id
-                              ? typography.fontWeight.semibold
-                              : typography.fontWeight.regular,
-                        },
-                      ]}>
-                      {tenant.name}
-                    </Text>
-                    <Text style={[styles.modalOptionSubtext, { color: colors.text.secondary }]}>
-                      {tenant.email}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <TouchableOpacity
-              style={[styles.modalCloseButton, { borderTopColor: colors.border.light }]}
-              onPress={() => setShowTenantPicker(false)}
-              activeOpacity={0.7}>
-              <Text style={[styles.modalCloseButtonText, { color: colors.text.secondary }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {/* Tenant selection modal removed */}
 
       <Modal
         visible={showMethodPicker}
@@ -610,6 +401,53 @@ export default function AddPaymentScreen() {
               <Text style={[styles.modalCloseButtonText, { color: colors.text.secondary }]}>
                 Cancel
               </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showFrequencyPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFrequencyPicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}> 
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}> 
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Select Billing Cycle</Text>
+            </View>
+            <ScrollView style={styles.modalScrollView}>
+              {(['monthly', 'day-wise'] as Array<'monthly' | 'day-wise'>).map((cycle, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.modalOption, { borderBottomColor: colors.border.light }]} 
+                  onPress={() => {
+                    setBillingCycle(cycle);
+                    setShowFrequencyPicker(false);
+                  }}
+                  activeOpacity={0.7}>
+                  <Text
+                    style={[
+                      styles.modalOptionText,
+                      {
+                        color:
+                          billingCycle === cycle ? colors.primary[500] : colors.text.primary,
+                        fontWeight:
+                          billingCycle === cycle
+                            ? typography.fontWeight.semibold
+                            : typography.fontWeight.regular,
+                      },
+                    ]}>
+                    {cycle.charAt(0).toUpperCase() + cycle.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.modalCloseButton, { borderTopColor: colors.border.light }]} 
+              onPress={() => setShowFrequencyPicker(false)}
+              activeOpacity={0.7}>
+              <Text style={[styles.modalCloseButtonText, { color: colors.text.secondary }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>

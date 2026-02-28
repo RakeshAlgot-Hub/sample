@@ -221,38 +221,39 @@ export default function PaymentsScreen() {
 
               {payments.map((payment, index) => (
                 <TouchableOpacity key={index} activeOpacity={0.7} onPress={() => router.push(`/edit-payment?paymentId=${payment.id}`)}>
-                <Card style={styles.paymentCard}>
-                  <View style={styles.paymentHeader}>
-                    <View style={styles.statusIconContainer}>
-                      {getStatusIcon(payment.status)}
-                    </View>
-                    <View style={styles.paymentInfo}>
-                      <Text style={[styles.tenantName, { color: colors.text.primary }]}>{payment.tenantName}</Text>
-                      <Text style={[styles.propertyName, { color: colors.text.secondary }]}>{selectedProperty.name}</Text>
-                      <Text style={[styles.bedNumber, { color: colors.text.tertiary }]}>Bed: {payment.bed}</Text>
-                    </View>
-                    <View style={styles.amountContainer}>
-                      <Text style={[styles.amount, { color: colors.text.primary }]}>{payment.amount}</Text>
-                      <StatusBadge status={payment.status} />
-                    </View>
-                  </View>
-
-                  <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
-
-                  <View style={styles.paymentFooter}>
-                    <View style={styles.dateRow}>
-                      <Calendar size={14} color={colors.text.secondary} />
-                      <Text style={[styles.dateLabel, { color: colors.text.secondary }]}>Due:</Text>
-                      <Text style={[styles.dateValue, { color: colors.text.primary }]}>{payment.dueDate}</Text>
-                    </View>
-                    {payment.date && (
-                      <View style={styles.methodRow}>
-                        <Text style={[styles.methodLabel, { color: colors.text.secondary }]}>Paid via:</Text>
-                        <Text style={[styles.methodValue, { color: colors.primary[500] }]}>{payment.method}</Text>
+                  <Card style={styles.paymentCard}>
+                    <View style={styles.paymentHeader}>
+                      <View style={styles.statusIconContainer}>
+                        {getStatusIcon(payment.status)}
                       </View>
-                    )}
-                  </View>
-                </Card>
+                      <View style={styles.paymentInfo}>
+                        {/* Removed tenantName field */}
+                        {/* Removed property field from payment, using selectedProperty.name for display only */}
+                        <Text style={[styles.bedNumber, { color: colors.text.tertiary }]}>Bed: {payment.bed}</Text>
+                      </View>
+                      <View style={styles.amountContainer}>
+                        <Text style={[styles.amount, { color: colors.text.primary }]}>{payment.amount}</Text>
+                        <StatusBadge status={payment.status} />
+                      </View>
+                    </View>
+
+                    <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
+
+                    <View style={styles.paymentFooter}>
+                      <View style={styles.dateRow}>
+                        <Calendar size={14} color={colors.text.secondary} />
+                        <Text style={[styles.dateLabel, { color: colors.text.secondary }]}>Due:</Text>
+                        <Text style={[styles.dateValue, { color: colors.text.primary }]}>{payment.dueDate ? payment.dueDate : '-'}</Text>
+                      </View>
+                      {/* Show payment method if present */}
+                      {payment.method && (
+                        <View style={styles.methodRow}>
+                          <Text style={[styles.methodLabel, { color: colors.text.secondary }]}>Method:</Text>
+                          <Text style={[styles.methodValue, { color: colors.primary[500] }]}>{payment.method}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </Card>
                 </TouchableOpacity>
               ))}
             </View>

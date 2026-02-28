@@ -1,3 +1,4 @@
+import { PAYMENT_STATUSES } from './add-payment';
 import { useState, useCallback } from 'react';
 import {
   View,
@@ -50,7 +51,7 @@ export default function TenantDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const [showEditBillingModal, setShowEditBillingModal] = useState(false);
-  const [editFrequency, setEditFrequency] = useState<BillingFrequency>('monthly');
+  const [editFrequency, setEditFrequency] = useState<'monthly' | 'day-wise'>('monthly');
   const [editAnchorDate, setEditAnchorDate] = useState('');
   const [editAutoGenerate, setEditAutoGenerate] = useState(true);
   const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
@@ -79,7 +80,7 @@ export default function TenantDetailScreen() {
         if (paymentsRes.data) {
           const tenantPayments = paymentsRes.data
             .filter(p => p.tenantId === tenantId)
-            .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+            .sort((a, b) => new Date(b.dueDate ?? '').getTime() - new Date(a.dueDate ?? '').getTime());
           setPayments(tenantPayments);
         }
 
@@ -113,27 +114,16 @@ export default function TenantDetailScreen() {
   const calculateNextBillingDate = (anchorDate: string, frequency: BillingFrequency): string => {
     const anchor = new Date(anchorDate);
     const nextDate = new Date(anchor);
-
-    switch (frequency) {
-      case 'monthly':
-        nextDate.setMonth(nextDate.getMonth() + 1);
-        break;
-      case 'quarterly':
-        nextDate.setMonth(nextDate.getMonth() + 3);
-        break;
-      case 'yearly':
-        nextDate.setFullYear(nextDate.getFullYear() + 1);
-        break;
-    }
-
+    // Only support 'monthly' for now
+    nextDate.setMonth(nextDate.getMonth() + 1);
+    return nextDate.toISOString();
     return nextDate.toISOString();
   };
 
   const openEditBillingModal = () => {
     if (tenant?.billingConfig) {
-      setEditFrequency(tenant.billingConfig.frequency);
+      setEditFrequency(tenant.billingConfig.billingCycle);
       setEditAnchorDate(tenant.billingConfig.anchorDate);
-      setEditAutoGenerate(tenant.billingConfig.autoGenerate);
     }
     setShowEditBillingModal(true);
   };
@@ -145,9 +135,9 @@ export default function TenantDetailScreen() {
       setEditLoading(true);
 
       const billingConfig: BillingConfig = {
-        frequency: editFrequency,
+        billingCycle: editFrequency,
         anchorDate: editAnchorDate,
-        autoGenerate: editAutoGenerate,
+        status: 'due' as BillingConfig['status'],
       };
 
       await tenantService.updateTenant(tenant.id, {
@@ -221,10 +211,12 @@ export default function TenantDetailScreen() {
   };
 
   const calculateNextDueDate = (lastDueDate: string): string => {
+    if (!lastDueDate) return '';
     const lastDue = new Date(lastDueDate);
+    if (isNaN(lastDue.getTime())) return '';
     const nextDue = new Date(lastDue);
     nextDue.setMonth(nextDue.getMonth() + 1);
-    return nextDue.toISOString();
+    return isNaN(nextDue.getTime()) ? '' : nextDue.toISOString();
   };
 
   const handleMarkAsPaid = async () => {
@@ -428,7 +420,7 @@ export default function TenantDetailScreen() {
                         Billing Frequency
                       </Text>
                       <Text style={[styles.billingValue, { color: colors.text.primary }]}>
-                        {tenant.billingConfig.frequency.charAt(0).toUpperCase() + tenant.billingConfig.frequency.slice(1)}
+                        {tenant.billingConfig.billingCycle ? (tenant.billingConfig.billingCycle.charAt(0).toUpperCase() + tenant.billingConfig.billingCycle.slice(1)) : ''}
                       </Text>
                     </View>
 
@@ -450,38 +442,13 @@ export default function TenantDetailScreen() {
                         Next Billing Date
                       </Text>
                       <Text style={[styles.billingValue, { color: colors.primary[600] }]}>
-                        {formatDateYYYYMMMDD(calculateNextBillingDate(tenant.billingConfig.anchorDate, tenant.billingConfig.frequency))}
+                        {formatDateYYYYMMMDD(calculateNextBillingDate(tenant.billingConfig.anchorDate, 'monthly'))}
                       </Text>
                     </View>
 
                     <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
 
-                    <View style={[styles.billingStatusRow, { backgroundColor: tenant.billingConfig.autoGenerate ? colors.success[50] : colors.warning[50] }]}>
-                      <Text style={[styles.billingLabel, { color: colors.text.secondary }]}>
-                        Auto-Generate Status
-                      </Text>
-                      <View style={[styles.statusBadge, { backgroundColor: tenant.billingConfig.autoGenerate ? colors.success[100] : colors.warning[100] }]}>
-                        <Text style={[styles.statusBadgeText, { color: tenant.billingConfig.autoGenerate ? colors.success[700] : colors.warning[700] }]}>
-                          {tenant.billingConfig.autoGenerate ? 'ON' : 'OFF'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {tenant.billingConfig.autoGenerate && (
-                      <View style={[styles.infoBanner, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}>
-                        <Text style={[styles.infoBannerText, { color: colors.primary[700] }]}>
-                          System will automatically create a due payment on the billing date.
-                        </Text>
-                      </View>
-                    )}
-
-                    {!tenant.billingConfig.autoGenerate && (
-                      <View style={[styles.infoBanner, { backgroundColor: colors.warning[50], borderColor: colors.warning[200] }]}>
-                        <Text style={[styles.infoBannerText, { color: colors.warning[700] }]}>
-                          Manual payment creation required.
-                        </Text>
-                      </View>
-                    )}
+                    {/* Auto-Generate logic removed, not present in BillingConfig type */}
                   </>
                 ) : (
                   <Text style={[styles.noBillingText, { color: colors.text.secondary }]}>
@@ -520,7 +487,7 @@ export default function TenantDetailScreen() {
                   <View style={[styles.nextDueContainer, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}>
                     <Calendar size={14} color={colors.primary[600]} />
                     <Text style={[styles.nextDueText, { color: colors.primary[700] }]}>
-                      Next Due: {formatDateYYYYMMMDD(calculateNextDueDate(latestPayment.dueDate))}
+                      Next Due: {formatDateYYYYMMMDD(calculateNextDueDate(latestPayment.dueDate ?? ''))}
                     </Text>
                   </View>
                 ) : (
@@ -568,20 +535,11 @@ export default function TenantDetailScreen() {
                             Due Date:
                           </Text>
                           <Text style={[styles.paymentDetailValue, { color: colors.text.primary }]}>
-                            {formatDate(payment.dueDate)}
+                            {formatDate(payment.dueDate ?? '')}
                           </Text>
                         </View>
 
-                        {payment.date && (
-                          <View style={styles.paymentDetailRow}>
-                            <Text style={[styles.paymentDetailLabel, { color: colors.text.secondary }]}>
-                              Paid Date:
-                            </Text>
-                            <Text style={[styles.paymentDetailValue, { color: colors.success[500] }]}>
-                              {formatDate(payment.date)}
-                            </Text>
-                          </View>
-                        )}
+                        {/* Removed payment.date logic, not present in Payment type */}
                       </View>
                     </Card>
                   ))}
@@ -631,7 +589,7 @@ export default function TenantDetailScreen() {
                         color: colors.text.primary,
                       },
                     ]}>
-                    {editFrequency.charAt(0).toUpperCase() + editFrequency.slice(1)}
+                    {editFrequency ? (editFrequency.charAt(0).toUpperCase() + editFrequency.slice(1)) : ''}
                   </Text>
                   <ChevronDown size={20} color={colors.text.tertiary} />
                 </TouchableOpacity>
@@ -713,7 +671,7 @@ export default function TenantDetailScreen() {
             </View>
 
             <ScrollView style={styles.pickerScrollView}>
-              {(['monthly', 'quarterly', 'yearly'] as BillingFrequency[]).map((freq, index) => (
+              {(['monthly', 'day-wise'] as BillingConfig['billingCycle'][]).map((freq, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
@@ -739,7 +697,7 @@ export default function TenantDetailScreen() {
                             : typography.fontWeight.regular,
                       },
                     ]}>
-                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                    {freq ? (freq.charAt(0).toUpperCase() + freq.slice(1)) : ''}
                   </Text>
                 </TouchableOpacity>
               ))}

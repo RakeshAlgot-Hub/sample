@@ -27,9 +27,10 @@ export interface PropertyStats {
 export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly';
 
 export interface BillingConfig {
-  frequency: BillingFrequency;
+  status: 'paid' | 'due' | 'overdue';
+  billingCycle: 'monthly' | 'day-wise';
   anchorDate: string;
-  autoGenerate: boolean;
+  method?: string;
 }
 
 export interface Tenant {
@@ -41,7 +42,6 @@ export interface Tenant {
   email: string;
   phone: string;
   rent: string;
-  status: 'paid' | 'due' | 'overdue';
   joinDate: string;
   billingConfig?: BillingConfig;
   createdAt: string;
@@ -52,13 +52,11 @@ export interface Payment {
   id: string;
   tenantId: string;
   propertyId: string;
-  tenantName: string;
-  property: string;
+  // property field removed
   bed: string;
   amount: string;
   status: 'paid' | 'due' | 'overdue';
-  date: string | null;
-  dueDate: string;
+  dueDate?: string; // received from backend, optional
   method: string | null;
   createdAt: string;
   updatedAt: string;

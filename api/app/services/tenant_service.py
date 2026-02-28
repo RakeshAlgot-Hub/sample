@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from app.models.payment_schema import PaymentCreate
 from app.services.payment_service import create_payment
+from app.models.tenant_schema import BillingConfig
+
 class TenantService:
     async def is_property_owner(self, user_id: str, property_id: str) -> bool:
         from app.database.mongodb import db
@@ -46,24 +48,24 @@ class TenantService:
         # Ensure billingConfig is present and stored
         billing_config = tenant_data.get("billingConfig")
         if billing_config:
-            tenant_data["billingConfig"] = billing_config
+            # Ensure billing_config is a BillingConfig model, not a dict
+            if isinstance(billing_config, dict):
+                billing_config = BillingConfig(**billing_config)
+            # Convert to dict for MongoDB
+            tenant_data["billingConfig"] = billing_config.model_dump()
         result = await self.collection.insert_one(tenant_data)
         tenant_data["id"] = str(result.inserted_id)
 
-        # Auto-generate payment if enabled
-        if billing_config and getattr(billing_config, "autoGenerate", False):
-
+        # Always create payment after tenant creation
+        if billing_config:
             payment = PaymentCreate(
                 tenantId=tenant_data["id"],
                 propertyId=tenant_data["propertyId"],
-                tenantName=tenant_data["name"],
-                property=tenant_data.get("propertyId", ""),
                 bed=tenant_data.get("bedId", ""),
                 amount=tenant_data["rent"],
-                status="due",
-                dueDate=billing_config.anchorDate,
-                date=None,
-                method=None
+                status=billing_config.status,
+                anchorDate=billing_config.anchorDate,
+                method=billing_config.method
             )
             await create_payment(payment)
 

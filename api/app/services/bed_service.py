@@ -14,10 +14,7 @@ async def create_bed_service(bed: BedCreate) -> BedOut:
     return BedOut(**doc)
 
 async def list_beds_service() -> List[BedOut]:
-    beds = []
-    async for doc in db["beds"].find():
-        beds.append(BedOut(**doc))
-    return beds
+    raise NotImplementedError("list_beds_service now requires user_id argument")
 
 async def get_bed_service(bed_id: str) -> Optional[BedOut]:
     doc = await db["beds"].find_one({"id": bed_id})
