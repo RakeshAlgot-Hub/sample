@@ -24,6 +24,14 @@ export interface PropertyStats {
   occupancy: number;
 }
 
+export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly';
+
+export interface BillingConfig {
+  frequency: BillingFrequency;
+  anchorDate: string;
+  autoGenerate: boolean;
+}
+
 export interface Tenant {
   id: string;
   propertyId: string;
@@ -35,6 +43,7 @@ export interface Tenant {
   rent: string;
   status: 'paid' | 'due' | 'overdue';
   joinDate: string;
+  billingConfig?: BillingConfig;
   createdAt: string;
   updatedAt: string;
 }

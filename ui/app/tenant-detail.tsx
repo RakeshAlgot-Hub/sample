@@ -6,6 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  Switch,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -22,11 +25,12 @@ import {
   Plus,
   Edit,
   CheckCircle,
+  ChevronDown,
 } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { tenantService, paymentService, roomService, bedService } from '@/services/apiClient';
-import type { Tenant, Payment, Room, Bed } from '@/services/apiTypes';
+import type { Tenant, Payment, Room, Bed, BillingFrequency, BillingConfig } from '@/services/apiTypes';
 import Card from '@/components/Card';
 import StatusBadge from '@/components/StatusBadge';
 import EmptyState from '@/components/EmptyState';
@@ -44,6 +48,13 @@ export default function TenantDetailScreen() {
   const [bed, setBed] = useState<Bed | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [showEditBillingModal, setShowEditBillingModal] = useState(false);
+  const [editFrequency, setEditFrequency] = useState<BillingFrequency>('monthly');
+  const [editAnchorDate, setEditAnchorDate] = useState('');
+  const [editAutoGenerate, setEditAutoGenerate] = useState(true);
+  const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
 
   const fetchTenantData = async () => {
     if (!tenantId) {
@@ -97,6 +108,63 @@ export default function TenantDetailScreen() {
 
   const handleRetry = () => {
     fetchTenantData();
+  };
+
+  const calculateNextBillingDate = (anchorDate: string, frequency: BillingFrequency): string => {
+    const anchor = new Date(anchorDate);
+    const nextDate = new Date(anchor);
+
+    switch (frequency) {
+      case 'monthly':
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        break;
+      case 'quarterly':
+        nextDate.setMonth(nextDate.getMonth() + 3);
+        break;
+      case 'yearly':
+        nextDate.setFullYear(nextDate.getFullYear() + 1);
+        break;
+    }
+
+    return nextDate.toISOString();
+  };
+
+  const openEditBillingModal = () => {
+    if (tenant?.billingConfig) {
+      setEditFrequency(tenant.billingConfig.frequency);
+      setEditAnchorDate(tenant.billingConfig.anchorDate);
+      setEditAutoGenerate(tenant.billingConfig.autoGenerate);
+    }
+    setShowEditBillingModal(true);
+  };
+
+  const handleSaveBillingConfig = async () => {
+    if (!tenant) return;
+
+    try {
+      setEditLoading(true);
+
+      const billingConfig: BillingConfig = {
+        frequency: editFrequency,
+        anchorDate: editAnchorDate,
+        autoGenerate: editAutoGenerate,
+      };
+
+      await tenantService.updateTenant(tenant.id, {
+        billingConfig,
+      });
+
+      setTenant({
+        ...tenant,
+        billingConfig,
+      });
+
+      setShowEditBillingModal(false);
+    } catch (err: any) {
+      console.error('Failed to update billing config:', err);
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const calculateFinancialSummary = () => {
@@ -339,6 +407,93 @@ export default function TenantDetailScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+                  Billing Configuration
+                </Text>
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: colors.primary[500] }]}
+                  onPress={openEditBillingModal}
+                  activeOpacity={0.7}>
+                  <Edit size={16} color={colors.white} />
+                  <Text style={[styles.actionButtonText, { color: colors.white }]}>
+                    Edit
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Card style={styles.billingCard}>
+                {tenant?.billingConfig ? (
+                  <>
+                    <View style={styles.billingRow}>
+                      <Text style={[styles.billingLabel, { color: colors.text.secondary }]}>
+                        Billing Frequency
+                      </Text>
+                      <Text style={[styles.billingValue, { color: colors.text.primary }]}>
+                        {tenant.billingConfig.frequency.charAt(0).toUpperCase() + tenant.billingConfig.frequency.slice(1)}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
+
+                    <View style={styles.billingRow}>
+                      <Text style={[styles.billingLabel, { color: colors.text.secondary }]}>
+                        Anchor Date
+                      </Text>
+                      <Text style={[styles.billingValue, { color: colors.text.primary }]}>
+                        {formatDateYYYYMMMDD(tenant.billingConfig.anchorDate)}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
+
+                    <View style={styles.billingRow}>
+                      <Text style={[styles.billingLabel, { color: colors.text.secondary }]}>
+                        Next Billing Date
+                      </Text>
+                      <Text style={[styles.billingValue, { color: colors.primary[600] }]}>
+                        {formatDateYYYYMMMDD(calculateNextBillingDate(tenant.billingConfig.anchorDate, tenant.billingConfig.frequency))}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
+
+                    <View style={[styles.billingStatusRow, { backgroundColor: tenant.billingConfig.autoGenerate ? colors.success[50] : colors.warning[50] }]}>
+                      <Text style={[styles.billingLabel, { color: colors.text.secondary }]}>
+                        Auto-Generate Status
+                      </Text>
+                      <View style={[styles.statusBadge, { backgroundColor: tenant.billingConfig.autoGenerate ? colors.success[100] : colors.warning[100] }]}>
+                        <Text style={[styles.statusBadgeText, { color: tenant.billingConfig.autoGenerate ? colors.success[700] : colors.warning[700] }]}>
+                          {tenant.billingConfig.autoGenerate ? 'ON' : 'OFF'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {tenant.billingConfig.autoGenerate && (
+                      <View style={[styles.infoBanner, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}>
+                        <Text style={[styles.infoBannerText, { color: colors.primary[700] }]}>
+                          System will automatically create a due payment on the billing date.
+                        </Text>
+                      </View>
+                    )}
+
+                    {!tenant.billingConfig.autoGenerate && (
+                      <View style={[styles.infoBanner, { backgroundColor: colors.warning[50], borderColor: colors.warning[200] }]}>
+                        <Text style={[styles.infoBannerText, { color: colors.warning[700] }]}>
+                          Manual payment creation required.
+                        </Text>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <Text style={[styles.noBillingText, { color: colors.text.secondary }]}>
+                    No billing configuration set
+                  </Text>
+                )}
+              </Card>
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
                   Payment History
                 </Text>
                 {latestPayment && latestPayment.status === 'due' ? (
@@ -436,6 +591,171 @@ export default function TenantDetailScreen() {
           </>
         )}
       </ScrollView>
+
+      <Modal
+        visible={showEditBillingModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditBillingModal(false)}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background.primary }]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setShowEditBillingModal(false)}
+              activeOpacity={0.7}>
+              <ChevronLeft size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Edit Billing</Text>
+            <View style={styles.placeholder} />
+          </View>
+
+          <ScrollView contentContainerStyle={styles.modalScrollContent}>
+            <View style={styles.formContainer}>
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Billing Frequency</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.pickerButton,
+                    {
+                      backgroundColor: colors.white,
+                      borderColor: colors.border.medium,
+                    },
+                  ]}
+                  onPress={() => setShowFrequencyPicker(true)}
+                  activeOpacity={0.7}
+                  disabled={editLoading}>
+                  <Text
+                    style={[
+                      styles.pickerButtonText,
+                      {
+                        color: colors.text.primary,
+                      },
+                    ]}>
+                    {editFrequency.charAt(0).toUpperCase() + editFrequency.slice(1)}
+                  </Text>
+                  <ChevronDown size={20} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Anchor Date</Text>
+                <View style={styles.dateInputContainer}>
+                  <Calendar size={20} color={colors.text.tertiary} style={styles.dateIcon} />
+                  <TextInput
+                    style={[
+                      styles.dateInput,
+                      {
+                        backgroundColor: colors.white,
+                        color: colors.text.primary,
+                        borderColor: colors.border.medium,
+                      },
+                    ]}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors.text.tertiary}
+                    value={editAnchorDate}
+                    onChangeText={setEditAnchorDate}
+                    editable={!editLoading}
+                  />
+                </View>
+              </View>
+
+              <View style={[styles.toggleContainer, { backgroundColor: colors.white, borderColor: colors.border.medium }]}>
+                <View style={styles.toggleLabel}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Enable Auto-Generate</Text>
+                  <Text style={[styles.toggleHint, { color: colors.text.secondary }]}>
+                    Automatically generate due payments
+                  </Text>
+                </View>
+                <Switch
+                  value={editAutoGenerate}
+                  onValueChange={setEditAutoGenerate}
+                  disabled={editLoading}
+                  trackColor={{ false: colors.border.medium, true: colors.primary[200] }}
+                  thumbColor={editAutoGenerate ? colors.primary[500] : colors.text.tertiary}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  {
+                    backgroundColor: colors.primary[500],
+                    opacity: editLoading ? 0.6 : 1,
+                  },
+                ]}
+                onPress={handleSaveBillingConfig}
+                activeOpacity={0.8}
+                disabled={editLoading}>
+                {editLoading ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <Text style={[styles.submitButtonText, { color: colors.white }]}>
+                    Save Changes
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal
+        visible={showFrequencyPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFrequencyPicker(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={[styles.pickerContainer, { backgroundColor: colors.white }]}>
+            <View style={[styles.pickerHeader, { borderBottomColor: colors.border.light }]}>
+              <Text style={[styles.pickerTitle, { color: colors.text.primary }]}>
+                Select Frequency
+              </Text>
+            </View>
+
+            <ScrollView style={styles.pickerScrollView}>
+              {(['monthly', 'quarterly', 'yearly'] as BillingFrequency[]).map((freq, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.pickerOption,
+                    { borderBottomColor: colors.border.light },
+                  ]}
+                  onPress={() => {
+                    setEditFrequency(freq);
+                    setShowFrequencyPicker(false);
+                  }}
+                  activeOpacity={0.7}>
+                  <Text
+                    style={[
+                      styles.pickerOptionText,
+                      {
+                        color:
+                          editFrequency === freq
+                            ? colors.primary[500]
+                            : colors.text.primary,
+                        fontWeight:
+                          editFrequency === freq
+                            ? typography.fontWeight.semibold
+                            : typography.fontWeight.regular,
+                      },
+                    ]}>
+                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.pickerCloseButton, { borderTopColor: colors.border.light }]}
+              onPress={() => setShowFrequencyPicker(false)}
+              activeOpacity={0.7}>
+              <Text style={[styles.pickerCloseButtonText, { color: colors.text.secondary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -617,6 +937,189 @@ const styles = StyleSheet.create({
   },
   nextDueText: {
     fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  billingCard: {
+    paddingVertical: spacing.lg,
+  },
+  billingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  billingStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+  },
+  billingLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  billingValue: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+  },
+  statusBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+  },
+  infoBanner: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+  },
+  infoBannerText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  noBillingText: {
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+    paddingVertical: spacing.lg,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+  },
+  modalScrollContent: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+  },
+  formContainer: {
+    width: '100%',
+  },
+  dateInputContainer: {
+    position: 'relative',
+  },
+  dateIcon: {
+    position: 'absolute',
+    left: spacing.lg,
+    top: spacing.md,
+    zIndex: 1,
+  },
+  dateInput: {
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingLeft: 48,
+    fontSize: typography.fontSize.md,
+    borderWidth: 1,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  toggleLabel: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  toggleHint: {
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
+  },
+  inputContainer: {
+    marginBottom: spacing.xl,
+  },
+  label: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.sm,
+  },
+  pickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderWidth: 1,
+  },
+  pickerButtonText: {
+    fontSize: typography.fontSize.md,
+  },
+  submitButton: {
+    borderRadius: radius.md,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    ...shadows.lg,
+  },
+  submitButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  pickerContainer: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    maxHeight: '50%',
+    ...shadows.xl,
+  },
+  pickerHeader: {
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+  },
+  pickerTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    textAlign: 'center',
+  },
+  pickerScrollView: {
+    maxHeight: 250,
+  },
+  pickerOption: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
+  },
+  pickerOptionText: {
+    fontSize: typography.fontSize.md,
+  },
+  pickerCloseButton: {
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    alignItems: 'center',
+  },
+  pickerCloseButtonText: {
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },
 });

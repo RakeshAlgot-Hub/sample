@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,9 +19,10 @@ import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 import { tenantService, roomService, bedService } from '@/services/apiClient';
-import type { Room, Bed } from '@/services/apiTypes';
+import type { Room, Bed, BillingFrequency, BillingConfig } from '@/services/apiTypes';
 import EmptyState from '@/components/EmptyState';
 import UpgradeModal from '@/components/UpgradeModal';
+import DatePicker from '@/components/DatePicker';
 
 export default function AddTenantScreen() {
   const { colors } = useTheme();
@@ -47,6 +49,11 @@ export default function AddTenantScreen() {
   const [showBedPicker, setShowBedPicker] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
+  const [billingFrequency, setBillingFrequency] = useState<BillingFrequency>('monthly');
+  const [billingAnchorDate, setBillingAnchorDate] = useState('');
+  const [autoGeneratePayments, setAutoGeneratePayments] = useState(true);
+  const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
+
   useEffect(() => {
     if (selectedPropertyId) {
       fetchRooms();
@@ -62,6 +69,10 @@ export default function AddTenantScreen() {
       setSelectedBed(null);
     }
   }, [selectedRoom]);
+
+  useEffect(() => {
+    setBillingAnchorDate(joinDate);
+  }, [joinDate]);
 
   const fetchRooms = async () => {
     if (!selectedPropertyId) return;
@@ -104,6 +115,11 @@ export default function AddTenantScreen() {
       return;
     }
 
+    if (!billingFrequency || !billingAnchorDate) {
+      setError('Billing settings are required');
+      return;
+    }
+
     const rentNum = parseFloat(rent);
     if (isNaN(rentNum) || rentNum <= 0) {
       setError('Please enter a valid rent amount');
@@ -119,6 +135,12 @@ export default function AddTenantScreen() {
       setLoading(true);
       setError(null);
 
+      const billingConfig: BillingConfig = {
+        frequency: billingFrequency,
+        anchorDate: billingAnchorDate,
+        autoGenerate: autoGeneratePayments,
+      };
+
       await tenantService.createTenant({
         propertyId: selectedPropertyId,
         roomId: selectedRoom.id,
@@ -129,6 +151,7 @@ export default function AddTenantScreen() {
         rent: `₹${rentNum.toLocaleString()}`,
         status: 'paid',
         joinDate,
+        billingConfig,
       });
 
       router.back();
@@ -403,24 +426,65 @@ export default function AddTenantScreen() {
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Join Date *</Text>
-              <View style={styles.dateInputContainer}>
-                <Calendar size={20} color={colors.text.tertiary} style={styles.dateIcon} />
-                <TextInput
+            <DatePicker
+              value={joinDate}
+              onChange={setJoinDate}
+              label="Join Date"
+              disabled={loading}
+              required
+            />
+
+            <View style={[styles.billingSection, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}>
+              <Text style={[styles.billingSectionTitle, { color: colors.text.primary }]}>Billing Settings *</Text>
+
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Billing Frequency *</Text>
+                <TouchableOpacity
                   style={[
-                    styles.dateInput,
+                    styles.pickerButton,
                     {
                       backgroundColor: colors.white,
-                      color: colors.text.primary,
                       borderColor: colors.border.medium,
+                      opacity: autoGeneratePayments ? 1 : 0.5,
                     },
                   ]}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.text.tertiary}
-                  value={joinDate}
-                  onChangeText={setJoinDate}
-                  editable={!loading}
+                  onPress={() => autoGeneratePayments && setShowFrequencyPicker(true)}
+                  activeOpacity={0.7}
+                  disabled={loading || !autoGeneratePayments}>
+                  <Text
+                    style={[
+                      styles.pickerButtonText,
+                      {
+                        color: colors.text.primary,
+                      },
+                    ]}>
+                    {billingFrequency.charAt(0).toUpperCase() + billingFrequency.slice(1)}
+                  </Text>
+                  <ChevronDown size={20} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              </View>
+
+              <DatePicker
+                value={billingAnchorDate}
+                onChange={setBillingAnchorDate}
+                label="Billing Anchor Date"
+                disabled={loading || !autoGeneratePayments}
+                required
+              />
+
+              <View style={[styles.toggleContainer, { backgroundColor: colors.white, borderColor: colors.border.medium }]}>
+                <View style={styles.toggleLabel}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Enable Auto-Generate Payments</Text>
+                  <Text style={[styles.toggleHint, { color: colors.text.secondary }]}>
+                    Automatically generate due payment every billing cycle
+                  </Text>
+                </View>
+                <Switch
+                  value={autoGeneratePayments}
+                  onValueChange={setAutoGeneratePayments}
+                  disabled={loading}
+                  trackColor={{ false: colors.border.medium, true: colors.primary[200] }}
+                  thumbColor={autoGeneratePayments ? colors.primary[500] : colors.text.tertiary}
                 />
               </View>
             </View>
@@ -560,6 +624,64 @@ export default function AddTenantScreen() {
             <TouchableOpacity
               style={[styles.modalCloseButton, { borderTopColor: colors.border.light }]}
               onPress={() => setShowBedPicker(false)}
+              activeOpacity={0.7}>
+              <Text style={[styles.modalCloseButtonText, { color: colors.text.secondary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showFrequencyPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFrequencyPicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+                Select Billing Frequency
+              </Text>
+            </View>
+
+            <ScrollView style={styles.modalScrollView}>
+              {(['monthly', 'quarterly', 'yearly'] as BillingFrequency[]).map((freq, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.modalOption,
+                    { borderBottomColor: colors.border.light },
+                  ]}
+                  onPress={() => {
+                    setBillingFrequency(freq);
+                    setShowFrequencyPicker(false);
+                  }}
+                  activeOpacity={0.7}>
+                  <Text
+                    style={[
+                      styles.modalOptionText,
+                      {
+                        color:
+                          billingFrequency === freq
+                            ? colors.primary[500]
+                            : colors.text.primary,
+                        fontWeight:
+                          billingFrequency === freq
+                            ? typography.fontWeight.semibold
+                            : typography.fontWeight.regular,
+                      },
+                    ]}>
+                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.modalCloseButton, { borderTopColor: colors.border.light }]}
+              onPress={() => setShowFrequencyPicker(false)}
               activeOpacity={0.7}>
               <Text style={[styles.modalCloseButtonText, { color: colors.text.secondary }]}>
                 Cancel
@@ -772,5 +894,35 @@ const styles = StyleSheet.create({
   modalCloseButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
+  },
+  billingSection: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  billingSectionTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.lg,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginTop: spacing.md,
+  },
+  toggleLabel: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  toggleHint: {
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
   },
 });

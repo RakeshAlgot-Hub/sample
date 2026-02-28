@@ -1,5 +1,10 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Literal
+
+class BillingConfig(BaseModel):
+    frequency: Literal['monthly', 'quarterly', 'yearly']
+    anchorDate: str
+    autoGenerate: bool
 
 class Tenant(BaseModel):
     id: Optional[str] = None
@@ -14,6 +19,7 @@ class Tenant(BaseModel):
     joinDate: Optional[str] = None
     createdAt: Optional[str] = None
     updatedAt: Optional[str] = None
+    billingConfig: Optional[BillingConfig] = None
 
 class TenantCreate(BaseModel):
     propertyId: Optional[str] = None
@@ -25,6 +31,7 @@ class TenantCreate(BaseModel):
     rent: Optional[str] = None
     status: Optional[str] = None
     joinDate: Optional[str] = None
+    billingConfig: Optional[BillingConfig] = None
 
 class TenantUpdate(BaseModel):
     propertyId: Optional[str] = None
@@ -36,3 +43,4 @@ class TenantUpdate(BaseModel):
     rent: Optional[str] = None
     status: Optional[str] = None
     joinDate: Optional[str] = None
+    billingConfig: Optional[BillingConfig] = None

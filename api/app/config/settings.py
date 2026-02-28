@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MONGO_URL = os.environ.get("MONGO_URL")
+MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME","project")
 JWT_SECRET = os.environ.get("JWT_SECRET")
 JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 15))

@@ -1,7 +1,5 @@
-import uuid
-
 from app.database.mongodb import db
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from bson import ObjectId
 from jose import JWTError, jwt
 from app.utils.helpers import hash_password, verify_password, create_access_token, create_refresh_token, SECRET_KEY, ALGORITHM
@@ -9,9 +7,7 @@ from app.database.token_blacklist import blacklist_token, is_token_blacklisted
 from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from app.models.user_schema import UserCreate, UserLogin, UserOut, AuthResponse
-from app.database.mongodb import AsyncIOMotorClient
-import asyncio
+from app.models.user_schema import UserCreate, UserLogin, UserOut
 
 users_collection = db["users"]
 
@@ -34,11 +30,10 @@ async def register_user_service(user: UserCreate):
         "deviceId": None,
         "deviceType": None,
         "osVersion": None,
-        "appVersion": None,
-        "id": str(uuid.uuid4())
+        "appVersion": None
     }
     result = await users_collection.insert_one(user_doc)
-    user_id = user_doc["id"]
+    user_id = str(result.inserted_id)
     import time
     access_token = create_access_token({"sub": user_id})
     refresh_token = create_refresh_token({"sub": user_id})
@@ -62,10 +57,11 @@ async def login_user_service(data: UserLogin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deleted")
     await users_collection.update_one({"_id": user["_id"]}, {"$set": {"lastLogin": datetime.now(timezone.utc)}})
     import time
-    access_token = create_access_token({"sub": user["id"]})
-    refresh_token = create_refresh_token({"sub": user["id"]})
+    user_id = str(user["_id"])
+    access_token = create_access_token({"sub": user_id})
+    refresh_token = create_refresh_token({"sub": user_id})
     expires_at = int(time.time()) + 60 * 60 * 24 * 7  # 7 days expiry, adjust as needed
-    user_out = UserOut(id=user["id"], name=user["name"], email=user["email"])
+    user_out = UserOut(id=user_id, name=user["name"], email=user["email"])
     response = {
         "user": user_out.model_dump(),
         "tokens": {
@@ -87,7 +83,7 @@ async def refresh_token_service(payload: dict):
         if decoded.get("type") != "refresh":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
         user_id = decoded.get("sub")
-        user = await users_collection.find_one({"id": user_id})
+        user = await users_collection.find_one({"_id": ObjectId(user_id)})
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         # Blacklist the used refresh token (rotation)
@@ -117,7 +113,7 @@ async def refresh_token_service(payload):
         if decoded.get("type") != "refresh":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
         user_id = decoded.get("sub")
-        user = await users_collection.find_one({"id": user_id})
+        user = await users_collection.find_one({"_id": ObjectId(user_id)})
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         # Blacklist the used refresh token (rotation)
