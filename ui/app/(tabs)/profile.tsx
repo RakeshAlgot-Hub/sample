@@ -112,19 +112,7 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.infoContent}>
                 <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Phone</Text>
-                <Text style={[styles.infoValue, { color: colors.text.primary }]}>{user?.phone || '+91 98765 43210'}</Text>
-              </View>
-            </View>
-          </Card>
-
-          <Card style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <View style={[styles.infoIcon, { backgroundColor: colors.background.tertiary }]}>
-                <MapPin size={20} color={colors.warning[500]} />
-              </View>
-              <View style={styles.infoContent}>
-                <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Location</Text>
-                <Text style={[styles.infoValue, { color: colors.text.primary }]}>{user?.location || 'Bangalore, India'}</Text>
+                <Text style={[styles.infoValue, { color: colors.text.primary }]}>{user?.phone || 'Not provided'}</Text>
               </View>
             </View>
           </Card>
@@ -136,7 +124,9 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.infoContent}>
                 <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Properties Managed</Text>
-                <Text style={[styles.infoValue, { color: colors.text.primary }]}>8 Properties</Text>
+                <Text style={[styles.infoValue, { color: colors.text.primary }]}>
+                  {user?.propertyIds?.length || 0} {(user?.propertyIds?.length || 0) === 1 ? 'Property' : 'Properties'}
+                </Text>
               </View>
             </View>
           </Card>

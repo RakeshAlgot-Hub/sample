@@ -7,18 +7,42 @@ from app.services.bed_service import BedService
 router = APIRouter(prefix="/beds", tags=["beds"])
 bed_service = BedService()
 
-@router.get("", response_model=List[BedOut])
-async def list_beds(request: Request, room_id: str = Query(None)):
+@router.get("", response_model=dict)
+async def list_beds(request: Request, room_id: str = Query(None), property_id: str = Query(None), status_filter: str = Query(None), page: int = Query(1), page_size: int = Query(50)):
     beds = []
     query = {}
     property_ids = getattr(request.state, "property_ids", [])
+    
     if room_id:
         query["roomId"] = room_id
+    if property_id:
+        query["propertyId"] = property_id
+    if status_filter:
+        query["status"] = status_filter
     if property_ids:
         query["propertyId"] = {"$in": property_ids}
-    async for doc in bed_service.db["beds"].find(query):
+    
+    page = max(1, page)
+    page_size = min(100, max(1, page_size))  # Cap at 100 per page
+    skip = (page - 1) * page_size
+    
+    # Get total count
+    total = await bed_service.db["beds"].count_documents(query)
+    
+    # Get paginated results
+    cursor = bed_service.db["beds"].find(query).skip(skip).limit(page_size)
+    async for doc in cursor:
         beds.append(BedOut(**doc))
-    return beds
+    
+    return {
+        "data": beds,
+        "meta": {
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+            "hasMore": skip + page_size < total
+        }
+    }
 
 @router.post("", response_model=BedOut, status_code=status.HTTP_201_CREATED)
 async def create_bed(request: Request, bed: BedCreate):

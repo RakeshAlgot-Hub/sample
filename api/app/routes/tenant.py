@@ -7,17 +7,37 @@ tenant_service = TenantService()
 
 @router.get("/")
 @router.get("")
-async def get_tenants(request: Request, property_id: str = None):
-    tenants = await tenant_service.get_tenants(property_id)
+async def get_tenants(
+    request: Request,
+    property_id: str = None,
+    search: str = None,
+    status: str = None,
+    page: int = 1,
+    page_size: int = 50
+):
+    page = max(1, page)
+    page_size = min(100, max(1, page_size))  # Cap at 100 per page
+    skip = (page - 1) * page_size
+    
+    tenants, total = await tenant_service.get_tenants(
+        property_id=property_id,
+        search=search,
+        status=status,
+        skip=skip,
+        limit=page_size,
+        include_room_bed=True  # Enrich with room/bed data
+    )
+    
     property_ids = getattr(request.state, "property_ids", [])
     filtered = [t for t in tenants if t.propertyId and t.propertyId in property_ids]
+    
     return {
-        "data": [tenant.model_dump() for tenant in filtered],
+        "data": [tenant.model_dump(exclude_none=True) for tenant in filtered],
         "meta": {
-            "total": len(filtered),
-            "page": 1,
-            "pageSize": len(filtered),
-            "hasMore": False
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+            "hasMore": skip + page_size < total
         }
     }
 

@@ -7,23 +7,36 @@ router = APIRouter(prefix="/rooms", tags=["rooms"])
 room_service = RoomService()
 
 @router.get("/")
-async def get_rooms(request: Request, property_id: str = None):
+async def get_rooms(request: Request, property_id: str = None, search: str = None, page: int = 1, page_size: int = 50):
     property_ids = getattr(request.state, "property_ids", [])
     query = {"propertyId": {"$in": property_ids}}
     if property_id:
         query["propertyId"] = property_id
-    rooms = await room_service.collection.find(query).to_list(length=100)
+    if search:
+        query["$or"] = [
+            {"roomNumber": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}}
+        ]
+    
+    page = max(1, page)
+    page_size = min(100, max(1, page_size))  # Cap at 100 per page
+    skip = (page - 1) * page_size
+    
+    total = await room_service.collection.count_documents(query)
+    rooms = await room_service.collection.find(query).skip(skip).limit(page_size).to_list(length=page_size)
+    
     for doc in rooms:
         doc["id"] = str(doc["_id"])
         if "_id" in doc:
             del doc["_id"]
+    
     return {
         "data": rooms,
         "meta": {
-            "total": len(rooms),
-            "page": 1,
-            "pageSize": len(rooms),
-            "hasMore": False
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+            "hasMore": skip + page_size < total
         }
     }
 

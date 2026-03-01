@@ -7,9 +7,11 @@ class UserInDB(BaseModel):
     id: Optional[str] = None
     name: str
     email: EmailStr
+    phone: Optional[str] = None
     password: str  # hashed
     role: str = Field(default="propertyowner")
     isVerified: bool = False
+    isEmailVerified: bool = False
     isDeleted: bool = False
     lastLogin: Optional[datetime] = None    
     createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -26,15 +28,35 @@ class UserOut(BaseModel):
     id: str
     name: str
     email: EmailStr
+    phone: Optional[str] = None
+    propertyIds: Optional[list[str]] = Field(default_factory=list)
 
 class UserCreate(BaseModel):
     name: str
     email: EmailStr
+    phone: str
     password: str
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+
+class GoogleSignInRequest(BaseModel):
+    idToken: str
+
+
+class EmailSendOTPRequest(BaseModel):
+    email: EmailStr
+
+
+class EmailSendOTPResponse(BaseModel):
+    message: str
+
+
+class EmailVerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str
 
 class AuthResponse(BaseModel):
     accessToken: str

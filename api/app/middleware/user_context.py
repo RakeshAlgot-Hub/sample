@@ -21,7 +21,21 @@ class UserContextMiddleware(BaseHTTPMiddleware):
         logger = logging.getLogger("uvicorn.error")
 
         # Read public endpoints from environment variable PUBLIC_PATHS (comma-separated)
-        public_paths = [p.strip() for p in settings.PUBLIC_PATHS.split(",") if p.strip()]
+        public_paths = {p.strip() for p in settings.PUBLIC_PATHS.split(",") if p.strip()}
+        public_paths.update({
+            "/api/v1/health",
+            "/api/v1/health/auth-config",
+            "/api/v1/auth/login",
+            "/api/v1/auth/register",
+            "/api/v1/auth/google",
+            "/api/v1/auth/email/send-otp",
+            "/api/v1/auth/email/verify-otp",
+            "/api/v1/auth/refresh",
+            "/api/v1/auth/logout",  # Logout only needs refresh token, not access token
+            "/api/v1/subscription/limits/free",  # Plan limits are public
+            "/api/v1/subscription/limits/pro",
+            "/api/v1/subscription/limits/premium",
+        })
         if request.url.path in public_paths:
             # Allow public access, skip authentication
             response = await call_next(request)

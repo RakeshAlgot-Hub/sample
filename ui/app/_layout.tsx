@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform, Text, TouchableOpacity, Linking } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,6 +7,41 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PropertyProvider } from '@/context/PropertyContext';
+import { spacing, typography, radius, shadows } from '@/theme';
+
+const PLAY_STORE_URL = process.env.EXPO_PUBLIC_PLAYSTORE_URL || 'https://play.google.com/store/apps/details?id=com.lohilit101.boltexponativewind';
+
+function WebRedirectScreen() {
+  const { colors } = useTheme();
+
+  const handleDownload = () => {
+    Linking.openURL(PLAY_STORE_URL).catch((err) => {
+      console.error('Failed to open Play Store:', err);
+    });
+  };
+
+  return (
+    <View style={[styles.webContainer, { backgroundColor: colors.background.primary }]}> 
+      <View style={[styles.iconCircle, { backgroundColor: colors.primary[50] }]}>
+        <Text style={[styles.iconText, { color: colors.primary[500] }]}>📱</Text>
+      </View>
+      <Text style={[styles.webTitle, { color: colors.text.primary }]}>Mobile App Only</Text>
+      <Text style={[styles.webSubtitle, { color: colors.text.secondary }]}>
+        This application is designed exclusively for mobile devices. 
+        Download it from Google Play Store to access all features on your Android or iOS device.
+      </Text>
+      <TouchableOpacity
+        style={[styles.webButton, { backgroundColor: colors.primary[500] }]}
+        onPress={handleDownload}
+        activeOpacity={0.8}>
+        <Text style={[styles.webButtonText, { color: colors.white }]}>Download from Play Store</Text>
+      </TouchableOpacity>
+      <Text style={[styles.webFooter, { color: colors.text.tertiary }]}>
+        Available for Android and iOS
+      </Text>
+    </View>
+  );
+}
 
 function RootNavigator() {
   const { isDark, colors } = useTheme();
@@ -18,11 +53,13 @@ function RootNavigator() {
     if (loading) return;
 
     const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'property-detail' || segments[0] === 'subscription' || segments[0] === 'manage-properties' || segments[0] === 'property-form' || segments[0] === 'manage-rooms' || segments[0] === 'room-form' || segments[0] === 'manage-beds' || segments[0] === 'manage-staff' || segments[0] === 'manage-teams' || segments[0] === 'add-tenant' || segments[0] === 'add-payment' || segments[0] === 'tenant-detail';
-    const inPublicRoute = segments[0] === 'register' || segments[0] === 'email-verification-pending' || segments[0] === 'otp-verification' || segments[0] === 'forgot-password' || segments[0] === 'reset-password';
+    const inPublicRoute = (segments[0] as any) === 'register' || (segments[0] as any) === 'index';
 
     if (!isAuthenticated && inAuthGroup) {
+      // Not authenticated but trying to access protected routes
       router.replace('/');
-    } else if (isAuthenticated && !inAuthGroup && !inPublicRoute) {
+    } else if (isAuthenticated && (inPublicRoute || !inAuthGroup)) {
+      // Authenticated - redirect to dashboard from any public route
       router.replace('/(tabs)/dashboard');
     }
   }, [isAuthenticated, loading, segments]);
@@ -40,10 +77,6 @@ function RootNavigator() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="register" />
-        <Stack.Screen name="email-verification-pending" />
-        <Stack.Screen name="otp-verification" />
-        <Stack.Screen name="forgot-password" />
-        <Stack.Screen name="reset-password" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="property-detail" />
         <Stack.Screen name="subscription" />
@@ -68,6 +101,16 @@ function RootNavigator() {
 export default function RootLayout() {
   useFrameworkReady();
 
+  if (Platform.OS === 'web') {
+    return (
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <WebRedirectScreen />
+        </ThemeProvider>
+      </SafeAreaProvider>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>
@@ -86,5 +129,53 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  webContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  iconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xl,
+  },
+  iconText: {
+    fontSize: 48,
+  },
+  webTitle: {
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  webSubtitle: {
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+    marginBottom: spacing.xxl,
+    maxWidth: 520,
+    lineHeight: 24,
+  },
+  webButton: {
+    borderRadius: radius.md,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+    ...shadows.lg,
+  },
+  webButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  webFooter: {
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
 });

@@ -12,6 +12,12 @@ import {
   PaginatedResponse,
   LoginCredentials,
   LoginResponse,
+  GoogleSignInRequest,
+  GoogleAuthResponse,
+  EmailSendOTPRequest,
+  EmailSendOTPResponse,
+  EmailVerifyOTPRequest,
+  EmailVerifyOTPResponse,
   RegisterCredentials,
   RegisterResponse,
   VerifyOTPRequest,
@@ -26,6 +32,7 @@ import {
   RazorpayCheckoutSession,
   VerifyPaymentRequest,
   VerifyPaymentResponse,
+  DashboardStats,
 } from './apiTypes';
 import { tokenStorage } from './tokenStorage';
 
@@ -40,9 +47,21 @@ interface RequestOptions {
   requiresAuth?: boolean;
 }
 
+// Request deduplication cache to prevent duplicate in-flight requests
+const inFlightRequests = new Map<string, Promise<any>>();
+
+function getRequestKey(method: HttpMethod, endpoint: string, body?: any): string {
+  // Only deduplicate GET/read requests, not mutations
+  if (method !== 'GET') {
+    return '';
+  }
+  return `${method}:${endpoint}`;
+}
+
 async function refreshAccessToken() {
   const refreshToken = await tokenStorage.getRefreshToken();
   if (!refreshToken) return null;
+  
   try {
     const response = await fetch(`${BASE_URL}/auth/refresh`, {
       method: 'POST',
@@ -52,21 +71,62 @@ async function refreshAccessToken() {
       },
       body: JSON.stringify({ refreshToken }),
     });
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (data?.accessToken && data?.refreshToken && data?.expiresAt) {
-      await tokenStorage.setAccessToken(data.accessToken);
-      await tokenStorage.setRefreshToken(data.refreshToken);
-      await tokenStorage.setTokenExpiry(data.expiresAt);
-      return data.accessToken;
+    
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        // Token is invalid or user is deleted - clear tokens
+        await tokenStorage.clearTokens();
+      }
+      return null;
+    }
+    
+    const responseData = await response.json();
+    const data = responseData?.data;
+    
+    if (data?.tokens?.accessToken && data?.tokens?.refreshToken && data?.tokens?.expiresAt) {
+      await tokenStorage.setAccessToken(data.tokens.accessToken);
+      await tokenStorage.setRefreshToken(data.tokens.refreshToken);
+      await tokenStorage.setTokenExpiry(data.tokens.expiresAt);
+      return {
+        accessToken: data.tokens.accessToken,
+        user: data.user || null,
+      };
     }
     return null;
-  } catch {
+  } catch (error: any) {
+    // On network error, don't clear tokens - user might be offline
     return null;
   }
 }
 
 async function request<T>(
+  method: HttpMethod,
+  endpoint: string,
+  body?: any,
+  requiresAuth: boolean = false
+): Promise<ApiResponse<T> | PaginatedResponse<T>> {
+  // Check for duplicate request (deduplication)
+  const requestKey = getRequestKey(method, endpoint, body);
+  if (requestKey && inFlightRequests.has(requestKey)) {
+    return inFlightRequests.get(requestKey)!;
+  }
+
+  const requestPromise = _performRequest<T>(method, endpoint, body, requiresAuth);
+
+  // Store in-flight request
+  if (requestKey) {
+    inFlightRequests.set(requestKey, requestPromise);
+  }
+
+  // Remove from cache once complete
+  return requestPromise.finally(() => {
+    if (requestKey) {
+      inFlightRequests.delete(requestKey);
+    }
+  });
+}
+
+async function _performRequest<T>(
   method: HttpMethod,
   endpoint: string,
   body?: any,
@@ -112,7 +172,7 @@ async function request<T>(
         if (response.status === 401) {
           const error: ApiError = {
             code: 'UNAUTHORIZED',
-            message: 'Authentication required. Please login again.',
+            message: responseData?.detail || 'Authentication required. Please login again.',
             details: { status: 401 },
           };
           throw error;
@@ -120,14 +180,22 @@ async function request<T>(
         if (response.status === 403) {
           const error: ApiError = {
             code: responseData?.code || 'FORBIDDEN',
-            message: responseData?.message || 'Access denied',
+            message: responseData?.detail || responseData?.message || 'Access denied',
             details: responseData?.details || { status: 403 },
+          };
+          throw error;
+        }
+        if (response.status === 429) {
+          const error: ApiError = {
+            code: 'TOO_MANY_REQUESTS',
+            message: responseData?.detail || responseData?.message || 'Too many attempts. Please try again later.',
+            details: { status: 429 },
           };
           throw error;
         }
         const error: ApiError = {
           code: responseData?.code || 'API_ERROR',
-          message: responseData?.message || `HTTP ${response.status}: ${response.statusText}`,
+          message: responseData?.detail || responseData?.message || `HTTP ${response.status}: ${response.statusText}`,
           details: responseData?.details || { status: response.status },
         };
         throw error;
@@ -186,6 +254,26 @@ export const authService = {
     return await request<LoginResponse>('POST', '/auth/login', credentials, false) as ApiResponse<LoginResponse>;
   },
 
+  async refreshToken(refreshToken: string): Promise<any> {
+    return await request<any>('POST', '/auth/refresh', { refreshToken }, false);
+  },
+
+  async googleSignIn(payload: GoogleSignInRequest): Promise<ApiResponse<GoogleAuthResponse>> {
+    return await request<GoogleAuthResponse>('POST', '/auth/google', payload, false) as ApiResponse<GoogleAuthResponse>;
+  },
+
+  async sendEmailOTP(
+    data: EmailSendOTPRequest
+  ): Promise<ApiResponse<EmailSendOTPResponse>> {
+    return await request<EmailSendOTPResponse>('POST', '/auth/email/send-otp', data, false) as ApiResponse<EmailSendOTPResponse>;
+  },
+
+  async verifyEmailOTP(
+    data: EmailVerifyOTPRequest
+  ): Promise<ApiResponse<EmailVerifyOTPResponse>> {
+    return await request<EmailVerifyOTPResponse>('POST', '/auth/email/verify-otp', data, false) as ApiResponse<EmailVerifyOTPResponse>;
+  },
+
   async register(
     credentials: RegisterCredentials
   ): Promise<ApiResponse<RegisterResponse>> {
@@ -229,7 +317,29 @@ export const authService = {
   },
 
   async logout(): Promise<ApiResponse<{ success: boolean }>> {
-    return await request<{ success: boolean }>('POST', '/auth/logout', undefined, true) as ApiResponse<{ success: boolean }>;
+    // Get refresh token before making logout request
+    const refreshToken = await tokenStorage.getRefreshToken();
+    if (!refreshToken) {
+      // If no refresh token, just return success (already logged out locally)
+      return {
+        data: { success: true },
+        meta: { timestamp: new Date().toISOString() },
+      } as ApiResponse<{ success: boolean }>;
+    }
+    
+    // Send logout request with refresh token to blacklist it on server
+    // requiresAuth: false because logout endpoint is public and only needs refresh token in body
+    try {
+      const result = await request<{ success: boolean }>('POST', '/auth/logout', { refreshToken }, false) as ApiResponse<{ success: boolean }>;
+      return result;
+    } catch (error: any) {
+      // Even if logout fails on server, we still clear tokens locally
+      // This allows users to logout if offline
+      return {
+        data: { success: true },
+        meta: { timestamp: new Date().toISOString() },
+      } as ApiResponse<{ success: boolean }>;
+    }
   },
 
   async getCurrentUser(): Promise<ApiResponse<Owner>> {
@@ -265,8 +375,18 @@ export const propertyService = {
 };
 
 export const tenantService = {
-  async getTenants(): Promise<PaginatedResponse<Tenant>> {
-    return await request<Tenant>('GET', '/tenants', undefined, true) as PaginatedResponse<Tenant>;
+  async getTenants(propertyId?: string, search?: string, status?: string, page: number = 1, pageSize: number = 50): Promise<PaginatedResponse<Tenant>> {
+    let endpoint = '/tenants?';
+    const params: string[] = [];
+    
+    if (propertyId) params.push(`property_id=${encodeURIComponent(propertyId)}`);
+    if (search) params.push(`search=${encodeURIComponent(search)}`);
+    if (status) params.push(`status=${encodeURIComponent(status)}`);
+    params.push(`page=${page}`);
+    params.push(`page_size=${pageSize}`);
+    
+    endpoint += params.join('&');
+    return await request<Tenant>('GET', endpoint, undefined, true) as PaginatedResponse<Tenant>;
   },
 
   async getTenantById(id: string): Promise<ApiResponse<Tenant>> {
@@ -290,11 +410,31 @@ export const tenantService = {
 };
 
 export const paymentService = {
-  async getPayments(propertyId?: string): Promise<PaginatedResponse<Payment>> {
-    let endpoint = '/payments';
-    if (propertyId) {
-      endpoint += `?propertyId=${encodeURIComponent(propertyId)}`;
+  async getPayments(
+    propertyId?: string,
+    options?: {
+      tenantId?: string;
+      status?: 'paid' | 'due' | 'overdue';
+      page?: number;
+      pageSize?: number;
+      startDate?: string;
+      endDate?: string;
     }
+  ): Promise<PaginatedResponse<Payment>> {
+    const params: string[] = [];
+    if (propertyId) params.push(`propertyId=${encodeURIComponent(propertyId)}`);
+    if (options?.tenantId) params.push(`tenantId=${encodeURIComponent(options.tenantId)}`);
+    if (options?.status) params.push(`status=${encodeURIComponent(options.status)}`);
+    if (options?.page) params.push(`page=${options.page}`);
+    if (options?.pageSize) params.push(`page_size=${options.pageSize}`);
+    if (options?.startDate) params.push(`startDate=${encodeURIComponent(options.startDate)}`);
+    if (options?.endDate) params.push(`endDate=${encodeURIComponent(options.endDate)}`);
+
+    let endpoint = '/payments';
+    if (params.length > 0) {
+      endpoint += `?${params.join('&')}`;
+    }
+
     return await request<Payment>('GET', endpoint, undefined, true) as PaginatedResponse<Payment>;
   },
 
@@ -367,8 +507,17 @@ export const subscriptionService = {
 };
 
 export const roomService = {
-  async getRooms(): Promise<PaginatedResponse<Room>> {
-    return await request<Room>('GET', '/rooms', undefined, true) as PaginatedResponse<Room>;
+  async getRooms(propertyId?: string, search?: string, page: number = 1, pageSize: number = 50): Promise<PaginatedResponse<Room>> {
+    let endpoint = '/rooms?';
+    const params: string[] = [];
+    
+    if (propertyId) params.push(`property_id=${encodeURIComponent(propertyId)}`);
+    if (search) params.push(`search=${encodeURIComponent(search)}`);
+    params.push(`page=${page}`);
+    params.push(`page_size=${pageSize}`);
+    
+    endpoint += params.join('&');
+    return await request<Room>('GET', endpoint, undefined, true) as PaginatedResponse<Room>;
   },
 
   async getRoomById(id: string): Promise<ApiResponse<Room>> {
@@ -392,11 +541,17 @@ export const roomService = {
 };
 
 export const bedService = {
-  async getBeds(roomId?: string): Promise<PaginatedResponse<Bed>> {
-    let endpoint = '/beds';
-    if (roomId) {
-      endpoint += `?room_id=${encodeURIComponent(roomId)}`;
-    }
+  async getBeds(roomId?: string, propertyId?: string, status?: string, page: number = 1, pageSize: number = 50): Promise<PaginatedResponse<Bed>> {
+    let endpoint = '/beds?';
+    const params: string[] = [];
+    
+    if (roomId) params.push(`room_id=${encodeURIComponent(roomId)}`);
+    if (propertyId) params.push(`property_id=${encodeURIComponent(propertyId)}`);
+    if (status) params.push(`status_filter=${encodeURIComponent(status)}`);
+    params.push(`page=${page}`);
+    params.push(`page_size=${pageSize}`);
+    
+    endpoint += params.join('&');
     return await request<Bed>('GET', endpoint, undefined, true) as PaginatedResponse<Bed>;
   },
 
@@ -417,5 +572,15 @@ export const bedService = {
 
   async deleteBed(id: string): Promise<ApiResponse<{ success: boolean }>> {
     return await request<{ success: boolean }>('DELETE', `/beds/${id}`, undefined, true) as ApiResponse<{ success: boolean }>;
+  },
+};
+
+export const dashboardService = {
+  async getStats(propertyId?: string): Promise<ApiResponse<DashboardStats>> {
+    let endpoint = '/dashboard/stats';
+    if (propertyId) {
+      endpoint += `?property_id=${encodeURIComponent(propertyId)}`;
+    }
+    return await request<DashboardStats>('GET', endpoint, undefined, true) as ApiResponse<DashboardStats>;
   },
 };

@@ -26,6 +26,7 @@ import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { subscriptionService } from '@/services/apiClient';
 import type { Subscription, Usage, PlanLimits } from '@/services/apiTypes';
+import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
 
 type Plan = 'free' | 'pro' | 'premium';
 
@@ -35,6 +36,15 @@ interface PlanComparison {
   popular?: boolean;
   limits?: PlanLimits;
 }
+
+interface SubscriptionCachePayload {
+  subscription: Subscription;
+  usage: Usage;
+  limits: PlanLimits;
+  allLimits: Record<Plan, PlanLimits>;
+}
+
+const SUBSCRIPTION_CACHE_STALE_MS = 2 * 60 * 1000;
 
 export default function SubscriptionScreen() {
   const { colors } = useTheme();
@@ -48,6 +58,18 @@ export default function SubscriptionScreen() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const fetchSubscriptionData = async () => {
+    const cacheKey = cacheKeys.subscription();
+    const cachedData = getScreenCache<SubscriptionCachePayload>(cacheKey, SUBSCRIPTION_CACHE_STALE_MS);
+    if (cachedData) {
+      setSubscription(cachedData.subscription);
+      setUsage(cachedData.usage);
+      setLimits(cachedData.limits);
+      setAllLimits(cachedData.allLimits);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -73,6 +95,17 @@ export default function SubscriptionScreen() {
         free: freeLimitsRes.data,
         pro: proLimitsRes.data,
         premium: premiumLimitsRes.data,
+      });
+
+      setScreenCache(cacheKey, {
+        subscription: subscriptionData,
+        usage: usageData,
+        limits: limitsRes.data,
+        allLimits: {
+          free: freeLimitsRes.data,
+          pro: proLimitsRes.data,
+          premium: premiumLimitsRes.data,
+        },
       });
     } catch (err: any) {
       if (err?.code === 'upgrade_required') {

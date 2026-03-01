@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
-import { Building2 } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Building2, Eye, EyeOff } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
+
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { authService } from '@/services/apiClient';
@@ -24,25 +24,36 @@ export default function LoginScreen() {
   const { colors } = useTheme();
   const { login } = useAuth();
   const router = useRouter();
-  const params = useLocalSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [lockoutTimer, setLockoutTimer] = useState<number | null>(null);
 
   useEffect(() => {
-    if (params.verified === 'true') {
-      setSuccessMessage('Email verified successfully! You can now login.');
-      setTimeout(() => setSuccessMessage(null), 5000);
-    } else if (params.resetSuccess === 'true') {
-      setSuccessMessage('Password reset successfully! You can now login.');
-      setTimeout(() => setSuccessMessage(null), 5000);
+    if (!lockoutTimer || lockoutTimer <= 0) {
+      setIsLockedOut(false);
+      return;
     }
-  }, [params]);
+
+    const interval = setInterval(() => {
+      setLockoutTimer((prev) => {
+        if (prev && prev > 1) {
+          return prev - 1;
+        } else {
+          setIsLockedOut(false);
+          return null;
+        }
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [lockoutTimer]);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (!email.trim() || !password.trim()) {
       setError('Email and password are required');
       return;
     }
@@ -51,9 +62,8 @@ export default function LoginScreen() {
       setLoading(true);
       setError(null);
 
-      const response = await authService.login({ email, password });
-
-      if (response.data && response.data.tokens) {
+      const response = await authService.login({ email: email.trim(), password });
+      if (response?.data?.tokens) {
         await Promise.all([
           tokenStorage.setAccessToken(response.data.tokens.accessToken),
           tokenStorage.setRefreshToken(response.data.tokens.refreshToken),
@@ -61,17 +71,22 @@ export default function LoginScreen() {
         ]);
 
         login(response.data.user);
-      } else {
-        setError('Login failed. Please try again.');
+        return;
       }
+
+      setError('Login failed. Please try again.');
     } catch (err: any) {
-      if (err?.code === 'EMAIL_NOT_VERIFIED') {
-        router.push({
-          pathname: '/otp-verification',
-          params: { email, mode: 'register' },
-        });
-      } else {
-        setError(err?.message || 'Login failed. Please try again.');
+      const errorMessage = err?.message || 'Login failed. Please try again.';
+      setError(errorMessage);
+
+      // Check if it's a rate limit error (429)
+      const status = err?.details?.status || err?.status;
+      if (status === 429 || errorMessage.includes('Too many failed')) {
+        setIsLockedOut(true);
+        // Extract minutes from error message or default to 10
+        const minutesMatch = errorMessage.match(/(\d+)\s*minutes?/);
+        const minutes = minutesMatch ? parseInt(minutesMatch[1]) : 10;
+        setLockoutTimer(minutes * 60);
       }
     } finally {
       setLoading(false);
@@ -97,15 +112,16 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.formContainer}>
-            {successMessage && (
-              <View style={[styles.successContainer, { backgroundColor: colors.success[50], borderColor: colors.success[200] }]}>
-                <Text style={[styles.successText, { color: colors.success[700] }]}>{successMessage}</Text>
-              </View>
-            )}
-
             {error && (
-              <View style={[styles.errorContainer, { backgroundColor: colors.danger[50], borderColor: colors.danger[200] }]}>
-                <Text style={[styles.errorText, { color: colors.danger[700] }]}>{error}</Text>
+              <View style={[styles.errorContainer, { backgroundColor: isLockedOut ? colors.danger[50] : colors.warning[50], borderColor: isLockedOut ? colors.danger[200] : colors.warning[200] }]}>
+                <Text style={[styles.errorText, { color: isLockedOut ? colors.danger[700] : colors.warning[700] }]}>
+                  {error}
+                </Text>
+                {lockoutTimer && (
+                  <Text style={[styles.errorText, { color: isLockedOut ? colors.danger[700] : colors.warning[700], marginTop: 4 }]}>
+                    Try again in {Math.floor(lockoutTimer / 60)}:{(lockoutTimer % 60).toString().padStart(2, '0')} minutes
+                  </Text>
+                )}
               </View>
             )}
 
@@ -113,62 +129,66 @@ export default function LoginScreen() {
               <Text style={[styles.label, { color: colors.text.primary }]}>Email</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.white, color: colors.text.primary, borderColor: colors.border.medium }]}
-                placeholder="owner@example.com"
+                placeholder="Enter your email"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 placeholderTextColor={colors.text.tertiary}
                 value={email}
                 onChangeText={setEmail}
-                editable={!loading}
+                editable={!loading && !isLockedOut}
               />
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.text.primary }]}>Password</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.white, color: colors.text.primary, borderColor: colors.border.medium }]}
-                placeholder="••••••••"
-                secureTextEntry
-                placeholderTextColor={colors.text.tertiary}
-                value={password}
-                onChangeText={setPassword}
-                editable={!loading}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={[styles.passwordInput, { backgroundColor: colors.white, color: colors.text.primary, borderColor: colors.border.medium }]}
+                  placeholder="Enter your password"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  placeholderTextColor={colors.text.tertiary}
+                  value={password}
+                  onChangeText={setPassword}
+                  editable={!loading && !isLockedOut}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                  disabled={loading || isLockedOut}>
+                  {showPassword ? (
+                    <EyeOff size={20} color={colors.text.tertiary} />
+                  ) : (
+                    <Eye size={20} color={colors.text.tertiary} />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
 
             <TouchableOpacity
-              style={[styles.loginButton, { backgroundColor: colors.primary[500], opacity: loading ? 0.6 : 1 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary[500], opacity: loading || isLockedOut ? 0.6 : 1 }]}
               onPress={handleLogin}
               activeOpacity={0.8}
-              disabled={loading}>
+              disabled={loading || isLockedOut}>
               {loading ? (
                 <ActivityIndicator color={colors.white} size="small" />
               ) : (
-                <Text style={[styles.loginButtonText, { color: colors.white }]}>Login</Text>
+                <Text style={[styles.actionButtonText, { color: colors.white }]}>
+                  {isLockedOut ? 'Account Locked' : 'Login'}
+                </Text>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.forgotPasswordContainer}
-              onPress={() => router.push('/forgot-password')}
+              style={styles.registerLink}
+              onPress={() => router.push('/register' as any)}
               activeOpacity={0.7}
-              disabled={loading}>
-              <Text style={[styles.forgotPasswordText, { color: colors.primary[500] }]}>
-                Forgot Password?
-              </Text>
-            </TouchableOpacity>
-
-            <View style={styles.registerLinkContainer}>
+              disabled={loading || isLockedOut}>
               <Text style={[styles.registerLinkText, { color: colors.text.secondary }]}>
                 Don't have an account?{' '}
+                <Text style={[styles.registerLinkBold, { color: colors.primary[500] }]}>Register</Text>
               </Text>
-              <TouchableOpacity
-                onPress={() => router.push('/register')}
-                activeOpacity={0.7}
-                disabled={loading}>
-                <Text style={[styles.registerLink, { color: colors.primary[500] }]}>Register</Text>
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -211,30 +231,8 @@ const styles = StyleSheet.create({
   formContainer: {
     width: '100%',
   },
-  errorContainer: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  errorText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  successContainer: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  successText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-  },
   inputContainer: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   label: {
     fontSize: typography.fontSize.sm,
@@ -248,37 +246,70 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     borderWidth: 1,
   },
-  loginButton: {
+  passwordContainer: {
+    position: 'relative',
+  },
+  passwordInput: {
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingRight: 50,
+    fontSize: typography.fontSize.md,
+    borderWidth: 1,
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: spacing.lg,
+    top: '50%',
+    transform: [{ translateY: -10 }],
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.lg,
+    borderTopWidth: 1,
+  },
+  dividerText: {
+    position: 'absolute',
+    top: -10,
+    left: '50%',
+    transform: [{ translateX: -15 }],
+    backgroundColor: 'white',
+    paddingHorizontal: spacing.md,
+    fontSize: typography.fontSize.sm,
+  },
+  errorContainer: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  errorText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  actionButton: {
     borderRadius: radius.md,
     paddingVertical: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.sm,
+    borderWidth: 1,
+    marginBottom: spacing.md,
     ...shadows.lg,
   },
-  loginButtonText: {
+  actionButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },
-  registerLinkContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  registerLink: {
     alignItems: 'center',
     marginTop: spacing.xl,
   },
   registerLinkText: {
     fontSize: typography.fontSize.sm,
   },
-  registerLink: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  forgotPasswordContainer: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-  },
-  forgotPasswordText: {
-    fontSize: typography.fontSize.sm,
+  registerLinkBold: {
     fontWeight: typography.fontWeight.semibold,
   },
 });

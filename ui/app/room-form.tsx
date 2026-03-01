@@ -18,6 +18,7 @@ import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 import { roomService } from '@/services/apiClient';
+import { clearScreenCache } from '@/services/screenCache';
 
 const FLOOR_OPTIONS = [
   'Ground Floor',
@@ -85,6 +86,9 @@ export default function RoomFormScreen() {
         price: priceNum,
         numberOfBeds: bedsNum,
       });
+
+      clearScreenCache('rooms:');
+      clearScreenCache('dashboard:');
 
       router.back();
     } catch (err: any) {

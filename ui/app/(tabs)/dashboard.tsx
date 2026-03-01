@@ -23,19 +23,19 @@ import { spacing, typography, radius } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 import {
-  tenantService,
   paymentService,
-  bedService,
+  dashboardService,
 } from '@/services/apiClient';
-import type { Tenant, Payment, Bed as BedType } from '@/services/apiTypes';
+import type { Payment, DashboardStats } from '@/services/apiTypes';
+import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
 
 interface DashboardData {
-  tenants: Tenant[];
-  payments: Payment[];
+  stats: DashboardStats;
   duePayments: Payment[];
   overduePayments: Payment[];
-  beds: BedType[];
 }
+
+const DASHBOARD_CACHE_STALE_MS = 60 * 1000;
 
 export default function DashboardScreen() {
   const { colors } = useTheme();
@@ -52,29 +52,45 @@ export default function DashboardScreen() {
       return;
     }
 
+    const cacheKey = cacheKeys.dashboard(selectedPropertyId);
+    const cachedData = getScreenCache<DashboardData>(cacheKey, DASHBOARD_CACHE_STALE_MS);
+    if (cachedData) {
+      setDashboardData(cachedData);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      const [tenantsRes, paymentsRes, bedsRes] = await Promise.all([
-        tenantService.getTenants(),
-        paymentService.getPayments(),
-        bedService.getBeds(),
+      // Fetch aggregated stats and payments data
+      const [statsRes, dueRes, overdueRes] = await Promise.all([
+        dashboardService.getStats(selectedPropertyId),
+        paymentService.getPayments(selectedPropertyId, { status: 'due', page: 1, pageSize: 10 }),
+        paymentService.getPayments(selectedPropertyId, { status: 'overdue', page: 1, pageSize: 10 }),
       ]);
 
-      const tenants = (tenantsRes.data || []).filter(t => t.propertyId === selectedPropertyId);
-      const payments = (paymentsRes.data || []).filter(p => p.propertyId === selectedPropertyId);
-      const beds = (bedsRes.data || []).filter(b => b.propertyId === selectedPropertyId);
-
-      const duePayments = payments.filter((p) => p.status === 'due');
-      const overduePayments = payments.filter((p) => p.status === 'overdue');
+      const stats = statsRes.data || {
+        totalTenants: 0,
+        totalBeds: 0,
+        occupiedBeds: 0,
+        availableBeds: 0,
+        occupancyRate: 0,
+      };
+      const duePayments = dueRes.data || [];
+      const overduePayments = overdueRes.data || [];
 
       setDashboardData({
-        tenants,
-        payments,
+        stats,
         duePayments,
         overduePayments,
-        beds,
+      });
+      setScreenCache(cacheKey, {
+        stats,
+        duePayments,
+        overduePayments,
       });
     } catch (err: any) {
       if (err?.code === 'upgrade_required') {
@@ -138,9 +154,9 @@ export default function DashboardScreen() {
     );
   }
 
-  const totalBeds = dashboardData?.beds.length || 0;
-  const occupiedBeds = dashboardData?.beds.filter(b => b.status === 'occupied').length || 0;
-  const occupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
+  const totalBeds = dashboardData?.stats.totalBeds || 0;
+  const occupiedBeds = dashboardData?.stats.occupiedBeds || 0;
+  const occupancyRate = dashboardData?.stats.occupancyRate || 0;
 
   const stats = [
     {
@@ -152,7 +168,7 @@ export default function DashboardScreen() {
     {
       icon: Users,
       label: 'Tenants',
-      value: String(occupiedBeds),
+      value: String(dashboardData?.stats.totalTenants || 0),
       color: colors.success[500],
     },
     {

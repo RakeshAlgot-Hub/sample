@@ -21,6 +21,15 @@ import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 import { bedService, roomService, tenantService } from '@/services/apiClient';
 import type { Bed, Room, Tenant } from '@/services/apiTypes';
+import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
+
+interface ManageBedsCachePayload {
+  beds: Bed[];
+  room: Room | null;
+  tenants: Tenant[];
+}
+
+const MANAGE_BEDS_CACHE_STALE_MS = 30 * 1000;
 
 export default function ManageBedsScreen() {
   const { colors } = useTheme();
@@ -39,29 +48,51 @@ export default function ManageBedsScreen() {
       return;
     }
 
+    const cacheKey = cacheKeys.manageBeds(selectedPropertyId, roomId);
+    const cachedData = getScreenCache<ManageBedsCachePayload>(cacheKey, MANAGE_BEDS_CACHE_STALE_MS);
+    if (cachedData) {
+      setBeds(cachedData.beds);
+      setRoom(cachedData.room);
+      setTenants(cachedData.tenants);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
       const [bedsRes, roomRes, tenantsRes] = await Promise.all([
-        bedService.getBeds(),
+        bedService.getBeds(roomId, selectedPropertyId),
         roomService.getRoomById(roomId),
-        tenantService.getTenants(),
+        tenantService.getTenants(selectedPropertyId),
       ]);
 
+      let nextBeds: Bed[] = [];
+      let nextRoom: Room | null = null;
+      let nextTenants: Tenant[] = [];
+
       if (bedsRes.data) {
-        const filteredBeds = bedsRes.data.filter(b => b.roomId === roomId);
-        setBeds(filteredBeds);
+        nextBeds = bedsRes.data.filter(b => b.roomId === roomId);
+        setBeds(nextBeds);
       }
 
       if (roomRes.data) {
-        setRoom(roomRes.data);
+        nextRoom = roomRes.data;
+        setRoom(nextRoom);
       }
 
       if (tenantsRes.data) {
-        const filteredTenants = tenantsRes.data.filter(t => t.roomId === roomId);
-        setTenants(filteredTenants);
+        nextTenants = tenantsRes.data.filter(t => t.roomId === roomId);
+        setTenants(nextTenants);
       }
+
+      setScreenCache(cacheKey, {
+        beds: nextBeds,
+        room: nextRoom,
+        tenants: nextTenants,
+      });
     } catch (err: any) {
       setError(err?.message || 'Failed to load beds');
     } finally {

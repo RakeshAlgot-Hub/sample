@@ -20,7 +20,10 @@ import { spacing, typography, radius } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 import { roomService } from '@/services/apiClient';
-import type { Room } from '@/services/apiTypes';
+import type { Room, PaginatedResponse } from '@/services/apiTypes';
+import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
+
+const ROOMS_CACHE_STALE_MS = 60 * 1000;
 
 export default function ManageRoomsScreen() {
   const { colors } = useTheme();
@@ -36,14 +39,23 @@ export default function ManageRoomsScreen() {
       return;
     }
 
+    const cacheKey = cacheKeys.rooms(selectedPropertyId);
+    const cachedResponse = getScreenCache<PaginatedResponse<Room>>(cacheKey, ROOMS_CACHE_STALE_MS);
+    if (cachedResponse) {
+      setRooms(cachedResponse.data || []);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const response = await roomService.getRooms();
+      const response = await roomService.getRooms(selectedPropertyId);
 
       if (response.data) {
-        const filteredRooms = response.data.filter(r => r.propertyId === selectedPropertyId);
-        setRooms(filteredRooms);
+        setRooms(response.data);
+        setScreenCache(cacheKey, response);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to load rooms');

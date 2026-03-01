@@ -2,9 +2,8 @@ export interface Owner {
   id: string;
   email: string;
   name: string;
-  phone: string;
-  location: string;
-  createdAt: string;
+  phone?: string;
+  propertyIds?: string[];
 }
 
 export interface Property {
@@ -46,6 +45,8 @@ export interface Tenant {
   billingConfig?: BillingConfig;
   createdAt: string;
   updatedAt: string;
+  roomNumber?: string;    // Enriched data from backend
+  bedNumber?: string;     // Enriched data from backend
 }
 
 export interface Payment {
@@ -53,10 +54,12 @@ export interface Payment {
   tenantId: string;
   propertyId: string;
   // property field removed
+  tenantName?: string;
   bed: string;
   amount: string;
   status: 'paid' | 'due' | 'overdue';
   dueDate?: string; // received from backend, optional
+  date?: string;
   method: string | null;
   createdAt: string;
   updatedAt: string;
@@ -126,15 +129,42 @@ export interface LoginResponse {
   tokens: AuthTokens;
 }
 
+export interface GoogleSignInRequest {
+  idToken: string;
+}
+
+export interface GoogleAuthResponse {
+  user: Owner;
+  tokens: AuthTokens;
+}
+
+export interface EmailSendOTPRequest {
+  email: string;
+}
+
+export interface EmailSendOTPResponse {
+  message: string;
+}
+
+export interface EmailVerifyOTPRequest {
+  email: string;
+  otp: string;
+}
+
+export interface EmailVerifyOTPResponse {
+  message: string;
+}
+
 export interface RegisterCredentials {
   name: string;
-  documentId: string;
+  email: string;
+  phone: string;
   password: string;
 }
 
 export interface RegisterResponse {
-  message: string;
-  documentId: string;
+  user: Owner;
+  tokens: AuthTokens;
 }
 
 export interface VerifyOTPRequest {
@@ -191,6 +221,14 @@ export interface Bed {
   status: 'available' | 'occupied' | 'maintenance';
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DashboardStats {
+  totalTenants: number;
+  totalBeds: number;
+  occupiedBeds: number;
+  availableBeds: number;
+  occupancyRate: number;
 }
 
 export interface RazorpayCheckoutSession {

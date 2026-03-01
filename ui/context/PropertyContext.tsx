@@ -1,6 +1,9 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { propertyService } from '@/services/apiClient';
+import { useAuth } from '@/context/AuthContext';
 import type { Property } from '@/services/apiTypes';
+import { propertyStorage } from '@/services/propertyStorage';
+import { clearScreenCache } from '@/services/screenCache';
 
 interface PropertyContextType {
   properties: Property[];
@@ -14,41 +17,75 @@ interface PropertyContextType {
 const PropertyContext = createContext<PropertyContextType | undefined>(undefined);
 
 export function PropertyProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const selectedProperty = properties.find(p => p.id === selectedPropertyId) || null;
 
-  const fetchProperties = async () => {
+  const fetchProperties = useCallback(async () => {
     try {
       setLoading(true);
       const response = await propertyService.getProperties();
       const propertiesData = response.data || [];
       setProperties(propertiesData);
 
-      if (propertiesData.length > 0 && !selectedPropertyId) {
-        setSelectedPropertyId(propertiesData[0].id);
-      } else if (propertiesData.length === 0) {
+      if (propertiesData.length === 0) {
         setSelectedPropertyId(null);
-      } else if (selectedPropertyId && !propertiesData.find(p => p.id === selectedPropertyId)) {
-        setSelectedPropertyId(propertiesData[0].id);
+        await propertyStorage.clearSelectedPropertyId();
+        return;
       }
+
+      const persistedPropertyId = await propertyStorage.getSelectedPropertyId();
+      const currentSelectedIsValid = selectedPropertyId
+        ? propertiesData.some((p) => p.id === selectedPropertyId)
+        : false;
+      const persistedIsValid = persistedPropertyId
+        ? propertiesData.some((p) => p.id === persistedPropertyId)
+        : false;
+
+      const nextSelectedPropertyId = currentSelectedIsValid
+        ? selectedPropertyId!
+        : persistedIsValid
+          ? persistedPropertyId!
+          : propertiesData[0].id;
+
+      setSelectedPropertyId(nextSelectedPropertyId);
+      await propertyStorage.setSelectedPropertyId(nextSelectedPropertyId);
+      // Removed prefetching - screens will lazy-load on focus
     } catch (error) {
       setProperties([]);
       setSelectedPropertyId(null);
+      await propertyStorage.clearSelectedPropertyId();
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedPropertyId]);
 
   useEffect(() => {
-    fetchProperties();
-  }, []);
+    if (isAuthenticated) {
+      fetchProperties();
+    } else {
+      setProperties([]);
+      setSelectedPropertyId(null);
+      clearScreenCache();
+      propertyStorage.clearSelectedPropertyId().catch(() => {
+        // ignore storage errors
+      });
+      setLoading(false);
+    }
+  }, [isAuthenticated, fetchProperties]);
 
   const switchProperty = (propertyId: string) => {
     if (properties.find(p => p.id === propertyId)) {
       setSelectedPropertyId(propertyId);
+      propertyStorage.setSelectedPropertyId(propertyId).catch(() => {
+        // ignore storage errors
+      });
+      prefetchPropertyData(propertyId).catch(() => {
+        // ignore warm-up failures
+      });
     }
   };
 

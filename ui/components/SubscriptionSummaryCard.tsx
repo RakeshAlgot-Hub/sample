@@ -1,18 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Card from '@/components/Card';
+import Skeleton from '@/components/Skeleton';
 import { Crown, Building2, Users, ArrowRight } from 'lucide-react-native';
 import { spacing, typography, radius } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { subscriptionService } from '@/services/apiClient';
 import type { Subscription, Usage, PlanLimits } from '@/services/apiTypes';
+import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
+
+const SUBSCRIPTION_CACHE_STALE_MS = 60 * 1000;
 
 export default function SubscriptionSummaryCard() {
   const { colors } = useTheme();
@@ -21,14 +26,43 @@ export default function SubscriptionSummaryCard() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [limits, setLimits] = useState<PlanLimits | null>(null);
   const [loading, setLoading] = useState(true);
+  const [shouldLoad, setShouldLoad] = useState(false);
+  const { height: screenHeight } = useWindowDimensions();
 
+  // Lazy load when component is likely to be visible
   useEffect(() => {
-    fetchSubscriptionData();
+    const timer = setTimeout(() => {
+      setShouldLoad(true);
+    }, 500); // Delay load by 500ms to let critical content render first
+
+    return () => clearTimeout(timer);
   }, []);
+
+  // Fetch subscription data only when shouldLoad is true
+  useEffect(() => {
+    if (!shouldLoad) return;
+
+    fetchSubscriptionData();
+  }, [shouldLoad]);
 
   const fetchSubscriptionData = async () => {
     try {
       setLoading(true);
+
+      const cacheKey = 'subscription_card';
+      const cachedData = getScreenCache<{
+        subscription: Subscription;
+        usage: Usage;
+        limits: PlanLimits;
+      }>(cacheKey, SUBSCRIPTION_CACHE_STALE_MS);
+
+      if (cachedData) {
+        setSubscription(cachedData.subscription);
+        setUsage(cachedData.usage);
+        setLimits(cachedData.limits);
+        setLoading(false);
+        return;
+      }
 
       const [subscriptionRes, usageRes] = await Promise.all([
         subscriptionService.getSubscription(),
@@ -41,8 +75,15 @@ export default function SubscriptionSummaryCard() {
 
       const limitsRes = await subscriptionService.getLimits(subscriptionData.plan);
       setLimits(limitsRes.data);
+
+      // Cache the result
+      setScreenCache(cacheKey, {
+        subscription: subscriptionData,
+        usage: usageRes.data,
+        limits: limitsRes.data,
+      });
     } catch (error) {
-      console.error('Failed to fetch subscription data:', error);
+      // Silently fail
     } finally {
       setLoading(false);
     }
@@ -64,8 +105,8 @@ export default function SubscriptionSummaryCard() {
   if (loading || !subscription || !usage || !limits) {
     return (
       <Card style={styles.card}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color={colors.primary[500]} />
+        <View style={styles.skeletonContainer}>
+          <Skeleton height={80} count={3} />
         </View>
       </Card>
     );
@@ -159,6 +200,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  skeletonContainer: {
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   header: {
     flexDirection: 'row',

@@ -19,10 +19,13 @@ import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 import { tenantService, roomService, bedService } from '@/services/apiClient';
-import type { Room, Bed, BillingFrequency, BillingConfig } from '@/services/apiTypes';
+import type { Room, Bed, BillingFrequency, BillingConfig, PaginatedResponse } from '@/services/apiTypes';
 import EmptyState from '@/components/EmptyState';
 import UpgradeModal from '@/components/UpgradeModal';
 import DatePicker from '@/components/DatePicker';
+import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
+
+const FORM_CACHE_STALE_MS = 60 * 1000;
 
 export default function AddTenantScreen() {
   const { colors } = useTheme();
@@ -75,12 +78,20 @@ export default function AddTenantScreen() {
   const fetchRooms = async () => {
     if (!selectedPropertyId) return;
 
+    const roomsCacheKey = cacheKeys.rooms(selectedPropertyId);
+    const cachedRooms = getScreenCache<PaginatedResponse<Room>>(roomsCacheKey, FORM_CACHE_STALE_MS);
+    if (cachedRooms?.data) {
+      setRooms(cachedRooms.data);
+      setFetchingRooms(false);
+      return;
+    }
+
     try {
       setFetchingRooms(true);
-      const response = await roomService.getRooms();
+      const response = await roomService.getRooms(selectedPropertyId);
       if (response.data) {
-        const filteredRooms = response.data.filter(r => r.propertyId === selectedPropertyId);
-        setRooms(filteredRooms);
+        setRooms(response.data);
+        setScreenCache(roomsCacheKey, response);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to load rooms');
@@ -90,15 +101,24 @@ export default function AddTenantScreen() {
   };
 
   const fetchBeds = async (roomId: string) => {
+    if (!selectedPropertyId) return;
+
+    const bedsCacheKey = cacheKeys.roomBeds(selectedPropertyId, roomId);
+    const cachedBeds = getScreenCache<PaginatedResponse<Bed>>(bedsCacheKey, FORM_CACHE_STALE_MS);
+    if (cachedBeds?.data) {
+      setBeds(cachedBeds.data);
+      setSelectedBed(null);
+      setFetchingBeds(false);
+      return;
+    }
+
     try {
       setFetchingBeds(true);
-      const response = await bedService.getBeds(roomId);
+      const response = await bedService.getBeds(roomId, selectedPropertyId, 'available');
       if (response.data) {
-        const filteredBeds = response.data.filter(
-          b => b.status === 'available'
-        );
-        setBeds(filteredBeds);
+        setBeds(response.data);
         setSelectedBed(null);
+        setScreenCache(bedsCacheKey, response);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to load beds');

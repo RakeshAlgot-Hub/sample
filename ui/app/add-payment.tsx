@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -21,6 +22,7 @@ import { paymentService, tenantService } from '@/services/apiClient';
 import type { Tenant, Payment } from '@/services/apiTypes';
 import EmptyState from '@/components/EmptyState';
 import DatePicker from '@/components/DatePicker';
+import { clearScreenCache } from '@/services/screenCache';
 
 const PAYMENT_STATUSES = [
   { value: 'paid', label: 'Paid' },
@@ -43,6 +45,7 @@ export default function AddPaymentScreen() {
   const [phone, setPhone] = useState(typeof params.phone === 'string' ? params.phone : '');
   const [rent, setRent] = useState(typeof params.rent === 'string' ? params.rent : ''); // Rent remains unchanged
   const [joinDate, setJoinDate] = useState(typeof params.joinDate === 'string' ? params.joinDate : '');
+  const [checkoutDate, setCheckoutDate] = useState('');
   const [roomId] = useState(typeof params.roomId === 'string' ? params.roomId : '');
   const [bedId] = useState(typeof params.bedId === 'string' ? params.bedId : '');
   const [propertyId] = useState(typeof params.propertyId === 'string' ? params.propertyId : selectedPropertyId);
@@ -87,11 +90,18 @@ export default function AddPaymentScreen() {
   };
 
   const handleSubmit = async () => {
-    // Only send tenant + status + billingCycle + anchorDate
-    if (!name || !phone || !rent || !joinDate || !roomId || !bedId || !propertyId || !anchorDate || !billingCycle) {
+    // Only require tenant + status. If autoGeneratePayments is true, also require billingCycle + anchorDate
+    if (!name || !phone || !rent || !joinDate || !roomId || !bedId || !propertyId) {
       setError('All required fields must be filled');
       return;
     }
+
+    // If auto-generating payments, require billing config
+    if (autoGeneratePayments && (!anchorDate || !billingCycle)) {
+      setError('Billing Cycle and Anchor Date are required for auto-generated payments');
+      return;
+    }
+
     const rentNum = parseFloat(typeof rent === 'string' ? rent : '');
     if (isNaN(rentNum) || rentNum <= 0) {
       setError('Please enter a valid rent');
@@ -116,14 +126,31 @@ export default function AddPaymentScreen() {
         anchorDate,
       };
       // Call backend to create tenant
-      await tenantService.createTenant({
+      const tenantPayload: any = {
         ...payload.tenant,
-        billingConfig: {
+        autoGeneratePayments,
+      };
+      
+      // Include checkoutDate if provided
+      if (checkoutDate) {
+        tenantPayload.checkoutDate = checkoutDate;
+      }
+
+      // Only include billingConfig if auto-generating payments
+      if (autoGeneratePayments) {
+        tenantPayload.billingConfig = {
           status,
           billingCycle,
           anchorDate: typeof anchorDate === 'string' ? anchorDate : (Array.isArray(anchorDate) ? anchorDate[0] : ''),
-        },
-      });
+        };
+      }
+
+      await tenantService.createTenant(tenantPayload);
+      clearScreenCache('tenants:');
+      clearScreenCache('dashboard:');
+      clearScreenCache('payments:');
+      clearScreenCache('manage-beds:');
+      clearScreenCache('room-beds:');
       setLoading(false);
       router.replace('/tenants'); // Navigate to tenant list after success
     } catch (err: any) {
@@ -134,11 +161,23 @@ export default function AddPaymentScreen() {
   };
 
   const isFormValid = () => {
-    const baseValid =
-      typeof amount === 'string' && amount.trim() &&
-      status &&
-      !isNaN(parseFloat(typeof amount === 'string' ? amount : '')) &&
-      parseFloat(typeof amount === 'string' ? amount : '') > 0;
+    // Base tenant fields must always be filled
+    const baseValid = 
+      name && 
+      phone && 
+      rent && 
+      joinDate && 
+      roomId && 
+      bedId && 
+      status && 
+      !isNaN(parseFloat(rent)) && 
+      parseFloat(rent) > 0;
+
+    // If auto-generating payments, also check billing config
+    if (autoGeneratePayments) {
+      return baseValid && anchorDate && billingCycle;
+    }
+
     return baseValid;
   };
 
@@ -223,32 +262,67 @@ export default function AddPaymentScreen() {
                 <ChevronDown size={20} color={colors.text.tertiary} />
               </TouchableOpacity>
             </View>
-            {/* Billing Cycle */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Billing Cycle *</Text>
-              <TouchableOpacity
-                style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]} 
-                onPress={() => setShowFrequencyPicker(true)}
-                activeOpacity={0.7}
-                disabled={loading}>
-                <Text style={[styles.pickerButtonText, { color: colors.text.primary }]}> 
-                  {billingCycle.charAt(0).toUpperCase() + billingCycle.slice(1)}
+
+            {/* Billing Configuration - Only show when auto-generate is ENABLED */}
+            {autoGeneratePayments && (
+              <>
+                {/* Billing Cycle */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Billing Cycle *</Text>
+                  <TouchableOpacity
+                    style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]} 
+                    onPress={() => setShowFrequencyPicker(true)}
+                    activeOpacity={0.7}
+                    disabled={loading}>
+                    <Text style={[styles.pickerButtonText, { color: colors.text.primary }]}> 
+                      {billingCycle.charAt(0).toUpperCase() + billingCycle.slice(1)}
+                    </Text>
+                    <ChevronDown size={20} color={colors.text.tertiary} />
+                  </TouchableOpacity>
+                </View>
+                {/* Anchor Date */}
+                <DatePicker
+                  value={typeof anchorDate === 'string' ? anchorDate : (Array.isArray(anchorDate) ? anchorDate[0] : '')}
+                  onChange={setAnchorDate}
+                  label="Anchor Date"
+                  disabled={loading}
+                  required
+                  restrictToLast30Days={true}
+                />
+                <Text style={[styles.helperText, { color: colors.text.secondary, marginTop: 2 }]}>The anchor date is the starting point for your billing cycle. Payments will be scheduled based on this date.</Text>
+              </>
+            )}
+
+            {/* Auto-generate Payments Toggle */}
+            <View style={[styles.toggleContainer, { backgroundColor: colors.neutral[50], borderColor: colors.border.light }]}>
+              <View style={styles.toggleTextContainer}>
+                <Text style={[styles.toggleLabel, { color: colors.text.primary }]}>Auto-Generate Payment</Text>
+                <Text style={[styles.toggleDescription, { color: colors.text.secondary }]}>
+                  Create an initial payment record for this tenant
                 </Text>
-                <ChevronDown size={20} color={colors.text.tertiary} />
-              </TouchableOpacity>
+              </View>
+              <Switch
+                value={autoGeneratePayments}
+                onValueChange={setAutoGeneratePayments}
+                trackColor={{ false: colors.neutral[300], true: colors.primary[200] }}
+                thumbColor={autoGeneratePayments ? colors.primary[500] : colors.neutral[400]}
+                disabled={loading}
+              />
             </View>
-            {/* Anchor Date */}
+
+            {/* Checkout Date (Optional) - Stop generating payments after this date */}
             <DatePicker
-              value={typeof anchorDate === 'string' ? anchorDate : (Array.isArray(anchorDate) ? anchorDate[0] : '')}
-              onChange={setAnchorDate}
-              label="Anchor Date"
+              value={checkoutDate}
+              onChange={setCheckoutDate}
+              label="Checkout Date"
               disabled={loading}
-              required
-              restrictToLast30Days={true}
+              required={false}
+              restrictToLast30Days={false}
             />
-            <Text style={[styles.helperText, { color: colors.text.secondary, marginTop: 2 }]}>The anchor date is the starting point for your billing cycle. Payments will be scheduled based on this date.</Text>
-            {/* Next Due Date (not editable, boxed) */}
-            {/* Next Due Date removed from UI */}
+            <Text style={[styles.helperText, { color: colors.text.secondary, marginTop: 2 }]}>
+              Optional: Set when tenant will move out. Payments will stop generating after this date.
+            </Text>
+
             <TouchableOpacity
               style={[
                 styles.submitButton,
@@ -492,6 +566,28 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+  },
+  toggleTextContainer: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  toggleLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs,
+  },
+  toggleDescription: {
+    fontSize: typography.fontSize.xs,
   },
   submitButton: {
     borderRadius: radius.md,

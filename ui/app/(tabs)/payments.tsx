@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,37 +26,87 @@ import {
   Calendar,
   Wallet,
   Building2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 import { paymentService } from '@/services/apiClient';
-import type { Payment } from '@/services/apiTypes';
+import type { Payment, PaginatedResponse } from '@/services/apiTypes';
+import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
+
+const PAYMENTS_CACHE_STALE_MS = 30 * 1000;
 
 export default function PaymentsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { selectedProperty, selectedPropertyId, loading: propertyLoading } = useProperty();
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  
+  // Month navigation state
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Get month/year display string
+  const monthYearString = useMemo(() => {
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${monthNames[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`;
+  }, [selectedDate]);
+
+  // Get start and end dates for current month
+  const dateRange = useMemo(() => {
+    const startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    };
+  }, [selectedDate]);
+
+  const monthKey = useMemo(() => {
+    return `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`;
+  }, [selectedDate]);
 
   const fetchPayments = async () => {
     if (!selectedPropertyId) {
-      setLoading(false);
+      setIsInitialLoad(false);
+      setIsRefreshing(false);
+      return;
+    }
+
+    const cacheKey = cacheKeys.payments(selectedPropertyId, monthKey);
+    const cachedResponse = getScreenCache<PaginatedResponse<Payment>>(cacheKey, PAYMENTS_CACHE_STALE_MS);
+    if (cachedResponse) {
+      const cachedData = cachedResponse.data || [];
+      setPayments(cachedData);
+      setTotal(cachedResponse.meta?.total || cachedData.length);
+      setError(null);
+      setIsInitialLoad(false);
+      setIsRefreshing(false);
       return;
     }
 
     try {
-      setLoading(true);
+      setIsRefreshing(true);
       setError(null);
 
-      const response = await paymentService.getPayments();
-      const data = (response.data || []).filter(p => p.propertyId === selectedPropertyId);
+      const response = await paymentService.getPayments(selectedPropertyId, {
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+        page: currentPage,
+        pageSize: 50,
+      });
+      const data = response.data || [];
       setPayments(data);
-      setTotal(data.length);
+      setTotal(response.meta?.total || data.length);
+      setScreenCache(cacheKey, response);
     } catch (err: any) {
       if (err?.code === 'upgrade_required') {
         setShowUpgradeModal(true);
@@ -63,17 +114,29 @@ export default function PaymentsScreen() {
         setError(err?.message || 'Failed to load payments');
       }
     } finally {
-      setLoading(false);
+      setIsInitialLoad(false);
+      setIsRefreshing(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       if (!propertyLoading) {
+        setCurrentPage(1);
         fetchPayments();
       }
-    }, [selectedPropertyId, propertyLoading])
+    }, [selectedPropertyId, propertyLoading, monthKey])
   );
+
+  const handlePreviousMonth = () => {
+    setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1));
+    setCurrentPage(1);
+  };
+
+  const handleNextMonth = () => {
+    setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1));
+    setCurrentPage(1);
+  };
 
   const handleRetry = () => {
     fetchPayments();
@@ -129,7 +192,7 @@ export default function PaymentsScreen() {
     }
   };
 
-  if (propertyLoading || loading) {
+  if (propertyLoading || isInitialLoad) {
     return (
       <ScreenContainer edges={['top']}>
         <PropertySwitcher />
@@ -182,6 +245,37 @@ export default function PaymentsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Modern Month Navigator */}
+      <View style={[styles.monthNavigator, { backgroundColor: colors.background.secondary, borderColor: colors.border.light }]}>
+        <TouchableOpacity
+          onPress={handlePreviousMonth}
+          style={[styles.monthNavButton, { backgroundColor: colors.primary[50] }]}
+          activeOpacity={0.7}
+          disabled={isRefreshing}
+        >
+          <ChevronLeft size={24} color={colors.primary[500]} />
+        </TouchableOpacity>
+        
+        <View style={styles.monthDisplay}>
+          <Calendar size={18} color={colors.primary[500]} />
+          <Text style={[styles.monthYearText, { color: colors.text.primary }]}>
+            {monthYearString}
+          </Text>
+          {isRefreshing && (
+            <ActivityIndicator size="small" color={colors.primary[500]} style={styles.monthLoader} />
+          )}
+        </View>
+
+        <TouchableOpacity
+          onPress={handleNextMonth}
+          style={[styles.monthNavButton, { backgroundColor: colors.primary[50] }]}
+          activeOpacity={0.7}
+          disabled={isRefreshing}
+        >
+          <ChevronRight size={24} color={colors.primary[500]} />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
@@ -194,7 +288,7 @@ export default function PaymentsScreen() {
             subtitle="Payment history will appear here once tenants start making payments"
           />
         ) : (
-          <>
+          <View style={{ opacity: isRefreshing ? 0.5 : 1 }}>
             <View style={styles.statsContainer}>
               <Card style={styles.statCard}>
                 <Text style={[styles.statLabel, { color: colors.text.secondary }]}>Collected</Text>
@@ -257,7 +351,7 @@ export default function PaymentsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-          </>
+          </View>
         )}
       </ScrollView>
       <FAB onPress={handleFabPress} />
@@ -391,5 +485,38 @@ const styles = StyleSheet.create({
   methodValue: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
+  },
+  monthNavigator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: spacing.md,
+    marginHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    ...shadows.sm,
+  },
+  monthNavButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  monthYearText: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    minWidth: 150,
+    textAlign: 'center',
+  },
+  monthLoader: {
+    marginLeft: spacing.sm,
   },
 });

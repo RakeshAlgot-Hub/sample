@@ -18,6 +18,7 @@ import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { paymentService } from '@/services/apiClient';
 import ApiErrorCard from '@/components/ApiErrorCard';
+import { cacheKeys, clearScreenCache, getScreenCache, setScreenCache } from '@/services/screenCache';
 
 const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Other'];
 const PAYMENT_STATUSES = [
@@ -25,6 +26,8 @@ const PAYMENT_STATUSES = [
   { value: 'due', label: 'Due' },
   { value: 'overdue', label: 'Overdue' },
 ];
+
+const PAYMENT_DETAIL_CACHE_STALE_MS = 60 * 1000;
 
 export default function EditPaymentScreen() {
   const { colors } = useTheme();
@@ -56,22 +59,38 @@ export default function EditPaymentScreen() {
   const fetchPayment = async () => {
     if (!paymentId) return;
 
+    const paymentCacheKey = cacheKeys.paymentDetail(paymentId);
+    const cachedPayment = getScreenCache<any>(paymentCacheKey, PAYMENT_DETAIL_CACHE_STALE_MS);
+    if (cachedPayment) {
+      const amountStr = cachedPayment.amount.replace(/[^0-9]/g, '');
+      setAmount(amountStr);
+      setDueDate(cachedPayment.dueDate || '');
+      setPaymentDate((cachedPayment as any).date || '');
+      setMethod(cachedPayment.method || 'Cash');
+      setStatus(cachedPayment.status);
+      setTenantName((cachedPayment as any).tenantName || '');
+      setBedInfo(cachedPayment.bed);
+      setFetchingPayment(false);
+      return;
+    }
+
     try {
       setFetchingPayment(true);
       setError(null);
 
       const response = await paymentService.getPaymentById(paymentId);
-      const payment = response.data;
+      const payment: any = response.data;
 
       const amountStr = payment.amount.replace(/[^0-9]/g, '');
 
       setAmount(amountStr);
-      setDueDate(payment.dueDate);
+      setDueDate(payment.dueDate || '');
       setPaymentDate(payment.date || '');
       setMethod(payment.method || 'Cash');
       setStatus(payment.status);
       setTenantName(payment.tenantName);
       setBedInfo(payment.bed);
+      setScreenCache(paymentCacheKey, payment);
     } catch (err: any) {
       setError(err?.message || 'Failed to load payment');
     } finally {
@@ -110,7 +129,12 @@ export default function EditPaymentScreen() {
         date: paymentDate || null,
         method: paymentDate ? method : null,
         status,
-      });
+      } as any);
+
+      clearScreenCache('payments:');
+      clearScreenCache('dashboard:');
+      clearScreenCache('tenant-detail:');
+      clearScreenCache(`payment-detail:${paymentId}`);
 
       router.back();
     } catch (err: any) {

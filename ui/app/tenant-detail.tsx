@@ -29,13 +29,22 @@ import {
 import { Bed as BedIcon } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
-import { tenantService, paymentService, roomService, bedService } from '@/services/apiClient';
+import { tenantService, paymentService, roomService } from '@/services/apiClient';
 import type { Tenant, Payment, Room, Bed, BillingFrequency, BillingConfig } from '@/services/apiTypes';
 import Card from '@/components/Card';
 import StatusBadge from '@/components/StatusBadge';
 import EmptyState from '@/components/EmptyState';
 import Skeleton from '@/components/Skeleton';
 import ApiErrorCard from '@/components/ApiErrorCard';
+import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
+
+interface TenantDetailCachePayload {
+  tenant: Tenant;
+  payments: Payment[];
+  room: Room | null;
+}
+
+const TENANT_DETAIL_CACHE_STALE_MS = 30 * 1000;
 
 export default function TenantDetailScreen() {
   const { colors } = useTheme();
@@ -62,37 +71,47 @@ export default function TenantDetailScreen() {
       return;
     }
 
+    const cacheKey = cacheKeys.tenantDetail(tenantId);
+    const cachedData = getScreenCache<TenantDetailCachePayload>(cacheKey, TENANT_DETAIL_CACHE_STALE_MS);
+    if (cachedData) {
+      setTenant(cachedData.tenant);
+      setPayments(cachedData.payments);
+      setRoom(cachedData.room);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      const [tenantRes, paymentsRes, roomsRes, bedsRes] = await Promise.all([
-        tenantService.getTenantById(tenantId),
-        paymentService.getPayments(),
-        roomService.getRooms(),
-        bedService.getBeds(),
-      ]);
+      // Only fetch what we need for this tenant
+      const tenantRes = await tenantService.getTenantById(tenantId);
 
       if (tenantRes.data) {
         setTenant(tenantRes.data);
+        
+        // Only fetch payments/room data if tenant exists
+        const [paymentsRes, roomRes] = await Promise.all([
+          paymentService.getPayments(tenantRes.data.propertyId, { tenantId, page: 1, pageSize: 50 }),
+          tenantRes.data.roomId ? roomService.getRoomById(tenantRes.data.roomId) : Promise.resolve({ data: null }),
+        ]);
 
         if (paymentsRes.data) {
           const tenantPayments = paymentsRes.data
-            .filter(p => p.tenantId === tenantId)
             .sort((a, b) => new Date(b.dueDate ?? '').getTime() - new Date(a.dueDate ?? '').getTime());
           setPayments(tenantPayments);
+
+          setScreenCache(cacheKey, {
+            tenant: tenantRes.data,
+            payments: tenantPayments,
+            room: roomRes?.data || null,
+          });
         }
 
-        // Find the tenant's room
-        let tenantRoom: Room | null = null;
-        if (roomsRes.data && tenantRes.data.roomId) {
-          tenantRoom = roomsRes.data.find((r: Room) => r.id === tenantRes.data.roomId) || null;
-        }
-        setRoom(tenantRoom);
-
-        // Find all beds for lookup
-        if (bedsRes.data) {
-          setBeds(bedsRes.data);
+        if (roomRes?.data) {
+          setRoom(roomRes.data);
         }
       }
     } catch (err: any) {
@@ -284,12 +303,6 @@ export default function TenantDetailScreen() {
 
   const { totalPaid, latestPayment, outstanding } = calculateFinancialSummary();
 
-  // Define bed in render scope
-  let bed: Bed | null = null;
-  if (tenant && tenant.bedId && beds.length > 0) {
-    bed = beds.find(b => b.id === tenant.bedId) || null;
-  }
-
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
@@ -350,10 +363,10 @@ export default function TenantDetailScreen() {
                     Joined {formatDate(tenant.joinDate)}
                   </Text>
                 </View>
-                {room && bed && (
+                {tenant.roomNumber && tenant.bedNumber && (
                   <View style={styles.contactItem}>
                     <BedIcon size={16} color={colors.text.secondary} />
-                    <Text style={[styles.contactText, { color: colors.text.primary }]}>Room {room.roomNumber} - Bed {bed.bedNumber}</Text>
+                    <Text style={[styles.contactText, { color: colors.text.primary }]}>Room {tenant.roomNumber} - Bed {tenant.bedNumber}</Text>
                   </View>
                 )}
               </View>

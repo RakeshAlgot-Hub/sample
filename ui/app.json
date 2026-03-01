@@ -16,6 +16,10 @@
       "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "plugins": [
       "expo-router",
       "expo-font",

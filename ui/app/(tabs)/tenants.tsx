@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,28 +18,45 @@ import Skeleton from '@/components/Skeleton';
 import ApiErrorCard from '@/components/ApiErrorCard';
 import FAB from '@/components/FAB';
 import UpgradeModal from '@/components/UpgradeModal';
-import { Search, Filter, Phone, Mail, MapPin, Users } from 'lucide-react-native';
+import { Search, Filter, Phone, Users } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
-import { tenantService, roomService, paymentService } from '@/services/apiClient';
-import type { Tenant, Room, Bed, Payment } from '@/services/apiTypes';
+import { tenantService } from '@/services/apiClient';
+import type { Tenant, PaginatedResponse } from '@/services/apiTypes';
+import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
+
+const TENANTS_CACHE_STALE_MS = 30 * 1000;
 
 export default function TenantsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { selectedProperty, selectedPropertyId, loading: propertyLoading } = useProperty();
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [beds, setBeds] = useState<Bed[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  
+  // Filter & Pagination
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'paid' | 'due' | 'overdue'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchTenants = async () => {
+  const fetchTenants = useCallback(async (page: number = 1, search: string = '', status: string = 'all') => {
     if (!selectedPropertyId) {
+      setLoading(false);
+      return;
+    }
+
+    const cacheKey = cacheKeys.tenants(selectedPropertyId, page, search, status);
+    const cachedResponse = getScreenCache<PaginatedResponse<Tenant>>(cacheKey, TENANTS_CACHE_STALE_MS);
+    if (cachedResponse) {
+      setTenants(cachedResponse.data || []);
+      setTotal(cachedResponse.meta?.total || 0);
+      setError(null);
       setLoading(false);
       return;
     }
@@ -47,26 +64,16 @@ export default function TenantsScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [tenantsRes, roomsRes, paymentsRes] = await Promise.all([
-        tenantService.getTenants(),
-        roomService.getRooms(),
-        paymentService.getPayments(),
-      ]);
+      
+      const statusFilter = status !== 'all' ? status : undefined;
+      
+      // ONLY fetch tenants - rooms & beds data now included in response
+      const tenantsRes = await tenantService.getTenants(selectedPropertyId, search || undefined, statusFilter, page, pageSize);
 
       if (tenantsRes.data) {
-        const filteredTenants = tenantsRes.data.filter(t => t.propertyId === selectedPropertyId);
-        setTenants(filteredTenants);
-        setTotal(filteredTenants.length);
-      }
-
-      if (roomsRes.data) {
-        const filteredRooms = roomsRes.data.filter(r => r.propertyId === selectedPropertyId);
-        setRooms(filteredRooms);
-      }
-
-      if (paymentsRes.data) {
-        const filteredPayments = paymentsRes.data.filter(p => p.propertyId === selectedPropertyId);
-        setPayments(filteredPayments);
+        setTenants(tenantsRes.data);
+        setTotal(tenantsRes.meta?.total || 0);
+        setScreenCache(cacheKey, tenantsRes);
       }
     } catch (err: any) {
       if (err?.code === 'upgrade_required') {
@@ -77,14 +84,44 @@ export default function TenantsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedPropertyId]);
+
+  // Reset state when property changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setSearchQuery('');
+    setSelectedStatus('all');
+    setTenants([]);
+    setTotal(0);
+    
+    if (selectedPropertyId && !propertyLoading) {
+      fetchTenants(1, '', 'all');
+    }
+  }, [selectedPropertyId, propertyLoading]);
+
+  // Debounced search handler
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setCurrentPage(1); // Reset to first page on new search
+      fetchTenants(1, searchQuery, selectedStatus);
+    }, 500); // 500ms debounce
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [searchQuery, selectedStatus, fetchTenants]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!propertyLoading) {
-        fetchTenants();
+      if (!propertyLoading && selectedPropertyId) {
+        // Refresh tenants when screen is focused
+        fetchTenants(currentPage, searchQuery, selectedStatus);
       }
-    }, [selectedPropertyId, propertyLoading])
+    }, [propertyLoading, selectedPropertyId, currentPage, searchQuery, selectedStatus, fetchTenants])
   );
 
   const handleRetry = () => {
@@ -95,21 +132,12 @@ export default function TenantsScreen() {
     router.push('/add-tenant');
   };
 
-  const getBedInfo = (bedId: string) => {
-    const bed = beds.find(b => b.id === bedId);
-    if (!bed) return 'N/A';
-    const room = rooms.find(r => r.id === bed.roomId);
-    if (!room) return `Bed ${bed.bedNumber}`;
-    return `Room ${room.roomNumber} - Bed ${bed.bedNumber}`;
-  };
-
-  const getLatestPaymentStatus = (tenantId: string): 'paid' | 'due' | 'overdue' | null => {
-    const tenantPayments = payments
-      .filter(p => p.tenantId === tenantId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    if (tenantPayments.length === 0) return null;
-    return tenantPayments[0].status;
+  const getRoomInfo = (tenant: Tenant) => {
+    // Show only room number
+    if (tenant.roomNumber) {
+      return `Room ${tenant.roomNumber}`;
+    }
+    return 'N/A';
   };
 
   if (propertyLoading || loading) {
@@ -163,19 +191,40 @@ export default function TenantsScreen() {
           <Search size={20} color={colors.text.tertiary} />
           <TextInput
             style={[styles.searchInput, { color: colors.text.primary }]}
-            placeholder="Search tenants..."
+            placeholder="Search by name, phone..."
             placeholderTextColor={colors.text.tertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
         </View>
-        <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[100] }]} activeOpacity={0.7}>
-          <Filter size={20} color={colors.primary[500]} />
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            {
+              backgroundColor: selectedStatus !== 'all' ? colors.primary[100] : colors.primary[50],
+              borderColor: selectedStatus !== 'all' ? colors.primary[300] : colors.primary[100]
+            }
+          ]}
+          activeOpacity={0.7}
+          onPress={() => {
+            // Show status filter menu
+            const statusOptions = [
+              { label: 'All', value: 'all' },
+              { label: 'Paid', value: 'paid' },
+              { label: 'Due', value: 'due' },
+              { label: 'Overdue', value: 'overdue' }
+            ];
+            // You can use Alert for this or a custom modal
+            alert('Filter by payment status - Consider adding a modal for better UX');
+          }}>
+          <Filter size={20} color={selectedStatus !== 'all' ? colors.primary[700] : colors.primary[500]} />
         </TouchableOpacity>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {error ? (
+        {error && selectedProperty ? (
           <ApiErrorCard error={error} onRetry={handleRetry} />
         ) : showEmptyState ? (
           <EmptyState
@@ -188,7 +237,6 @@ export default function TenantsScreen() {
         ) : (
           <>
             {tenants.map((tenant, index) => {
-              const paymentStatus = getLatestPaymentStatus(tenant.id);
               return (
                 <TouchableOpacity
                   key={index}
@@ -196,60 +244,96 @@ export default function TenantsScreen() {
                   activeOpacity={0.7}>
                   <Card style={styles.tenantCard}>
                     <View style={styles.tenantHeader}>
-                    <View style={[styles.avatar, { backgroundColor: colors.primary[500] }]}>
-                      <Text style={[styles.avatarText, { color: colors.white }]}>
-                        {tenant.name
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')}
-                      </Text>
-                    </View>
-                    <View style={styles.tenantInfo}>
-                      <Text style={[styles.tenantName, { color: colors.text.primary }]}>{tenant.name}</Text>
-                      <View style={styles.propertyRow}>
-                        <MapPin size={14} color={colors.text.secondary} />
-                        <Text style={[styles.propertyText, { color: colors.text.secondary }]}>{selectedProperty.name}</Text>
+                      <View style={[styles.avatar, { backgroundColor: colors.primary[500] }]}>
+                        <Text style={[styles.avatarText, { color: colors.white }]}>
+                          {tenant.name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')}
+                        </Text>
+                      </View>
+                      <View style={styles.tenantInfo}>
+                        <Text style={[styles.tenantName, { color: colors.text.primary }]}>{tenant.name}</Text>
+                        <View style={styles.phoneRow}>
+                          <Phone size={13} color={colors.primary[500]} />
+                          <Text style={[styles.phoneText, { color: colors.text.secondary }]}>{tenant.phone}</Text>
+                        </View>
                       </View>
                     </View>
-                    {paymentStatus ? (
-                      <StatusBadge status={paymentStatus} />
-                    ) : (
-                      <View style={[styles.noPaymentBadge, { backgroundColor: colors.neutral[100] }]}>
-                        <Text style={[styles.noPaymentText, { color: colors.neutral[600] }]}>NO PAYMENT</Text>
+
+                    <View style={styles.detailsRow}>
+                      <View style={styles.detailItem}>
+                        <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>Room</Text>
+                        <Text style={[styles.detailValue, { color: colors.text.primary }]}>{getRoomInfo(tenant)}</Text>
                       </View>
-                    )}
-                  </View>
-
-                  <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
-
-                  <View style={styles.detailsRow}>
-                    <View style={styles.detailItem}>
-                      <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>Bed</Text>
-                      <Text style={[styles.detailValue, { color: colors.text.primary }]}>{getBedInfo(tenant.bedId)}</Text>
+                      <View style={styles.detailItem}>
+                        <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>Rent</Text>
+                        <Text style={[styles.detailValue, { color: colors.text.primary }]}>{tenant.rent}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>Since</Text>
+                        <Text style={[styles.detailValue, { color: colors.text.primary }]}>{tenant.joinDate}</Text>
+                      </View>
                     </View>
-                    <View style={styles.detailItem}>
-                      <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>Rent</Text>
-                      <Text style={[styles.detailValue, { color: colors.text.primary }]}>{tenant.rent}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>Since</Text>
-                      <Text style={[styles.detailValue, { color: colors.text.primary }]}>{tenant.joinDate}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.contactRow}>
-                    <View style={styles.contactItem}>
-                      <Phone size={14} color={colors.text.secondary} />
-                      <Text style={[styles.contactText, { color: colors.text.secondary }]}>{tenant.phone}</Text>
-                    </View>
-                    <View style={styles.contactItem}>
-                      <Text style={[styles.contactText, { color: colors.text.secondary }]}>Document ID: {tenant.documentId}</Text>
-                    </View>
-                  </View>
                   </Card>
                 </TouchableOpacity>
               );
             })}
+            
+            {/* Pagination Controls */}
+            {total > pageSize && (
+              <View style={[styles.paginationContainer, { backgroundColor: colors.white, borderTopColor: colors.border.light }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.paginationButton,
+                    {
+                      backgroundColor: currentPage === 1 ? colors.neutral[100] : colors.primary[500],
+                      borderColor: colors.border.medium
+                    }
+                  ]}
+                  onPress={() => {
+                    if (currentPage > 1) {
+                      const newPage = currentPage - 1;
+                      setCurrentPage(newPage);
+                      fetchTenants(newPage, searchQuery, selectedStatus);
+                    }
+                  }}
+                  disabled={currentPage === 1}
+                  activeOpacity={0.7}>
+                  <Text style={[styles.paginationButtonText, { color: currentPage === 1 ? colors.text.tertiary : colors.white }]}>
+                    ← Previous
+                  </Text>
+                </TouchableOpacity>
+                
+                <View style={styles.paginationInfo}>
+                  <Text style={[styles.paginationText, { color: colors.text.primary }]}>
+                    Page {currentPage} of {Math.ceil(total / pageSize)}
+                  </Text>
+                </View>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.paginationButton,
+                    {
+                      backgroundColor: currentPage >= Math.ceil(total / pageSize) ? colors.neutral[100] : colors.primary[500],
+                      borderColor: colors.border.medium
+                    }
+                  ]}
+                  onPress={() => {
+                    if (currentPage < Math.ceil(total / pageSize)) {
+                      const newPage = currentPage + 1;
+                      setCurrentPage(newPage);
+                      fetchTenants(newPage, searchQuery, selectedStatus);
+                    }
+                  }}
+                  disabled={currentPage >= Math.ceil(total / pageSize)}
+                  activeOpacity={0.7}>
+                  <Text style={[styles.paginationButtonText, { color: currentPage >= Math.ceil(total / pageSize) ? colors.text.tertiary : colors.white }]}>
+                    Next →
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         )}
       </ScrollView>
@@ -265,18 +349,19 @@ export default function TenantsScreen() {
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingBottom: spacing.xxxl,
+    paddingTop: spacing.sm,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   headerTitle: {
-    fontSize: typography.fontSize.xxxl,
+    fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
   },
   headerCount: {
@@ -285,8 +370,8 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
     gap: spacing.sm,
   },
   searchBar: {
@@ -294,8 +379,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderWidth: 1,
   },
   searchInput: {
@@ -304,24 +389,26 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
   },
   filterButton: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
   tenantCard: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   tenantHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   avatar: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -336,33 +423,21 @@ const styles = StyleSheet.create({
   },
   tenantName: {
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing.xs,
   },
-  propertyRow: {
+  phoneRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
   },
-  propertyText: {
+  phoneText: {
     fontSize: typography.fontSize.sm,
-    marginLeft: spacing.xs,
   },
-  noPaymentBadge: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-  },
-  noPaymentText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  divider: {
-    height: 1,
-    marginBottom: spacing.lg,
-  },
+
   detailsRow: {
     flexDirection: 'row',
-    marginBottom: spacing.lg,
+    gap: spacing.sm,
   },
   detailItem: {
     flex: 1,
@@ -375,15 +450,34 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
-  contactRow: {
-    gap: spacing.sm,
-  },
-  contactItem: {
+  paginationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    marginTop: spacing.md,
+    borderTopWidth: 1,
   },
-  contactText: {
+  paginationButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    minWidth: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paginationButtonText: {
     fontSize: typography.fontSize.sm,
-    marginLeft: spacing.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  paginationInfo: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  paginationText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

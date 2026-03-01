@@ -7,14 +7,22 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+import logging
 
 import os
-from app.routes import health, auth, property, room, tenant, bed, subscription
+from app.routes import health, auth, property, room, tenant, bed, subscription, dashboard
 from app.utils.rate_limit import limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from app.utils.exception_handlers import add_global_exception_handlers
 from app.middleware.user_context import UserContextMiddleware
+
+# Configure logging for APScheduler
+logging.basicConfig()
+scheduler_logger = logging.getLogger('apscheduler.executors.default')
+scheduler_logger.setLevel(logging.INFO)
 
 # Ensure 'static' directory exists
 static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -26,14 +34,48 @@ async def ensure_indexes():
     # Users: unique email, index on createdAt
     await db["users"].create_index("email", unique=True)
     await db["users"].create_index("createdAt")
+    await db["users"].create_index("phone")
     
     # Token blacklist: TTL index on createdAt (7 days)
     await db["token_blacklist"].create_index("createdAt", expireAfterSeconds=60*60*24*7)
 
+    # WhatsApp OTP: lookup + TTL expiry
+    await db["whatsapp_otps"].create_index("phoneNumber", unique=True)
+    await db["whatsapp_otps"].create_index("expiresAt", expireAfterSeconds=0)
+
 @asynccontextmanager
 async def lifespan(app):
     await ensure_indexes()
+    
+    # Initialize APScheduler for background jobs
+    scheduler = AsyncIOScheduler()
+    
+    # Import here to avoid circular imports
+    from app.services.tenant_service import TenantService
+    tenant_service = TenantService()
+    
+    # Job 1: Generate monthly payments daily at 00:05 UTC
+    # This ensures all tenants get their monthly payment created on the same day
+    scheduler.add_job(
+        tenant_service.generate_monthly_payments,
+        trigger=CronTrigger(hour=0, minute=5, timezone="UTC"),
+        id="generate_monthly_payments",
+        name="Generate monthly payments for tenants",
+        replace_existing=True,
+        max_instances=1  # Prevent concurrent executions
+    )
+    
+    scheduler.start()
+    app.state.scheduler = scheduler
+    
+    print("✓ Background scheduler initialized")
+    print("✓ Jobs registered: generate_monthly_payments (daily at 00:05 UTC)")
+    
     yield
+    
+    # Shutdown scheduler
+    scheduler.shutdown()
+    print("✓ Background scheduler shut down")
 
 
 
@@ -81,6 +123,7 @@ app.include_router(tenant.router, prefix=API_PREFIX)
 app.include_router(bed.router, prefix=API_PREFIX)
 app.include_router(payment.router, prefix=API_PREFIX)
 app.include_router(subscription.router, prefix=API_PREFIX)
+app.include_router(dashboard.router, prefix=API_PREFIX)
 
 
 # Register global exception handlers

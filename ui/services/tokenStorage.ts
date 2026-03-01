@@ -9,7 +9,6 @@ export const tokenStorage = {
     try {
       await AsyncStorage.setItem(ACCESS_TOKEN_KEY, token);
     } catch (error) {
-      console.error('Error storing access token:', error);
       throw error;
     }
   },
@@ -18,7 +17,6 @@ export const tokenStorage = {
     try {
       return await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
     } catch (error) {
-      console.error('Error retrieving access token:', error);
       return null;
     }
   },
@@ -27,7 +25,6 @@ export const tokenStorage = {
     try {
       await AsyncStorage.setItem(REFRESH_TOKEN_KEY, token);
     } catch (error) {
-      console.error('Error storing refresh token:', error);
       throw error;
     }
   },
@@ -36,7 +33,6 @@ export const tokenStorage = {
     try {
       return await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
     } catch (error) {
-      console.error('Error retrieving refresh token:', error);
       return null;
     }
   },
@@ -45,7 +41,6 @@ export const tokenStorage = {
     try {
       await AsyncStorage.setItem(TOKEN_EXPIRY_KEY, expiresAt.toString());
     } catch (error) {
-      console.error('Error storing token expiry:', error);
       throw error;
     }
   },
@@ -55,7 +50,6 @@ export const tokenStorage = {
       const expiry = await AsyncStorage.getItem(TOKEN_EXPIRY_KEY);
       return expiry ? parseInt(expiry, 10) : null;
     } catch (error) {
-      console.error('Error retrieving token expiry:', error);
       return null;
     }
   },
@@ -68,7 +62,6 @@ export const tokenStorage = {
         AsyncStorage.removeItem(TOKEN_EXPIRY_KEY),
       ]);
     } catch (error) {
-      console.error('Error clearing tokens:', error);
       throw error;
     }
   },
@@ -79,7 +72,6 @@ export const tokenStorage = {
       if (!expiry) return false;
       return Date.now() < expiry;
     } catch (error) {
-      console.error('Error checking token validity:', error);
       return false;
     }
   },
