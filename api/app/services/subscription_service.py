@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 #   rooms: Max rooms PER property
 #   staff: Max staff PER property
 DEFAULT_SUBSCRIPTION_PLANS = {
-    'free': {'properties': 1, 'tenants': 20, 'rooms': 30, 'staff': 3, 'price': 0},
-    'pro': {'properties': 3, 'tenants': 50, 'rooms': 50, 'staff': 5, 'price': 79},
-    'premium': {'properties': 5, 'tenants': 100, 'rooms': 70, 'staff': 7, 'price': 129},
+    'free': {'properties': 1, 'tenants': 80, 'rooms': 30, 'staff': 3, 'price': 0},
+    'pro': {'properties': 3, 'tenants': 150, 'rooms': 50, 'staff': 5, 'price': 79},
+    'premium': {'properties': 5, 'tenants': 200, 'rooms': 70, 'staff': 7, 'price': 129},
 }
 
 def format_price_text(price_paise: int) -> str:
@@ -77,6 +77,7 @@ class SubscriptionService:
             ownerId=owner_id,
             plan='free',
             status='active',
+            price=free_limits['price'],
             currentPeriodStart=now,
             currentPeriodEnd=(datetime.now() + timedelta(days=30)).isoformat(),
             propertyLimit=free_limits['properties'],
@@ -94,14 +95,17 @@ class SubscriptionService:
 
     @staticmethod
     async def update_subscription(owner_id: str, plan: Literal['free', 'pro', 'premium']):
-        """Update subscription plan"""
+        """Update subscription plan to activate it"""
         try:
             now = datetime.now().isoformat()
             plan_limits = SUBSCRIPTION_PLANS[plan]
+            
+            # Find and update the specific plan subscription for this user
             result = await db["subscriptions"].find_one_and_update(
-                {"ownerId": owner_id},
+                {"ownerId": owner_id, "plan": plan},
                 {"$set": {
-                    "plan": plan,
+                    "status": "active",
+                    "price": plan_limits['price'],
                     "propertyLimit": plan_limits['properties'],
                     "roomLimit": plan_limits['rooms'],
                     "tenantLimit": plan_limits['tenants'],
@@ -115,13 +119,14 @@ class SubscriptionService:
         except Exception as e:
             print(f"Error updating subscription: {str(e)}")
         
-        # If not found or error, create new
+        # If not found or error, create new (for backwards compatibility)
         now = datetime.now().isoformat()
         plan_limits = SUBSCRIPTION_PLANS[plan]
         sub = Subscription(
             ownerId=owner_id,
             plan=plan,
             status='active',
+            price=plan_limits['price'],
             currentPeriodStart=now,
             currentPeriodEnd=(datetime.now() + timedelta(days=30)).isoformat(),
             propertyLimit=plan_limits['properties'],
@@ -246,3 +251,61 @@ class SubscriptionService:
                 else "You can proceed with downgrade"
             )
         }
+
+    @staticmethod
+    async def create_default_subscriptions(owner_id: str) -> dict:
+        """
+        Create 3 default subscription documents (free, pro, premium) for a new user.
+        Only free plan is active by default. Pro and Premium are inactive until user upgrades.
+        
+        Returns:
+            dict with created subscription details
+        """
+        try:
+            now = datetime.now().isoformat()
+            period_end = (datetime.now() + timedelta(days=30)).isoformat()
+            
+            subscriptions_to_create = []
+            
+            for plan_name in ['free', 'pro', 'premium']:
+                plan_limits = SUBSCRIPTION_PLANS[plan_name]
+                # Only free plan is active by default
+                status = 'active' if plan_name == 'free' else 'inactive'
+                
+                sub_doc = {
+                    "ownerId": owner_id,
+                    "plan": plan_name,
+                    "status": status,
+                    "price": plan_limits['price'],
+                    "currentPeriodStart": now,
+                    "currentPeriodEnd": period_end,
+                    "propertyLimit": plan_limits['properties'],
+                    "roomLimit": plan_limits['rooms'],
+                    "tenantLimit": plan_limits['tenants'],
+                    "staffLimit": plan_limits['staff'],
+                    "createdAt": now,
+                    "updatedAt": now
+                }
+                subscriptions_to_create.append(sub_doc)
+            
+            # Insert all 3 subscriptions
+            result = await db["subscriptions"].insert_many(subscriptions_to_create)
+            
+            logger.info(f"✓ Created 3 default subscriptions for user {owner_id} (only free is active)")
+            
+            return {
+                "success": True,
+                "user_id": owner_id,
+                "subscriptions_created": len(result.inserted_ids),
+                "plans": ['free', 'pro', 'premium'],
+                "message": "3 default subscription documents created successfully (only free is active)"
+            }
+        except Exception as e:
+            logger.error(f"Error creating default subscriptions for {owner_id}: {str(e)}")
+            return {
+                "success": False,
+                "user_id": owner_id,
+                "error": str(e),
+                "message": "Failed to create default subscriptions"
+            }
+

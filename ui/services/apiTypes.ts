@@ -77,6 +77,11 @@ export interface Subscription {
   ownerId: string;
   plan: 'free' | 'pro' | 'premium';
   status: 'active' | 'inactive' | 'cancelled';
+  price: number; // Price in paise (₹1 = 100 paise)
+  propertyLimit: number;
+  roomLimit: number;
+  tenantLimit: number;
+  staffLimit: number;
   currentPeriodStart: string;
   currentPeriodEnd: string;
   createdAt: string;

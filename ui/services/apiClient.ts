@@ -488,6 +488,14 @@ export const subscriptionService = {
     return await request<Subscription>('GET', '/subscription', undefined, true) as ApiResponse<Subscription>;
   },
 
+  async getAllSubscriptions(): Promise<ApiResponse<{ count: number; subscriptions: Subscription[] }>> {
+    return await request<{ count: number; subscriptions: Subscription[] }>('GET', '/subscription/all', undefined, true) as ApiResponse<{ count: number; subscriptions: Subscription[] }>;
+  },
+
+  async initializeSubscriptions(): Promise<ApiResponse<{ success: boolean; message: string; subscriptions_created: number; plans_created: string[] }>> {
+    return await request<{ success: boolean; message: string; subscriptions_created: number; plans_created: string[] }>('POST', '/subscription/initialize', {}, true) as ApiResponse<{ success: boolean; message: string; subscriptions_created: number; plans_created: string[] }>;
+  },
+
   async getUsage(): Promise<ApiResponse<Usage>> {
     return await request<Usage>('GET', '/subscription/usage', undefined, true) as ApiResponse<Usage>;
   },

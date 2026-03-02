@@ -106,27 +106,21 @@ export default function ManageStaffScreen() {
   );
 
   useEffect(() => {
-    if (!subscription?.plan) {
+    if (!subscription) {
       setPlanLimits(null);
       return;
     }
 
-    let active = true;
-    (async () => {
-      try {
-        const response = await subscriptionService.getLimits(subscription.plan);
-        if (active) {
-          setPlanLimits(response.data || null);
-        }
-      } catch (error) {
-        console.error('Failed to load plan limits:', error);
-      }
-    })();
-
-    return () => {
-      active = false;
+    // Use limits directly from subscription object instead of separate API call
+    const limits: PlanLimits = {
+      properties: subscription.propertyLimit,
+      tenants: subscription.tenantLimit,
+      rooms: subscription.roomLimit,
+      staff: subscription.staffLimit,
+      price: subscription.price,
     };
-  }, [subscription?.plan]);
+    setPlanLimits(limits);
+  }, [subscription]);
 
   const resetForm = () => {
     setFormData({

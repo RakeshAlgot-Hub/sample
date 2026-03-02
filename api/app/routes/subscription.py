@@ -266,3 +266,120 @@ async def recover_archived_resources(user_id: str = Depends(get_current_user)):
             status_code=500,
             detail="Error recovering archived resources. Please try again."
         )
+
+@router.get("/all")
+async def get_all_subscriptions(user_id: str = Depends(get_current_user)):
+    """
+    Get all 3 subscription documents (free, pro, premium) for the current user.
+    Each subscription shows plan details including limits and pricing.
+    """
+    try:
+        from app.database.mongodb import db
+        
+        subs = await db["subscriptions"].find(
+            {"ownerId": user_id}
+        ).to_list(length=None)
+        
+        if not subs:
+            raise HTTPException(
+                status_code=404,
+                detail="No subscriptions found for user. Please contact support."
+            )
+        
+        # Sort by plan order: free, pro, premium
+        plan_order = {"free": 0, "pro": 1, "premium": 2}
+        subs.sort(key=lambda x: plan_order.get(x.get("plan"), 999))
+
+        # Normalize Mongo documents for JSON response
+        serialized_subs = []
+        for sub in subs:
+            doc = dict(sub)
+            mongo_id = doc.pop("_id", None)
+            if mongo_id is not None:
+                doc["id"] = str(mongo_id)
+
+            if "ownerId" in doc and doc["ownerId"] is not None:
+                doc["ownerId"] = str(doc["ownerId"])
+
+            serialized_subs.append(doc)
+        
+        return {
+            "data": {
+                "user_id": user_id,
+                "count": len(serialized_subs),
+                "subscriptions": serialized_subs
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Error retrieving subscriptions. Please try again."
+        )
+
+
+@router.post("/initialize")
+async def initialize_subscriptions(user_id: str = Depends(get_current_user)):
+    """
+    Check if user has 3 subscriptions (free, pro, premium).
+    If not, create the missing ones with active status.
+    Useful for existing users who may not have all 3 subscriptions.
+    """
+    try:
+        from app.database.mongodb import db
+        
+        # Check existing subscriptions
+        existing_subs = await db["subscriptions"].find(
+            {"ownerId": user_id}
+        ).to_list(length=None)
+        
+        existing_plans = {sub["plan"] for sub in existing_subs}
+        
+        if len(existing_subs) == 3 and existing_plans == {"free", "pro", "premium"}:
+            # User already has all 3 subscriptions
+            # Ensure free is active, pro/premium are inactive
+            await db["subscriptions"].update_many(
+                {"ownerId": user_id, "plan": "free"},
+                {"$set": {"status": "active"}}
+            )
+            await db["subscriptions"].update_many(
+                {"ownerId": user_id, "plan": {"$in": ["pro", "premium"]}},
+                {"$set": {"status": "inactive"}}
+            )
+            
+            return {
+                "data": {
+                    "success": True,
+                    "message": "User already has all 3 subscriptions (free: active, pro/premium: inactive)",
+                    "subscriptions_created": 0,
+                    "existing_subscriptions": 3
+                }
+            }
+        
+        # Create missing subscriptions
+        result = await SubscriptionService.create_default_subscriptions(user_id)
+        
+        if result["success"]:
+            return {
+                "data": {
+                    "success": True,
+                    "message": result["message"],
+                    "subscriptions_created": result["subscriptions_created"],
+                    "plans_created": result["plans"],
+                    "existing_subscriptions": len(existing_subs),
+                    "note": "Only free plan is active. Pro/Premium become active when user purchases."
+                }
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=result.get("error", "Failed to create subscriptions")
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Error initializing subscriptions. Please try again."
+        )

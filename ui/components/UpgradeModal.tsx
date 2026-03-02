@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,12 +15,13 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { subscriptionService } from '@/services/apiClient';
 import { openRazorpayCheckout, RazorpaySuccessResponse, RazorpayErrorResponse } from '@/services/razorpayService';
-import type { PlanLimits } from '@/services/apiTypes';
+import type { Subscription } from '@/services/apiTypes';
 
 interface UpgradeModalProps {
   visible: boolean;
   onClose: () => void;
-  onSelectPlan: (plan: 'free' | 'pro' | 'premium') => void;
+  onSelectPlan?: (plan: 'free' | 'pro' | 'premium') => void;
+  subscriptions?: Subscription[];
 }
 
 type Plan = 'free' | 'pro' | 'premium';
@@ -28,49 +29,52 @@ type Plan = 'free' | 'pro' | 'premium';
 interface PlanWithLimits {
   id: Plan;
   name: string;
-  limits?: PlanLimits;
+  limits?: {
+    properties: number;
+    tenants: number;
+    rooms: number;
+    staff: number;
+    price: number;
+  };
 }
 
 export default function UpgradeModal({
   visible,
   onClose,
-  onSelectPlan,
+  onSelectPlan = () => {},
+  subscriptions = [],
 }: UpgradeModalProps) {
   const { colors } = useTheme();
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [processingPlan, setProcessingPlan] = useState<Plan | null>(null);
-  const [allLimits, setAllLimits] = useState<Record<Plan, PlanLimits>>({} as Record<Plan, PlanLimits>);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [liveSubscriptions, setLiveSubscriptions] = useState<Subscription[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (visible) {
-      fetchLimits();
-    }
-  }, [visible]);
-
-  const fetchLimits = async () => {
+  const fetchAvailablePlans = useCallback(async () => {
     try {
-      setLoading(true);
-      const [freeLimitsRes, proLimitsRes, premiumLimitsRes] = await Promise.all([
-        subscriptionService.getLimits('free'),
-        subscriptionService.getLimits('pro'),
-        subscriptionService.getLimits('premium'),
-      ]);
-
-      setAllLimits({
-        free: freeLimitsRes.data,
-        pro: proLimitsRes.data,
-        premium: premiumLimitsRes.data,
-      });
-    } catch (error) {
-      console.error('Failed to fetch plan limits:', error);
-      setError('Failed to load plans. Please try again.');
+      setLoadingPlans(true);
+      const response = await subscriptionService.getAllSubscriptions();
+      setLiveSubscriptions(response.data.subscriptions || []);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load subscription plans');
     } finally {
-      setLoading(false);
+      setLoadingPlans(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    setError(null);
+
+    if (subscriptions.length > 0) {
+      setLiveSubscriptions(subscriptions);
+      return;
+    }
+
+    fetchAvailablePlans();
+  }, [visible, subscriptions, fetchAvailablePlans]);
 
   const handlePlanSelection = async (plan: Plan) => {
     if (plan === 'free') {
@@ -79,11 +83,9 @@ export default function UpgradeModal({
         setProcessingPlan(plan);
         setError(null);
 
-        await subscriptionService.updateSubscription(plan);
+        const updatedSubscription = await subscriptionService.updateSubscription(plan);
 
-        const updatedSubscription = await subscriptionService.getSubscription();
-
-        onSelectPlan(plan);
+        onSelectPlan(updatedSubscription.data.plan);
         onClose();
       } catch (err: any) {
         setError(err?.message || 'Failed to update subscription');
@@ -135,9 +137,7 @@ export default function UpgradeModal({
       });
 
       if (verifyResponse.data.success) {
-        const updatedSubscription = await subscriptionService.getSubscription();
-
-        onSelectPlan(updatedSubscription.data.plan);
+        onSelectPlan(verifyResponse.data.subscription.plan);
         onClose();
 
         Alert.alert(
@@ -167,27 +167,30 @@ export default function UpgradeModal({
     return value === 999 ? 'Unlimited' : `Up to ${value}`;
   };
 
-  const buildPlans = (): PlanWithLimits[] => {
-    return [
-      {
-        id: 'free',
-        name: 'Free',
-        limits: allLimits.free,
-      },
-      {
-        id: 'pro',
-        name: 'Pro',
-        limits: allLimits.pro,
-      },
-      {
-        id: 'premium',
-        name: 'Premium',
-        limits: allLimits.premium,
-      },
-    ];
+  const formatPrice = (paise: number) => {
+    if (paise === 0) return 'Free';
+    const rupees = paise / 100;
+    return `₹${rupees.toFixed(rupees === Math.floor(rupees) ? 0 : 2)}`;
   };
 
-  const plans = buildPlans();
+  const plans = useMemo<PlanWithLimits[]>(() => {
+    const source = subscriptions.length > 0 ? subscriptions : liveSubscriptions;
+    const order: Record<Plan, number> = { free: 0, pro: 1, premium: 2 };
+
+    return source
+      .map((sub) => ({
+        id: sub.plan as Plan,
+        name: sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1),
+        limits: {
+          properties: sub.propertyLimit,
+          tenants: sub.tenantLimit,
+          rooms: sub.roomLimit,
+          staff: sub.staffLimit,
+          price: sub.price,
+        },
+      }))
+      .sort((a, b) => order[a.id] - order[b.id]);
+  }, [subscriptions, liveSubscriptions]);
 
   return (
     <Modal
@@ -206,13 +209,13 @@ export default function UpgradeModal({
             )}
           </View>
 
-          {loading ? (
+          {loadingPlans ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary[500]} />
             </View>
           ) : (
             <>
-              {error && (
+          {error && (
                 <View style={[styles.errorContainer, { backgroundColor: colors.danger[50], borderColor: colors.danger[200] }]}>
                   <AlertCircle size={16} color={colors.danger[600]} />
                   <Text style={[styles.errorText, { color: colors.danger[700] }]}>{error}</Text>
@@ -228,6 +231,11 @@ export default function UpgradeModal({
                     <View key={plan.id} style={[styles.planCard, { backgroundColor: colors.background.tertiary }]}>
                       <View style={styles.planHeader}>
                         <Text style={[styles.planName, { color: colors.text.primary }]}>{plan.name}</Text>
+                        {plan.limits?.price !== undefined && (
+                          <Text style={[styles.price, { color: colors.primary[600] }]}>
+                            {formatPrice(plan.limits.price)}{plan.limits.price > 0 ? '/month' : ''}
+                          </Text>
+                        )}
                       </View>
 
                       {plan.limits && (
@@ -241,13 +249,19 @@ export default function UpgradeModal({
                           <View style={styles.featureRow}>
                             <Check size={16} color={colors.success[500]} />
                             <Text style={[styles.featureText, { color: colors.text.primary }]}>
-                              {formatLimit(plan.limits.tenants)} tenants
+                              {formatLimit(plan.limits.tenants)} tenants per property
                             </Text>
                           </View>
                           <View style={styles.featureRow}>
                             <Check size={16} color={colors.success[500]} />
                             <Text style={[styles.featureText, { color: colors.text.primary }]}>
-                              {formatLimit(plan.limits.smsCredits)} SMS credits/month
+                              {formatLimit(plan.limits.rooms)} rooms per property
+                            </Text>
+                          </View>
+                          <View style={styles.featureRow}>
+                            <Check size={16} color={colors.success[500]} />
+                            <Text style={[styles.featureText, { color: colors.text.primary }]}>
+                              {formatLimit(plan.limits.staff)} staff per property
                             </Text>
                           </View>
                         </View>
@@ -283,6 +297,10 @@ export default function UpgradeModal({
                     </View>
                   );
                 })}
+
+                {!loadingPlans && plans.length === 0 && (
+                  <Text style={[styles.featureText, { color: colors.text.secondary }]}>No subscription plans available right now.</Text>
+                )}
               </ScrollView>
             </>
           )}
@@ -360,6 +378,10 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     marginBottom: spacing.lg,
+  },
+  price: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
   },
   featuresContainer: {
     marginBottom: spacing.lg,

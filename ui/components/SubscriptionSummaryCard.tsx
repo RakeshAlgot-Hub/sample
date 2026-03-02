@@ -1,11 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
-  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Card from '@/components/Card';
@@ -14,20 +12,23 @@ import { Crown, Building2, Users, ArrowRight } from 'lucide-react-native';
 import { spacing, typography, radius } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { subscriptionService } from '@/services/apiClient';
-import type { Subscription, Usage, PlanLimits } from '@/services/apiTypes';
+import type { Subscription, Usage } from '@/services/apiTypes';
 import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
 
 const SUBSCRIPTION_CACHE_STALE_MS = 60 * 1000;
+
+interface SubscriptionCardCachePayload {
+  activeSubscription: Subscription | null;
+  usage: Usage;
+}
 
 export default function SubscriptionSummaryCard() {
   const { colors } = useTheme();
   const router = useRouter();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
-  const [limits, setLimits] = useState<PlanLimits | null>(null);
   const [loading, setLoading] = useState(true);
   const [shouldLoad, setShouldLoad] = useState(false);
-  const { height: screenHeight } = useWindowDimensions();
 
   // Lazy load when component is likely to be visible
   useEffect(() => {
@@ -49,38 +50,31 @@ export default function SubscriptionSummaryCard() {
     try {
       setLoading(true);
 
-      const cacheKey = 'subscription_card';
-      const cachedData = getScreenCache<{
-        subscription: Subscription;
-        usage: Usage;
-        limits: PlanLimits;
-      }>(cacheKey, SUBSCRIPTION_CACHE_STALE_MS);
+      const cacheKey = cacheKeys.subscription();
+      const cachedData = getScreenCache<SubscriptionCardCachePayload>(cacheKey, SUBSCRIPTION_CACHE_STALE_MS);
 
       if (cachedData) {
-        setSubscription(cachedData.subscription);
+        setSubscription(cachedData.activeSubscription);
         setUsage(cachedData.usage);
-        setLimits(cachedData.limits);
         setLoading(false);
         return;
       }
 
-      const [subscriptionRes, usageRes] = await Promise.all([
-        subscriptionService.getSubscription(),
+      const [allSubsRes, usageRes] = await Promise.all([
+        subscriptionService.getAllSubscriptions(),
         subscriptionService.getUsage(),
       ]);
 
-      const subscriptionData = subscriptionRes.data;
-      setSubscription(subscriptionData);
-      setUsage(usageRes.data);
+      const activeSubscription =
+        allSubsRes.data.subscriptions.find((sub) => sub.status === 'active') || null;
 
-      const limitsRes = await subscriptionService.getLimits(subscriptionData.plan);
-      setLimits(limitsRes.data);
+      setSubscription(activeSubscription);
+      setUsage(usageRes.data);
 
       // Cache the result
       setScreenCache(cacheKey, {
-        subscription: subscriptionData,
+        activeSubscription,
         usage: usageRes.data,
-        limits: limitsRes.data,
       });
     } catch (error) {
       // Silently fail
@@ -93,6 +87,12 @@ export default function SubscriptionSummaryCard() {
     return plan.charAt(0).toUpperCase() + plan.slice(1);
   };
 
+  const formatPrice = (paise: number) => {
+    if (paise === 0) return 'Free';
+    const rupees = paise / 100;
+    return `₹${rupees.toFixed(rupees === Math.floor(rupees) ? 0 : 2)}`;
+  };
+
   const formatLimit = (value: number) => {
     return value === 999 ? '∞' : value;
   };
@@ -102,7 +102,7 @@ export default function SubscriptionSummaryCard() {
     return Math.min((used / limit) * 100, 100);
   };
 
-  if (loading || !subscription || !usage || !limits) {
+  if (loading || !subscription || !usage) {
     return (
       <Card style={styles.card}>
         <View style={styles.skeletonContainer}>
@@ -130,13 +130,22 @@ export default function SubscriptionSummaryCard() {
         </TouchableOpacity>
       </View>
 
+      <Text style={[styles.planMetaText, { color: colors.text.primary }]}>
+        {formatPrice(subscription.price)}{subscription.price > 0 ? '/month' : ''}
+      </Text>
+      {subscription.currentPeriodStart && subscription.currentPeriodEnd && (
+        <Text style={[styles.planPeriodText, { color: colors.text.secondary }]}>
+          {new Date(subscription.currentPeriodStart).toLocaleDateString()} - {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+        </Text>
+      )}
+
       <View style={styles.usageSection}>
         <View style={styles.usageItem}>
           <View style={styles.usageHeader}>
             <Building2 size={16} color={colors.primary[500]} />
             <Text style={[styles.usageLabel, { color: colors.text.secondary }]}>Properties</Text>
             <Text style={[styles.usageValue, { color: colors.text.primary }]}>
-              {usage.properties} / {formatLimit(limits.properties)}
+              {usage.properties} / {formatLimit(subscription.propertyLimit)}
             </Text>
           </View>
           <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
@@ -144,9 +153,9 @@ export default function SubscriptionSummaryCard() {
               style={[
                 styles.progressFill,
                 {
-                  width: `${calculateProgressPercentage(usage.properties, limits.properties)}%`,
+                  width: `${calculateProgressPercentage(usage.properties, subscription.propertyLimit)}%`,
                   backgroundColor:
-                    usage.properties > limits.properties
+                    usage.properties > subscription.propertyLimit
                       ? colors.danger[500]
                       : colors.primary[500],
                 },
@@ -160,7 +169,7 @@ export default function SubscriptionSummaryCard() {
             <Users size={16} color={colors.success[500]} />
             <Text style={[styles.usageLabel, { color: colors.text.secondary }]}>Tenants</Text>
             <Text style={[styles.usageValue, { color: colors.text.primary }]}>
-              {usage.tenants} / {formatLimit(limits.tenants)}
+              {usage.tenants} / {formatLimit(subscription.tenantLimit)}
             </Text>
           </View>
           <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
@@ -168,11 +177,59 @@ export default function SubscriptionSummaryCard() {
               style={[
                 styles.progressFill,
                 {
-                  width: `${calculateProgressPercentage(usage.tenants, limits.tenants)}%`,
+                  width: `${calculateProgressPercentage(usage.tenants, subscription.tenantLimit)}%`,
                   backgroundColor:
-                    usage.tenants > limits.tenants
+                    usage.tenants > subscription.tenantLimit
                       ? colors.danger[500]
                       : colors.success[500],
+                },
+              ]}
+            />
+          </View>
+        </View>
+
+        <View style={styles.usageItem}>
+          <View style={styles.usageHeader}>
+            <Building2 size={16} color={colors.warning[500]} />
+            <Text style={[styles.usageLabel, { color: colors.text.secondary }]}>Rooms</Text>
+            <Text style={[styles.usageValue, { color: colors.text.primary }]}>
+              {usage.rooms} / {formatLimit(subscription.roomLimit)}
+            </Text>
+          </View>
+          <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${calculateProgressPercentage(usage.rooms, subscription.roomLimit)}%`,
+                  backgroundColor:
+                    usage.rooms > subscription.roomLimit
+                      ? colors.danger[500]
+                      : colors.warning[500],
+                },
+              ]}
+            />
+          </View>
+        </View>
+
+        <View style={styles.usageItem}>
+          <View style={styles.usageHeader}>
+            <Users size={16} color={colors.primary[500]} />
+            <Text style={[styles.usageLabel, { color: colors.text.secondary }]}>Staff</Text>
+            <Text style={[styles.usageValue, { color: colors.text.primary }]}>
+              {usage.staff ?? 0} / {formatLimit(subscription.staffLimit)}
+            </Text>
+          </View>
+          <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${calculateProgressPercentage(usage.staff ?? 0, subscription.staffLimit)}%`,
+                  backgroundColor:
+                    (usage.staff ?? 0) > subscription.staffLimit
+                      ? colors.danger[500]
+                      : colors.primary[500],
                 },
               ]}
             />
@@ -222,6 +279,15 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     marginLeft: spacing.xs,
+  },
+  planMetaText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.xs,
+  },
+  planPeriodText: {
+    fontSize: typography.fontSize.xs,
+    marginBottom: spacing.md,
   },
   viewButton: {
     flexDirection: 'row',

@@ -148,6 +148,10 @@ async def register_user_service(user: UserCreate):
     result = await users_collection.insert_one(user_doc)
     user_id = str(result.inserted_id)
     
+    # Create 3 default subscriptions for the user (free, pro, premium)
+    from app.services.subscription_service import SubscriptionService
+    await SubscriptionService.create_default_subscriptions(user_id)
+    
     # Clean up the OTP doc after successful registration
     await email_otp_collection.delete_one({"email": user.email})
     
@@ -227,6 +231,11 @@ async def google_sign_in_service(payload):
         }
         result = await users_collection.insert_one(user_doc)
         user_id = str(result.inserted_id)
+        
+        # Create 3 default subscriptions for the user (free, pro, premium)
+        from app.services.subscription_service import SubscriptionService
+        await SubscriptionService.create_default_subscriptions(user_id)
+        
         response = _build_auth_payload(user_doc, user_id)
         return JSONResponse(status_code=status.HTTP_200_OK, content={"data": response})
 

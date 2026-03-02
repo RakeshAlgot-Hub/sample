@@ -42,10 +42,9 @@ interface PlanComparison {
 }
 
 interface SubscriptionCachePayload {
-  subscription: Subscription;
+  activeSubscription: Subscription | null;
+  allSubscriptions: Subscription[];
   usage: Usage;
-  limits: PlanLimits;
-  allLimits: Record<Plan, PlanLimits>;
 }
 
 const SUBSCRIPTION_CACHE_STALE_MS = 2 * 60 * 1000;
@@ -53,10 +52,9 @@ const SUBSCRIPTION_CACHE_STALE_MS = 2 * 60 * 1000;
 export default function SubscriptionScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [activeSubscription, setActiveSubscription] = useState<Subscription | null>(null);
+  const [allSubscriptions, setAllSubscriptions] = useState<Subscription[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
-  const [limits, setLimits] = useState<PlanLimits | null>(null);
-  const [allLimits, setAllLimits] = useState<Record<Plan, PlanLimits>>({} as Record<Plan, PlanLimits>);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -64,14 +62,19 @@ export default function SubscriptionScreen() {
   const [archivedResources, setArchivedResources] = useState<ArchivedResourcesResponse | null>(null);
   const [loadingArchived, setLoadingArchived] = useState(false);
 
+  const formatPrice = (paise: number) => {
+    if (paise === 0) return 'Free';
+    const rupees = paise / 100;
+    return `₹${rupees.toFixed(rupees === Math.floor(rupees) ? 0 : 2)}`;
+  };
+
   const fetchSubscriptionData = async () => {
     const cacheKey = cacheKeys.subscription();
     const cachedData = getScreenCache<SubscriptionCachePayload>(cacheKey, SUBSCRIPTION_CACHE_STALE_MS);
     if (cachedData) {
-      setSubscription(cachedData.subscription);
+      setActiveSubscription(cachedData.activeSubscription);
+      setAllSubscriptions(cachedData.allSubscriptions);
       setUsage(cachedData.usage);
-      setLimits(cachedData.limits);
-      setAllLimits(cachedData.allLimits);
       setError(null);
       setLoading(false);
       return;
@@ -81,38 +84,25 @@ export default function SubscriptionScreen() {
       setLoading(true);
       setError(null);
 
-      const [subscriptionRes, usageRes, freeLimitsRes, proLimitsRes, premiumLimitsRes] = await Promise.all([
-        subscriptionService.getSubscription(),
+      const [allSubsRes, usageRes] = await Promise.all([
+        subscriptionService.getAllSubscriptions(),
         subscriptionService.getUsage(),
-        subscriptionService.getLimits('free'),
-        subscriptionService.getLimits('pro'),
-        subscriptionService.getLimits('premium'),
       ]);
 
-      const subscriptionData = subscriptionRes.data;
+      const allSubs = allSubsRes.data.subscriptions;
       const usageData = usageRes.data;
 
-      setSubscription(subscriptionData);
+      // Find the active subscription
+      const active = allSubs.find(sub => sub.status === 'active');
+      
+      setActiveSubscription(active || null);
+      setAllSubscriptions(allSubs);
       setUsage(usageData);
 
-      const limitsRes = await subscriptionService.getLimits(subscriptionData.plan);
-      setLimits(limitsRes.data);
-
-      setAllLimits({
-        free: freeLimitsRes.data,
-        pro: proLimitsRes.data,
-        premium: premiumLimitsRes.data,
-      });
-
       setScreenCache(cacheKey, {
-        subscription: subscriptionData,
+        activeSubscription: active || null,
+        allSubscriptions: allSubs,
         usage: usageData,
-        limits: limitsRes.data,
-        allLimits: {
-          free: freeLimitsRes.data,
-          pro: proLimitsRes.data,
-          premium: premiumLimitsRes.data,
-        },
       });
     } catch (err: any) {
       console.error('Subscription fetch error:', err);
@@ -155,10 +145,14 @@ export default function SubscriptionScreen() {
     try {
       setLoading(true);
       const response = await subscriptionService.updateSubscription(plan);
-      setSubscription(response.data);
-
-      const limitsRes = await subscriptionService.getLimits(plan);
-      setLimits(limitsRes.data);
+      
+      // Refresh all subscriptions to get updated status
+      const allSubsRes = await subscriptionService.getAllSubscriptions();
+      const allSubs = allSubsRes.data.subscriptions;
+      const active = allSubs.find(sub => sub.status === 'active');
+      
+      setActiveSubscription(active || null);
+      setAllSubscriptions(allSubs);
       
       // Clear cache to force refresh  
       setScreenCache(cacheKeys.subscription(), null);
@@ -176,27 +170,21 @@ export default function SubscriptionScreen() {
   };
 
   const buildComparisonPlans = (): PlanComparison[] => {
-    return [
-      {
-        id: 'free' as const,
-        name: 'Free',
-        limits: allLimits.free,
+    return allSubscriptions.map(sub => ({
+      id: sub.plan as Plan,
+      name: sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1),
+      popular: sub.plan === 'pro',
+      limits: {
+        properties: sub.propertyLimit,
+        tenants: sub.tenantLimit,
+        rooms: sub.roomLimit,
+        staff: sub.staffLimit,
+        price: sub.price,
       },
-      {
-        id: 'pro' as const,
-        name: 'Pro',
-        popular: true,
-        limits: allLimits.pro,
-      },
-      {
-        id: 'premium' as const,
-        name: 'Premium',
-        limits: allLimits.premium,
-      },
-    ];
+    }));
   };
 
-  const currentPlan = subscription?.plan || 'free';
+  const currentPlan = activeSubscription?.plan || 'free';
   const isLocked = currentPlan === 'free';
 
   const formatLimit = (value: number) => {
@@ -233,7 +221,7 @@ export default function SubscriptionScreen() {
           </>
         ) : error ? (
           <ApiErrorCard error={error} onRetry={handleRetry} />
-        ) : subscription && usage && limits ? (
+        ) : activeSubscription && usage ? (
           <>
             <Card style={styles.currentPlanCard}>
               <View style={[styles.planBadge, { backgroundColor: colors.warning[50] }]}>
@@ -244,13 +232,16 @@ export default function SubscriptionScreen() {
                 {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}
               </Text>
               <Text style={[styles.currentPlanStatus, { color: colors.text.secondary }]}>
-                Status: {subscription.status}
+                Status: {activeSubscription.status}
               </Text>
-              {subscription.currentPeriodStart && subscription.currentPeriodEnd && (
+              {activeSubscription.currentPeriodStart && activeSubscription.currentPeriodEnd && (
                 <Text style={[styles.currentPlanPeriod, { color: colors.text.tertiary }]}>
-                  Period: {new Date(subscription.currentPeriodStart).toLocaleDateString()} - {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                  Period: {new Date(activeSubscription.currentPeriodStart).toLocaleDateString()} - {new Date(activeSubscription.currentPeriodEnd).toLocaleDateString()}
                 </Text>
               )}
+              <Text style={[styles.currentPlanPrice, { color: colors.text.primary }]}>
+                {formatPrice(activeSubscription.price)}/month
+              </Text>
             </Card>
 
             <View style={styles.section}>
@@ -264,7 +255,7 @@ export default function SubscriptionScreen() {
                   <View style={styles.limitInfo}>
                     <Text style={[styles.limitLabel, { color: colors.text.secondary }]}>Properties</Text>
                     <Text style={[styles.limitValue, { color: colors.text.primary }]}>
-                      {usage.properties} / {formatLimit(limits.properties)}
+                      {usage.properties} / {formatLimit(activeSubscription.propertyLimit)}
                     </Text>
                   </View>
                 </View>
@@ -273,9 +264,9 @@ export default function SubscriptionScreen() {
                     style={[
                       styles.progressFill,
                       {
-                        width: `${calculateProgressPercentage(usage.properties, limits.properties)}%`,
+                        width: `${calculateProgressPercentage(usage.properties, activeSubscription.propertyLimit)}%`,
                         backgroundColor:
-                          usage.properties > limits.properties
+                          usage.properties > activeSubscription.propertyLimit
                             ? colors.danger[500]
                             : colors.primary[500],
                       },
@@ -295,7 +286,7 @@ export default function SubscriptionScreen() {
                   <View style={styles.limitInfo}>
                     <Text style={[styles.limitLabel, { color: colors.text.secondary }]}>Tenants (per property)</Text>
                     <Text style={[styles.limitValue, { color: colors.text.primary }]}>
-                      Max {formatLimit(limits.tenants)} per property
+                      Max {formatLimit(activeSubscription.tenantLimit)} per property
                     </Text>
                   </View>
                 </View>
@@ -304,9 +295,9 @@ export default function SubscriptionScreen() {
                     style={[
                       styles.progressFill,
                       {
-                        width: `${calculateProgressPercentage(usage.tenants, limits.tenants)}%`,
+                        width: `${calculateProgressPercentage(usage.tenants, activeSubscription.tenantLimit)}%`,
                         backgroundColor:
-                          usage.tenants > limits.tenants
+                          usage.tenants > activeSubscription.tenantLimit
                             ? colors.danger[500]
                             : colors.success[500],
                       },
@@ -326,7 +317,7 @@ export default function SubscriptionScreen() {
                   <View style={styles.limitInfo}>
                     <Text style={[styles.limitLabel, { color: colors.text.secondary }]}>Rooms (per property)</Text>
                     <Text style={[styles.limitValue, { color: colors.text.primary }]}>
-                      Max {formatLimit(limits.rooms)} per property
+                      Max {formatLimit(activeSubscription.roomLimit)} per property
                     </Text>
                   </View>
                 </View>
@@ -335,7 +326,7 @@ export default function SubscriptionScreen() {
                     style={[
                       styles.progressFill,
                       {
-                        width: `${calculateProgressPercentage(usage.rooms, limits.rooms)}%`,
+                        width: `${calculateProgressPercentage(usage.rooms, activeSubscription.roomLimit)}%`,
                         backgroundColor: colors.warning[500],
                       },
                     ]}
@@ -354,7 +345,7 @@ export default function SubscriptionScreen() {
                   <View style={styles.limitInfo}>
                     <Text style={[styles.limitLabel, { color: colors.text.secondary }]}>Staff (per property)</Text>
                     <Text style={[styles.limitValue, { color: colors.text.primary }]}>
-                      Max {formatLimit(limits.staff ?? 0)} per property
+                      Max {formatLimit(activeSubscription.staffLimit)} per property
                     </Text>
                   </View>
                 </View>
@@ -363,7 +354,7 @@ export default function SubscriptionScreen() {
                     style={[
                       styles.progressFill,
                       {
-                        width: `${calculateProgressPercentage(usage.staff ?? 0, limits.staff ?? 0)}%`,
+                        width: `${calculateProgressPercentage(usage.staff ?? 0, activeSubscription.staffLimit)}%`,
                         backgroundColor: colors.primary[500],
                       },
                     ]}
@@ -440,7 +431,16 @@ export default function SubscriptionScreen() {
                     <Text style={[styles.comparisonPlanName, { color: colors.text.primary }]}>{plan.name}</Text>
 
                     {plan.limits && (
-                      <View style={styles.featuresContainer}>
+                      <>
+                        <View style={styles.priceRow}>
+                          <Text style={[styles.comparisonPrice, { color: colors.text.primary }]}>
+                            {formatPrice(plan.limits.price || 0)}
+                          </Text>
+                          <Text style={[styles.pricePeriod, { color: colors.text.secondary }]}>
+                            {plan.limits.price === 0 ? 'Forever' : '/month'}
+                          </Text>
+                        </View>
+                        <View style={styles.featuresContainer}>
                         <View style={styles.featureRow}>
                           <Check size={16} color={colors.success[500]} />
                           <Text style={[styles.featureText, { color: colors.text.primary }]}>
@@ -465,7 +465,8 @@ export default function SubscriptionScreen() {
                             {formatLimit(plan.limits.staff ?? 0)} {(plan.limits.staff ?? 0) === 999 ? 'staff' : (plan.limits.staff ?? 0) === 1 ? 'staff member' : 'staff members'} per property
                           </Text>
                         </View>
-                      </View>
+                        </View>
+                      </>
                     )}
 
                     {currentPlan === plan.id && (
@@ -485,6 +486,7 @@ export default function SubscriptionScreen() {
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         onSelectPlan={handleSelectPlan}
+        subscriptions={allSubscriptions}
       />
 
       <ArchivedResourcesModal
@@ -553,6 +555,11 @@ const styles = StyleSheet.create({
   },
   currentPlanPeriod: {
     fontSize: typography.fontSize.sm,
+  },
+  currentPlanPrice: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    marginTop: spacing.sm,
   },
   section: {
     marginBottom: spacing.xl,
