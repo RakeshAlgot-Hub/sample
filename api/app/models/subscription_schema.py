@@ -8,6 +8,10 @@ class Subscription(BaseModel):
     status: Literal['active', 'inactive', 'cancelled'] = 'active'
     currentPeriodStart: str
     currentPeriodEnd: str
+    propertyLimit: int
+    roomLimit: int
+    tenantLimit: int
+    staffLimit: int
     createdAt: str
     updatedAt: str
 

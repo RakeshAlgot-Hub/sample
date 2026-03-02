@@ -72,12 +72,17 @@ class SubscriptionService:
         
         # If not found or error, create default subscription
         now = datetime.now().isoformat()
+        free_limits = SUBSCRIPTION_PLANS['free']
         sub = Subscription(
             ownerId=owner_id,
             plan='free',
             status='active',
             currentPeriodStart=now,
             currentPeriodEnd=(datetime.now() + timedelta(days=30)).isoformat(),
+            propertyLimit=free_limits['properties'],
+            roomLimit=free_limits['rooms'],
+            tenantLimit=free_limits['tenants'],
+            staffLimit=free_limits['staff'],
             createdAt=now,
             updatedAt=now
         )
@@ -92,9 +97,17 @@ class SubscriptionService:
         """Update subscription plan"""
         try:
             now = datetime.now().isoformat()
+            plan_limits = SUBSCRIPTION_PLANS[plan]
             result = await db["subscriptions"].find_one_and_update(
                 {"ownerId": owner_id},
-                {"$set": {"plan": plan, "updatedAt": now}},
+                {"$set": {
+                    "plan": plan,
+                    "propertyLimit": plan_limits['properties'],
+                    "roomLimit": plan_limits['rooms'],
+                    "tenantLimit": plan_limits['tenants'],
+                    "staffLimit": plan_limits['staff'],
+                    "updatedAt": now
+                }},
                 return_document=True
             )
             if result:
@@ -104,12 +117,17 @@ class SubscriptionService:
         
         # If not found or error, create new
         now = datetime.now().isoformat()
+        plan_limits = SUBSCRIPTION_PLANS[plan]
         sub = Subscription(
             ownerId=owner_id,
             plan=plan,
             status='active',
             currentPeriodStart=now,
             currentPeriodEnd=(datetime.now() + timedelta(days=30)).isoformat(),
+            propertyLimit=plan_limits['properties'],
+            roomLimit=plan_limits['rooms'],
+            tenantLimit=plan_limits['tenants'],
+            staffLimit=plan_limits['staff'],
             createdAt=now,
             updatedAt=now
         )
