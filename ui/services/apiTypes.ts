@@ -86,6 +86,7 @@ export interface Usage {
   properties: number;
   tenants: number;
   rooms: number;
+  staff?: number;
   updatedAt: string;
 }
 
@@ -93,6 +94,7 @@ export interface PlanLimits {
   properties: number;
   tenants: number;
   rooms: number;
+  staff?: number;
   price?: number;
   priceText?: string;
 }

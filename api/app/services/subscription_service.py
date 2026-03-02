@@ -9,10 +9,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Default subscription plans (used if env vars not set)
+# Format:
+#   properties: Total number of properties owner can create (per-owner limit)
+#   tenants: Max tenants PER property
+#   rooms: Max rooms PER property
+#   staff: Max staff PER property
 DEFAULT_SUBSCRIPTION_PLANS = {
-    'free': {'properties': 2, 'tenants': 20, 'rooms': 30, 'staff': 4, 'price': 0, 'priceText': '₹0'},
-    'pro': {'properties': 10, 'tenants': 100, 'rooms': 30, 'staff': 8, 'price': 999, 'priceText': '₹999'},
-    'premium': {'properties': 999, 'tenants': 999, 'rooms': 30, 'staff': 15, 'price': 2499, 'priceText': '₹2,499'},
+    'free': {'properties': 1, 'tenants': 20, 'rooms': 30, 'staff': 3, 'price': 0},
+    'pro': {'properties': 3, 'tenants': 50, 'rooms': 50, 'staff': 5, 'price': 79},
+    'premium': {'properties': 5, 'tenants': 100, 'rooms': 70, 'staff': 7, 'price': 129},
 }
 
 def format_price_text(price_paise: int) -> str:

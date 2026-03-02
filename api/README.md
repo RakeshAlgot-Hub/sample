@@ -29,50 +29,69 @@
 
 Subscription plans (properties, tenants, rooms, staff limits and pricing) can be customized via environment variables for production deployments.
 
-**Format:** Simple key=value pairs (e.g., `freeProperties=2`, `proStaff=8`, `premiumPrice=2499`)
+**Limit Meanings:**
+- `{plan}Properties`: Total number of properties owner can create (per-owner limit)
+- `{plan}Tenants`: Max tenants PER property
+- `{plan}Rooms`: Max rooms PER property
+- `{plan}Staff`: Max staff members PER property
+
+**Example Usage (Pro Plan):**
+- Owner can create 3 properties total
+- Each property can have max 50 tenants
+- Each property can have max 50 rooms (3 properties × 50 = 150 total rooms possible)
+- Each property can have max 5 staff members (3 properties × 5 = 15 total staff possible)
+
+**Format:** Simple key=value pairs (e.g., `freeProperties=1`, `proTenants=50`, `premiumPrice=129`)
 
 **Example .env:**
 ```env
 # FREE PLAN
-freeProperties=2
+freeProperties=1
 freeTenants=20
 freeRooms=30
-freeStaff=4
+freeStaff=3
 freePrice=0
+
 # PRO PLAN
-proProperties=10
-proTenants=100
-proRooms=30
-proStaff=8
-proPrice=999
+proProperties=3
+proTenants=50
+proRooms=50
+proStaff=5
+proPrice=79
 
 # PREMIUM PLAN
-premiumProperties=999
-premiumTenants=999
-premiumRooms=30
-premiumStaff=15
-premiumPrice=2499
+premiumProperties=5
+premiumTenants=100
+premiumRooms=70
+premiumStaff=7
+premiumPrice=129
 ```
 
 **To change pricing in production:**
 
-For example, to change Pro plan price from ₹999 to ₹1499, just update:
+For example, to change Pro plan price from ₹0.79 to ₹1.29, just update:
 ```env
-proPrice=1499
+proPrice=129
 ```
 
-Price text is **generated automatically** from the price value (999 paise = ₹9.99, 2499 paise = ₹24.99, etc.)
+Price text is **generated automatically** from the price value (79 paise = ₹0.79, 129 paise = ₹1.29, etc.)
 
 **If not set:** System uses default values
 ```
-Free: properties=2, tenants=20, rooms=30, staff=4, price=₹0
-Pro: properties=10, tenants=100, rooms=30, staff=8, price=₹999
-Premium: properties=999, tenants=999, rooms=30, staff=15, price=₹2,499
+Free: properties=1, tenants=20 (per property), rooms=30 (per property), staff=3 (per property), price=₹0
+Pro: properties=3, tenants=50 (per property), rooms=50 (per property), staff=5 (per property), price=₹0.79
+Premium: properties=5, tenants=100 (per property), rooms=70 (per property), staff=7 (per property), price=₹1.29
 ```
+
+**Enforcement Logic:**
+- **Properties**: Total count (per-owner limit)
+- **Tenants**: Per-property enforcement (e.g., property can't exceed 50 tenants in Pro plan)
+- **Rooms**: Per-property enforcement (e.g., property can't exceed 50 rooms in Pro plan)
+- **Staff**: Per-property enforcement (e.g., property can't exceed 5 staff members in Pro plan)
 
 **Available Fields per Plan:**
 - `{plan}Properties`: Max properties owner can have
-- `{plan}Tenants`: Max tenants across all properties
+- `{plan}Tenants`: Max tenants per property
 - `{plan}Rooms`: Max rooms per property
 - `{plan}Staff`: Max staff members per property
-- `{plan}Price`: Price in paise (e.g., 999 = ₹9.99)
+- `{plan}Price`: Price in paise (e.g., 79 = ₹0.79)

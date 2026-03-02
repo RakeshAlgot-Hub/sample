@@ -282,6 +282,9 @@ export default function SubscriptionScreen() {
                     ]}
                   />
                 </View>
+                <Text style={[styles.limitDescription, { color: colors.text.tertiary }]}>
+                  Total number of properties you can create
+                </Text>
               </Card>
 
               <Card style={styles.limitCard}>
@@ -290,9 +293,9 @@ export default function SubscriptionScreen() {
                     <Users size={20} color={colors.success[500]} />
                   </View>
                   <View style={styles.limitInfo}>
-                    <Text style={[styles.limitLabel, { color: colors.text.secondary }]}>Tenants</Text>
+                    <Text style={[styles.limitLabel, { color: colors.text.secondary }]}>Tenants (per property)</Text>
                     <Text style={[styles.limitValue, { color: colors.text.primary }]}>
-                      {usage.tenants} / {formatLimit(limits.tenants)}
+                      Max {formatLimit(limits.tenants)} per property
                     </Text>
                   </View>
                 </View>
@@ -310,6 +313,9 @@ export default function SubscriptionScreen() {
                     ]}
                   />
                 </View>
+                <Text style={[styles.limitDescription, { color: colors.text.tertiary }]}>
+                  Maximum tenants allowed per property (not total)
+                </Text>
               </Card>
 
               <Card style={styles.limitCard}>
@@ -318,9 +324,9 @@ export default function SubscriptionScreen() {
                     <MessageSquare size={20} color={colors.warning[500]} />
                   </View>
                   <View style={styles.limitInfo}>
-                    <Text style={[styles.limitLabel, { color: colors.text.secondary }]}>Rooms</Text>
+                    <Text style={[styles.limitLabel, { color: colors.text.secondary }]}>Rooms (per property)</Text>
                     <Text style={[styles.limitValue, { color: colors.text.primary }]}>
-                      {usage.rooms} / {formatLimit(limits.rooms)}
+                      Max {formatLimit(limits.rooms)} per property
                     </Text>
                   </View>
                 </View>
@@ -335,6 +341,37 @@ export default function SubscriptionScreen() {
                     ]}
                   />
                 </View>
+                <Text style={[styles.limitDescription, { color: colors.text.tertiary }]}>
+                  Maximum rooms allowed per property (not total)
+                </Text>
+              </Card>
+
+              <Card style={styles.limitCard}>
+                <View style={styles.limitHeader}>
+                  <View style={[styles.limitIcon, { backgroundColor: colors.background.tertiary }]}>
+                    <Users size={20} color={colors.primary[500]} />
+                  </View>
+                  <View style={styles.limitInfo}>
+                    <Text style={[styles.limitLabel, { color: colors.text.secondary }]}>Staff (per property)</Text>
+                    <Text style={[styles.limitValue, { color: colors.text.primary }]}>
+                      Max {formatLimit(limits.staff || 5)} per property
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${calculateProgressPercentage(usage.staff || 0, limits.staff || 5)}%`,
+                        backgroundColor: colors.primary[500],
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.limitDescription, { color: colors.text.tertiary }]}>
+                  Maximum staff members allowed per property (not total)
+                </Text>
               </Card>
 
               {isLocked && (
@@ -413,13 +450,19 @@ export default function SubscriptionScreen() {
                         <View style={styles.featureRow}>
                           <Check size={16} color={colors.success[500]} />
                           <Text style={[styles.featureText, { color: colors.text.primary }]}>
-                            {formatLimit(plan.limits.tenants)} {plan.limits.tenants === 999 ? 'tenants' : plan.limits.tenants === 1 ? 'tenant' : 'tenants'}
+                            {formatLimit(plan.limits.tenants)} {plan.limits.tenants === 999 ? 'tenants' : plan.limits.tenants === 1 ? 'tenant' : 'tenants'} per property
                           </Text>
                         </View>
                         <View style={styles.featureRow}>
                           <Check size={16} color={colors.success[500]} />
                           <Text style={[styles.featureText, { color: colors.text.primary }]}>
                             {formatLimit(plan.limits.rooms)} {plan.limits.rooms === 999 ? 'rooms' : plan.limits.rooms === 1 ? 'room' : 'rooms'} per property
+                          </Text>
+                        </View>
+                        <View style={styles.featureRow}>
+                          <Check size={16} color={colors.success[500]} />
+                          <Text style={[styles.featureText, { color: colors.text.primary }]}>
+                            {formatLimit(plan.limits.staff || 5)} {(plan.limits.staff || 5) === 999 ? 'staff' : (plan.limits.staff || 5) === 1 ? 'staff member' : 'staff members'} per property
                           </Text>
                         </View>
                       </View>
@@ -554,6 +597,11 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: radius.sm,
+  },
+  limitDescription: {
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
+    fontStyle: 'italic',
   },
   upgradeButton: {
     flexDirection: 'row',

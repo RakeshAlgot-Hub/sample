@@ -84,7 +84,7 @@ class SubscriptionEnforcement:
         Check if owner can create a new tenant under this property.
         
         Raises:
-            HTTPException 402: If subscription is expired or quota exceeded
+            HTTPException 402: If subscription is expired or tenant quota exceeded per property
             HTTPException 403: If property doesn't belong to this owner
         """
         try:
@@ -118,21 +118,21 @@ class SubscriptionEnforcement:
             # Get plan limits
             limits = SubscriptionService.get_plan_limits(sub.plan)
 
-            # Count existing tenants across ALL properties
+            # Count existing tenants in THIS property only (not across all properties)
             current = await db["tenants"].count_documents(
                 {"propertyId": property_id}
             )
 
-            # Check quota
+            # Check quota (max tenants per property)
             if current >= limits["tenants"]:
                 raise HTTPException(
                     status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                    detail=f"You've reached the limit of {limits['tenants']} tenants on {sub.plan.title()} plan. "
+                    detail=f"You've reached the limit of {limits['tenants']} tenants per property on {sub.plan.title()} plan. "
                             f"Upgrade your subscription to add more tenants."
                 )
 
             logger.info(
-                f"Tenant creation allowed for {owner_id} ({sub.plan} plan, {current}/{limits['tenants']} used)"
+                f"Tenant creation allowed for {owner_id} ({sub.plan} plan, {current}/{limits['tenants']} tenants in this property)"
             )
         except HTTPException:
             raise
