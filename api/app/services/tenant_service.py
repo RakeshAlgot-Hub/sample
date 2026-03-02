@@ -1,8 +1,9 @@
-from app.models.tenant_schema import Tenant, TenantOut
-from app.models.bed_schema import BedUpdate
+from app.models.tenant_schema import Tenant, TenantOut, BillingStatus, BillingCycle
+from app.models.bed_schema import BedUpdate, BedStatus
+from app.models.payment_schema import PaymentMethod
 from app.services.bed_service import BedService
 from app.database.mongodb import getCollection
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dateutil.relativedelta import relativedelta
 from bson import ObjectId
 from app.models.payment_schema import PaymentCreate
@@ -80,9 +81,7 @@ class TenantService:
             tenant_data["createdAt"] = now
         if not tenant_data.get("updatedAt"):
             tenant_data["updatedAt"] = now
-        # Set bed status to occupied if bedId is present
-        if tenant_data.get("bedId"):
-            await bed_service.update_bed(tenant_data["bedId"], BedUpdate(status="occupied"))
+        
         # Get autoGeneratePayments flag
         auto_generate = tenant_data.get("autoGeneratePayments", True)
         
@@ -101,27 +100,29 @@ class TenantService:
         
         result = await self.collection.insert_one(tenant_data)
         tenant_data["id"] = str(result.inserted_id)
+        
+        # Update bed with tenantId and occupied status after tenant is created
+        if tenant_data.get("bedId"):
+            await bed_service.update_bed(tenant_data["bedId"], BedUpdate(status=BedStatus.OCCUPIED.value, tenantId=tenant_data["id"]))
 
         # Create payment only if autoGeneratePayments is True and billingConfig exists
         if auto_generate and billing_config:
-            # Calculate dueDate from anchorDate and billingCycle
-            anchor_day = int(billing_config.anchorDate) if billing_config.anchorDate.isdigit() else 1
+            # Calculate dueDate from anchorDay and billingCycle
+            # anchorDay is just the day of month (e.g., 2 means the 2nd of every month)
+            anchor_day = billing_config.anchorDay
             today = datetime.now(timezone.utc)
             
-            # For monthly billing, set dueDate to anchorDate day of current or next month
-            if billing_config.billingCycle == 'monthly':
-                # Try current month first
-                try:
-                    due_date = today.replace(day=anchor_day)
-                    # If the anchor day has already passed this month, use next month
-                    if due_date < today:
-                        due_date = due_date + relativedelta(months=1)
-                except ValueError:
-                    # If anchor_day doesn't exist in current month (e.g., 31 in Feb), use last day
-                    due_date = today.replace(day=1) + relativedelta(months=1, days=-1)
+            # For monthly billing, set dueDate to anchorDay of current or next month
+            if billing_config.billingCycle == BillingCycle.MONTHLY.value:
+                # Use relativedelta to handle months with fewer days (e.g., Feb 30 becomes Feb 28)
+                due_date = today + relativedelta(day=anchor_day)
+                # If the anchor day has already passed this month, use next month
+                if due_date < today:
+                    due_date = due_date + relativedelta(months=1)
             else:
-                # For day-wise billing, use join date as first due date
-                due_date = datetime.fromisoformat(tenant_data.get("joinDate", today.isoformat()))
+                # For day-wise billing, use the dayWiseStartDate if provided, otherwise use join date
+                start_date_str = billing_config.dayWiseStartDate or tenant_data.get("joinDate", today.isoformat())
+                due_date = datetime.fromisoformat(start_date_str)
             
             payment = PaymentCreate(
                 tenantId=tenant_data["id"],
@@ -129,8 +130,8 @@ class TenantService:
                 bed=tenant_data.get("bedId", ""),
                 amount=tenant_data["rent"],
                 status=billing_config.status,
-                dueDate=due_date.strftime("%Y-%m-%d"),
-                method=billing_config.method
+                dueDate=due_date.date(),
+                method=billing_config.method or PaymentMethod.CASH.value
             )
             await payment_service.create_payment(payment)
 
@@ -143,11 +144,11 @@ class TenantService:
         orig_bed_id = orig_doc.get("bedId") if orig_doc else None
         new_bed_id = tenant_data.get("bedId")
         if orig_bed_id and orig_bed_id != new_bed_id:
-            # Set previous bed to available
-            await bed_service.update_bed(orig_bed_id, BedUpdate(status="available"))
+            # Set previous bed to available and clear tenantId
+            await bed_service.update_bed(orig_bed_id, BedUpdate(status=BedStatus.AVAILABLE.value, tenantId=None))
         if new_bed_id and orig_bed_id != new_bed_id:
-            # Set new bed to occupied
-            await bed_service.update_bed(new_bed_id, BedUpdate(status="occupied"))
+            # Set new bed to occupied with tenantId
+            await bed_service.update_bed(new_bed_id, BedUpdate(status=BedStatus.OCCUPIED.value, tenantId=tenant_id))
         # Ensure billingConfig is present and stored
         if "billingConfig" in tenant_data:
             tenant_data["billingConfig"] = tenant_data["billingConfig"] or None
@@ -163,9 +164,19 @@ class TenantService:
         doc = await self.collection.find_one({"_id": ObjectId(tenant_id)})
         bed_id = doc.get("bedId") if doc else None
         if bed_id:
-            await bed_service.update_bed(bed_id, BedUpdate(status="available"))
+            # Set bed to available and clear tenantId
+            await bed_service.update_bed(bed_id, BedUpdate(status=BedStatus.AVAILABLE.value, tenantId=None))
+        
+        # Delete all payments associated with this tenant (cascade delete)
+        deleted_payments = await payment_service.delete_payments_by_tenant(tenant_id)
+        
+        # Delete the tenant
         await self.collection.delete_one({"_id": ObjectId(tenant_id)})
-        return {"success": True, "tenantId": tenant_id}
+        return {
+            "success": True, 
+            "tenantId": tenant_id,
+            "deletedPayments": deleted_payments
+        }
 
     async def generate_monthly_payments(self):
         """
@@ -189,21 +200,27 @@ class TenantService:
             tenants = await self.collection.find({
                 "autoGeneratePayments": True,
                 "billingConfig": {"$exists": True},
-                "billingConfig.billingCycle": {"$in": ["monthly", "day-wise"]}
+                "billingConfig.billingCycle": {"$in": [BillingCycle.MONTHLY.value, BillingCycle.DAY_WISE.value]}
             }).to_list(None)
             
             for tenant_doc in tenants:
                 try:
                     tenant_id = str(tenant_doc["_id"])
-                    billing_config = tenant_doc.get("billingConfig", {})
+                    billing_config_dict = tenant_doc.get("billingConfig", {})
                     
-                    if not billing_config or not billing_config.get("anchorDate"):
+                    if not billing_config_dict:
                         result["skipped"] += 1
                         continue
                     
-                    # Parse anchor date
-                    anchor_date_str = billing_config["anchorDate"]
-                    anchor_date = datetime.fromisoformat(anchor_date_str).date()
+                    # Parse billing config using schema for proper validation
+                    try:
+                        billing_config = BillingConfig(**billing_config_dict)
+                    except Exception:
+                        result["skipped"] += 1
+                        continue
+                    
+                    # Get anchor day from validated schema
+                    anchor_day = billing_config.anchorDay
                     
                     # Check if tenant has already checked out
                     checkout_date_str = tenant_doc.get("checkoutDate")
@@ -217,21 +234,28 @@ class TenantService:
                     # Determine due date based on billing cycle
                     due_date = None
                     
-                    if billing_config.get("billingCycle") == "monthly":
-                        # For monthly: due date is anchor day of this month
-                        try:
-                            due_date = today.replace(day=anchor_date.day)
-                            # If anchor day has passed this month, next month's due date
-                            if due_date < today:
-                                due_date = (due_date + relativedelta(months=1))
-                        except ValueError:
-                            # Handle case where anchor day doesn't exist (e.g., 31 in Feb)
-                            due_date = today.replace(day=1) + relativedelta(months=1, days=-1)
+                    if billing_config.billingCycle == BillingCycle.MONTHLY.value:
+                        # For monthly: use relativedelta(day=anchor_day) to handle non-existent days
+                        # (e.g., Feb 30 becomes Feb 28 automatically)
+                        due_date = today + relativedelta(day=anchor_day)
+                        # If anchor day has passed this month, use next month's due date
+                        if due_date < today:
+                            due_date = due_date + relativedelta(months=1)
                     
-                    elif billing_config.get("billingCycle") == "day-wise":
-                        # For day-wise: due date is anchor date (one-time or recurring every N days)
-                        # For now, we'll treat it as simple: if today >= anchor date, generate
-                        due_date = anchor_date if anchor_date <= today else None
+                    elif billing_config.billingCycle == BillingCycle.DAY_WISE.value:
+                        # For day-wise: calculate based on start date (or join date) + interval
+                        try:
+                            start_date_str = billing_config.dayWiseStartDate or tenant_doc.get("joinDate", today.isoformat())
+                            start_date = datetime.fromisoformat(start_date_str).date()
+                            anchor_days = billing_config.anchorDay
+                            # Calculate days since start
+                            days_since_start = (today.date() - start_date).days
+                            # Next due date is at the next interval boundary
+                            intervals_passed = days_since_start // anchor_days
+                            next_due = start_date + timedelta(days=(intervals_passed + 1) * anchor_days)
+                            due_date = next_due
+                        except (ValueError, TypeError):
+                            due_date = today.date()
                     
                     if not due_date:
                         result["skipped"] += 1
@@ -244,7 +268,7 @@ class TenantService:
                     
                     existing_payment = await payments_collection.find_one({
                         "tenantId": tenant_id,
-                        "dueDate": {"$gte": month_start.isoformat(), "$lte": month_end.isoformat()}
+                        "dueDate": {"$gte": month_start, "$lte": month_end}
                     })
                     
                     if existing_payment:
@@ -257,11 +281,11 @@ class TenantService:
                         "propertyId": tenant_doc.get("propertyId"),
                         "bed": tenant_doc.get("bedId", ""),
                         "amount": float(tenant_doc.get("rent", 0)),
-                        "status": billing_config.get("status", "due"),
-                        "dueDate": due_date.isoformat(),
-                        "method": billing_config.get("method", "razorpay"),
-                        "createdAt": datetime.now(timezone.utc).isoformat(),
-                        "updatedAt": datetime.now(timezone.utc).isoformat(),
+                        "status": billing_config.status,
+                        "dueDate": due_date,
+                        "method": billing_config.method or PaymentMethod.CASH.value,
+                        "createdAt": datetime.now(timezone.utc),
+                        "updatedAt": datetime.now(timezone.utc),
                         "notes": f"Auto-generated payment for {due_date.strftime('%B %Y')}"
                     }
                     

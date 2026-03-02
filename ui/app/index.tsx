@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Building2, Eye, EyeOff } from 'lucide-react-native';
+import { Building2, Eye, EyeOff, Chrome } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { spacing, typography, radius, shadows } from '@/theme';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -20,17 +22,27 @@ import { useAuth } from '@/context/AuthContext';
 import { authService } from '@/services/apiClient';
 import { tokenStorage } from '@/services/tokenStorage';
 
+WebBrowser.maybeCompleteAuthSession();
+
 export default function LoginScreen() {
   const { colors } = useTheme();
   const { login } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('testuser@test.com');
+  const [password, setPassword] = useState('testtest');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLockedOut, setIsLockedOut] = useState(false);
   const [lockoutTimer, setLockoutTimer] = useState<number | null>(null);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: '191330746464-hpqels1vva079e0ml9getqieg59ijakf.apps.googleusercontent.com',
+    iosClientId: '191330746464-hpqels1vva079e0ml9getqieg59ijakf.apps.googleusercontent.com',
+    androidClientId: '191330746464-hpqels1vva079e0ml9getqieg59ijakf.apps.googleusercontent.com',
+    scopes: ['profile', 'email'],
+  });
 
   useEffect(() => {
     if (!lockoutTimer || lockoutTimer <= 0) {
@@ -51,6 +63,58 @@ export default function LoginScreen() {
 
     return () => clearInterval(interval);
   }, [lockoutTimer]);
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      handleGoogleAuthResponse(response);
+    }
+  }, [response]);
+
+  const handleGoogleAuthResponse = async (authResponse: any) => {
+    if (!authResponse.authentication?.accessToken) {
+      setError('Failed to authenticate with Google. Please try again.');
+      return;
+    }
+
+    try {
+      setGoogleLoading(true);
+      setError(null);
+
+      const { idToken } = authResponse.authentication;
+      const response = await authService.googleSignIn({ idToken });
+
+      if (response?.data?.tokens) {
+        await Promise.all([
+          tokenStorage.setAccessToken(response.data.tokens.accessToken),
+          tokenStorage.setRefreshToken(response.data.tokens.refreshToken),
+          tokenStorage.setTokenExpiry(response.data.tokens.expiresAt),
+        ]);
+
+        login(response.data.user);
+        return;
+      }
+
+      setError('Google sign-in failed. Please try again.');
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Google sign-in failed. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setError(null);
+      const result = await promptAsync();
+      if (result?.type !== 'success') {
+        setError('Google sign-in was cancelled.');
+      }
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Google sign-in failed. Please try again.';
+      setError(errorMessage);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -169,13 +233,36 @@ export default function LoginScreen() {
               style={[styles.actionButton, { backgroundColor: colors.primary[500], opacity: loading || isLockedOut ? 0.6 : 1 }]}
               onPress={handleLogin}
               activeOpacity={0.8}
-              disabled={loading || isLockedOut}>
+              disabled={loading || isLockedOut || googleLoading}>
               {loading ? (
                 <ActivityIndicator color={colors.white} size="small" />
               ) : (
                 <Text style={[styles.actionButtonText, { color: colors.white }]}>
                   {isLockedOut ? 'Account Locked' : 'Login'}
                 </Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.dividerContainer}>
+              <View style={[styles.divider, { backgroundColor: colors.border.medium }]} />
+              <Text style={[styles.dividerText, { color: colors.text.secondary }]}>Or continue with</Text>
+              <View style={[styles.divider, { backgroundColor: colors.border.medium }]} />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.googleButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]}
+              onPress={handleGoogleSignIn}
+              activeOpacity={0.8}
+              disabled={loading || isLockedOut || googleLoading || !request}>
+              {googleLoading ? (
+                <ActivityIndicator color={colors.primary[500]} size="small" />
+              ) : (
+                <>
+                  <Chrome size={20} color={colors.primary[500]} />
+                  <Text style={[styles.googleButtonText, { color: colors.text.primary }]}>
+                    Continue with Google
+                  </Text>
+                </>
               )}
             </TouchableOpacity>
 
@@ -263,11 +350,15 @@ const styles = StyleSheet.create({
     top: '50%',
     transform: [{ translateY: -10 }],
   },
-  divider: {
+  dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: spacing.lg,
-    borderTopWidth: 1,
+    gap: spacing.md,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
   },
   dividerText: {
     position: 'absolute',
@@ -299,6 +390,21 @@ const styles = StyleSheet.create({
     ...shadows.lg,
   },
   actionButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  googleButton: {
+    borderRadius: radius.md,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    borderWidth: 1,
+    gap: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.sm,
+  },
+  googleButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },

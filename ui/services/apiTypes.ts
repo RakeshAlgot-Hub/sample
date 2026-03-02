@@ -28,8 +28,9 @@ export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly';
 export interface BillingConfig {
   status: 'paid' | 'due' | 'overdue';
   billingCycle: 'monthly' | 'day-wise';
-  anchorDate: string;
+  anchorDay: number;
   method?: string;
+  dayWiseStartDate?: string;
 }
 
 export interface Tenant {
@@ -55,6 +56,7 @@ export interface Payment {
   propertyId: string;
   // property field removed
   tenantName?: string;
+  roomNumber?: string;  // Enriched field
   bed: string;
   amount: string;
   status: 'paid' | 'due' | 'overdue';

@@ -32,10 +32,10 @@ export default function AddTenantScreen() {
   const router = useRouter();
   const { selectedPropertyId } = useProperty();
 
-  const [name, setName] = useState('');
-  const [documentId, setDocumentId] = useState('');
-  const [phone, setPhone] = useState('');
-  const [rent, setRent] = useState('');
+  const [name, setName] = useState('John Doe');
+  const [documentId, setDocumentId] = useState('1234567890');
+  const [phone, setPhone] = useState('9876543210');
+  const [rent, setRent] = useState('5000');
   const [joinDate, setJoinDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [rooms, setRooms] = useState<Room[]>([]);

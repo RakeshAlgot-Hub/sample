@@ -1,11 +1,22 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Literal
+from enum import Enum
+
+class BillingStatus(str, Enum):
+    PAID = 'paid'
+    DUE = 'due'
+    OVERDUE = 'overdue'
+
+class BillingCycle(str, Enum):
+    MONTHLY = 'monthly'
+    DAY_WISE = 'day-wise'
 
 class BillingConfig(BaseModel):
     status: Literal['paid', 'due', 'overdue']
     billingCycle: Literal['monthly', 'day-wise']
-    anchorDate: str
+    anchorDay: int = Field(default=1, ge=1)
     method: Optional[str] = None
+    dayWiseStartDate: Optional[str] = None
 
 class Tenant(BaseModel):
     id: Optional[str] = None

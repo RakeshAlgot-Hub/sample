@@ -39,9 +39,6 @@ async def ensure_indexes():
     # Token blacklist: TTL index on createdAt (7 days)
     await db["token_blacklist"].create_index("createdAt", expireAfterSeconds=60*60*24*7)
 
-    # WhatsApp OTP: lookup + TTL expiry
-    await db["whatsapp_otps"].create_index("phoneNumber", unique=True)
-    await db["whatsapp_otps"].create_index("expiresAt", expireAfterSeconds=0)
 
 @asynccontextmanager
 async def lifespan(app):

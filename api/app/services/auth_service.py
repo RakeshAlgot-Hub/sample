@@ -29,6 +29,7 @@ from app.utils.attempt_tracking import (
     reset_otp_attempts,
     delete_otp_attempts,
 )
+# from app.utils.email_service import send_otp_email  # TODO: Enable in production
 from app.models.user_schema import UserCreate, UserLogin, UserOut
 import re
 
@@ -255,7 +256,8 @@ async def send_email_otp_service(email: str):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is required")
 
     normalized_email = email.strip().lower()
-    otp = "130499"  # TODO: Replace with random OTP generation in production
+    # TODO: Use random OTP in production: otp = str(random.randint(100000, 999999))
+    otp = "130499"  # Mock OTP for development
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=10)
 
@@ -276,9 +278,9 @@ async def send_email_otp_service(email: str):
         upsert=True,
     )
 
-    # TODO: In production, integrate with an email service (SendGrid, AWS SES, etc.)
-    # For now, we'll just return success
-    print(f"OTP for {normalized_email}: {otp}")  # For development only
+    # TODO: In production, integrate with SendGrid email service
+    # For now, logging the OTP for testing purposes
+    print(f"[DEV] OTP for {normalized_email}: {otp}")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

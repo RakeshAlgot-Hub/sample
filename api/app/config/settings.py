@@ -23,8 +23,6 @@ if not PUBLIC_PATHS:
 		"/api/v1/auth/login",
 		"/api/v1/auth/register",
 		"/api/v1/auth/google",
-		"/api/v1/auth/whatsapp/send-otp",
-		"/api/v1/auth/whatsapp/verify-otp",
 		"/api/v1/auth/refresh",
 		"/api/v1/auth/forgot-password",
 		"/api/v1/auth/reset-password",

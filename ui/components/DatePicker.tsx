@@ -19,6 +19,7 @@ interface DatePickerProps {
   disabled?: boolean;
   required?: boolean;
   restrictToLast30Days?: boolean;
+  restrictToNext30Days?: boolean;
 }
 
 export default function DatePicker({
@@ -28,6 +29,7 @@ export default function DatePicker({
   disabled = false,
   required = false,
   restrictToLast30Days = false,
+  restrictToNext30Days = false,
 }: DatePickerProps) {
   const { colors } = useTheme();
   const [showModal, setShowModal] = useState(false);
@@ -35,20 +37,30 @@ export default function DatePicker({
     value ? new Date(value) : new Date()
   );
 
-  // Calculate date range: today and 30 days before (if enabled)
+  // Calculate date range: today and 30 days before (if enabled) OR 30 days ahead (if enabled)
   let today: Date | undefined;
   let minDate: Date | undefined;
+  let maxDate: Date | undefined;
+  
   if (restrictToLast30Days) {
     today = new Date();
     today.setHours(0, 0, 0, 0);
     minDate = new Date(today);
     minDate.setDate(today.getDate() - 29); // 30 days including today
+    maxDate = today;
+  } else if (restrictToNext30Days) {
+    today = new Date();
+    today.setHours(0, 0, 0, 0);
+    minDate = today;
+    maxDate = new Date(today);
+    maxDate.setDate(today.getDate() + 30); // 30 days from today
   }
 
   // Helper to check if a date is in range
   const isDateInRange = (date: Date) => {
-    if (!restrictToLast30Days) return true;
-    return date >= (minDate as Date) && date <= (today as Date);
+    if (!restrictToLast30Days && !restrictToNext30Days) return true;
+    if (!minDate || !maxDate) return true;
+    return date >= minDate && date <= maxDate;
   };
 
   const formatDisplayDate = (dateString: string): string => {

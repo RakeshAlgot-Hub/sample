@@ -23,6 +23,14 @@ import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 
+// Helper function to mask IDs professionally
+const maskId = (id: string): string => {
+  if (!id || id.length <= 8) return id;
+  const start = id.substring(0, 4);
+  const end = id.substring(id.length - 4);
+  return `${start}...${end}`;
+};
+
 export default function MyPropertyScreen() {
   const { colors } = useTheme();
   const router = useRouter();
@@ -119,7 +127,7 @@ export default function MyPropertyScreen() {
             <View style={styles.detailItem}>
               <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>Owner ID</Text>
               <Text style={[styles.detailValue, { color: colors.text.primary }]} numberOfLines={1}>
-                {selectedProperty.ownerId || 'N/A'}
+                {maskId(selectedProperty.ownerId) || 'N/A'}
               </Text>
             </View>
             <View style={styles.detailItem}>
@@ -127,7 +135,7 @@ export default function MyPropertyScreen() {
                 Property ID
               </Text>
               <Text style={[styles.detailValue, { color: colors.text.primary }]} numberOfLines={1}>
-                {selectedProperty.id}
+                {maskId(selectedProperty.id)}
               </Text>
             </View>
           </View>

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import ScreenContainer from '@/components/ScreenContainer';
@@ -27,7 +27,7 @@ import {
   dashboardService,
 } from '@/services/apiClient';
 import type { Payment, DashboardStats } from '@/services/apiTypes';
-import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
+import { cacheKeys, getScreenCache, setScreenCache, clearScreenCache } from '@/services/screenCache';
 
 interface DashboardData {
   stats: DashboardStats;
@@ -42,6 +42,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { selectedProperty, selectedPropertyId, loading: propertyLoading } = useProperty();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -106,6 +107,7 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!propertyLoading) {
+        clearScreenCache();
         fetchDashboardData();
       }
     }, [selectedPropertyId, propertyLoading])
@@ -115,13 +117,33 @@ export default function DashboardScreen() {
     fetchDashboardData();
   };
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setError(null);
+    
+    try {
+      clearScreenCache();
+      await fetchDashboardData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [selectedPropertyId]);
+
   if (propertyLoading || loading) {
     return (
       <ScreenContainer edges={['top']}>
         <PropertySwitcher />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh}
+              colors={[colors.primary[500]]}
+              tintColor={colors.primary[500]}
+            />
+          }>
           <View style={styles.header}>
             <Text style={[styles.greeting, { color: colors.text.secondary }]}>Welcome back,</Text>
             <Text style={[styles.ownerName, { color: colors.text.primary }]}>Property Owner</Text>
@@ -184,7 +206,15 @@ export default function DashboardScreen() {
       <PropertySwitcher />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={handleRefresh}
+            colors={[colors.primary[500]]}
+            tintColor={colors.primary[500]}
+          />
+        }>
         {error ? (
           <>
             <View style={styles.header}>

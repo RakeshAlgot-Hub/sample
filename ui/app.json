@@ -33,6 +33,8 @@
       "eas": {
         "projectId": "621109ec-b2e3-438e-8db3-1217ff0bfd9d"
       }
+      ,
+      "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "191330746464-hpqels1vva079e0ml9getqieg59ijakf.apps.googleusercontent.com"
     },
     "android": {
       "package": "com.lohilit101.boltexponativewind"

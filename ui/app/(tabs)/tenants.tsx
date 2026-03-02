@@ -6,11 +6,11 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import ScreenContainer from '@/components/ScreenContainer';
-import PropertySwitcher from '@/components/PropertySwitcher';
 import StatusBadge from '@/components/StatusBadge';
 import Card from '@/components/Card';
 import EmptyState from '@/components/EmptyState';
@@ -22,9 +22,9 @@ import { Search, Filter, Phone, Users } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
-import { tenantService } from '@/services/apiClient';
-import type { Tenant, PaginatedResponse } from '@/services/apiTypes';
-import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
+import { tenantService, roomService } from '@/services/apiClient';
+import type { Tenant, PaginatedResponse, Room } from '@/services/apiTypes';
+import { cacheKeys, getScreenCache, setScreenCache, clearScreenCache } from '@/services/screenCache';
 
 const TENANTS_CACHE_STALE_MS = 30 * 1000;
 
@@ -33,7 +33,9 @@ export default function TenantsScreen() {
   const router = useRouter();
   const { selectedProperty, selectedPropertyId, loading: propertyLoading } = useProperty();
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -44,6 +46,19 @@ export default function TenantsScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50;
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchRooms = useCallback(async () => {
+    if (!selectedPropertyId) return;
+
+    try {
+      const roomsRes = await roomService.getRooms(selectedPropertyId, undefined, 1, 1000);
+      if (roomsRes.data) {
+        setRooms(roomsRes.data);
+      }
+    } catch (err: any) {
+      console.error('Failed to load rooms:', err?.message);
+    }
+  }, [selectedPropertyId]);
 
   const fetchTenants = useCallback(async (page: number = 1, search: string = '', status: string = 'all') => {
     if (!selectedPropertyId) {
@@ -93,11 +108,13 @@ export default function TenantsScreen() {
     setSelectedStatus('all');
     setTenants([]);
     setTotal(0);
+    setRooms([]);
     
     if (selectedPropertyId && !propertyLoading) {
       fetchTenants(1, '', 'all');
+      fetchRooms();
     }
-  }, [selectedPropertyId, propertyLoading]);
+  }, [selectedPropertyId, propertyLoading, fetchTenants, fetchRooms]);
 
   // Debounced search handler
   useEffect(() => {
@@ -118,18 +135,49 @@ export default function TenantsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!propertyLoading && selectedPropertyId) {
-        // Refresh tenants when screen is focused
+        // Refresh tenants and rooms when screen is focused (after creating room, etc.)
+        clearScreenCache();
+        fetchRooms();
         fetchTenants(currentPage, searchQuery, selectedStatus);
       }
-    }, [propertyLoading, selectedPropertyId, currentPage, searchQuery, selectedStatus, fetchTenants])
+    }, [propertyLoading, selectedPropertyId, currentPage, searchQuery, selectedStatus, fetchTenants, fetchRooms])
   );
 
   const handleRetry = () => {
     fetchTenants();
   };
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    // Clear all cached data to force fresh data fetch
+    clearScreenCache();
+    
+    // Reset pagination and filters
+    setCurrentPage(1);
+    setSearchQuery('');
+    setSelectedStatus('all');
+    setTenants([]);
+    setTotal(0);
+    
+    // Re-fetch both tenants and rooms
+    if (selectedPropertyId) {
+      try {
+        await fetchRooms();
+        await fetchTenants(1, '', 'all');
+      } finally {
+        setRefreshing(false);
+      }
+    } else {
+      setRefreshing(false);
+    }
+  }, [selectedPropertyId, fetchRooms, fetchTenants]);
+
   const handleFabPress = () => {
     router.push('/add-tenant');
+  };
+
+  const handleAddRoom = () => {
+    router.push('/room-form');
   };
 
   const getRoomInfo = (tenant: Tenant) => {
@@ -143,7 +191,6 @@ export default function TenantsScreen() {
   if (propertyLoading || loading) {
     return (
       <ScreenContainer edges={['top']}>
-        <PropertySwitcher />
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Tenants</Text>
           <Text style={[styles.headerCount, { color: colors.text.secondary }]}>0 Total</Text>
@@ -160,7 +207,6 @@ export default function TenantsScreen() {
   if (!selectedProperty) {
     return (
       <ScreenContainer edges={['top']}>
-        <PropertySwitcher />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
@@ -177,10 +223,10 @@ export default function TenantsScreen() {
   }
 
   const showEmptyState = !loading && tenants.length === 0 && !error;
+  const showNoRoomsState = !loading && tenants.length === 0 && rooms.length === 0 && !error;
 
   return (
     <ScreenContainer edges={['top']}>
-      <PropertySwitcher />
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Tenants</Text>
         <Text style={[styles.headerCount, { color: colors.text.secondary }]}>{total} Total</Text>
@@ -223,9 +269,25 @@ export default function TenantsScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={handleRefresh}
+            colors={[colors.primary[500]]}
+            tintColor={colors.primary[500]}
+          />
+        }>
         {error && selectedProperty ? (
           <ApiErrorCard error={error} onRetry={handleRetry} />
+        ) : showNoRoomsState ? (
+          <EmptyState
+            icon={Users}
+            title="No Tenants or Rooms"
+            subtitle="Create rooms first, then add tenants to track rent payments and occupancy"
+            actionLabel="Add Room"
+            onActionPress={handleAddRoom}
+          />
         ) : showEmptyState ? (
           <EmptyState
             icon={Users}
@@ -337,7 +399,7 @@ export default function TenantsScreen() {
           </>
         )}
       </ScrollView>
-      <FAB onPress={handleFabPress} />
+      {!showNoRoomsState && <FAB onPress={handleFabPress} />}
       <UpgradeModal
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}

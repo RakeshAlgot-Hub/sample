@@ -36,7 +36,6 @@ export default function EditPaymentScreen() {
 
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [paymentDate, setPaymentDate] = useState('');
   const [method, setMethod] = useState('Cash');
   const [status, setStatus] = useState<'paid' | 'due' | 'overdue'>('paid');
 
@@ -48,7 +47,7 @@ export default function EditPaymentScreen() {
   const [showStatusPicker, setShowStatusPicker] = useState(false);
 
   const [tenantName, setTenantName] = useState('');
-  const [bedInfo, setBedInfo] = useState('');
+  const [roomNumber, setRoomNumber] = useState('');
 
   useEffect(() => {
     if (paymentId) {
@@ -65,11 +64,10 @@ export default function EditPaymentScreen() {
       const amountStr = cachedPayment.amount.replace(/[^0-9]/g, '');
       setAmount(amountStr);
       setDueDate(cachedPayment.dueDate || '');
-      setPaymentDate((cachedPayment as any).date || '');
       setMethod(cachedPayment.method || 'Cash');
       setStatus(cachedPayment.status);
       setTenantName((cachedPayment as any).tenantName || '');
-      setBedInfo(cachedPayment.bed);
+      setRoomNumber((cachedPayment as any).roomNumber || 'N/A');
       setFetchingPayment(false);
       return;
     }
@@ -85,11 +83,10 @@ export default function EditPaymentScreen() {
 
       setAmount(amountStr);
       setDueDate(payment.dueDate || '');
-      setPaymentDate(payment.date || '');
       setMethod(payment.method || 'Cash');
       setStatus(payment.status);
       setTenantName(payment.tenantName);
-      setBedInfo(payment.bed);
+      setRoomNumber(payment.roomNumber || 'N/A');
       setScreenCache(paymentCacheKey, payment);
     } catch (err: any) {
       setError(err?.message || 'Failed to load payment');
@@ -126,8 +123,7 @@ export default function EditPaymentScreen() {
       await paymentService.updatePayment(paymentId, {
         amount: `₹${amountNum.toLocaleString()}`,
         dueDate,
-        date: paymentDate || null,
-        method: paymentDate ? method : null,
+        method,
         status,
       } as any);
 
@@ -228,7 +224,7 @@ export default function EditPaymentScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Bed</Text>
+              <Text style={[styles.label, { color: colors.text.primary }]}>Room</Text>
               <View
                 style={[
                   styles.disabledInput,
@@ -238,7 +234,7 @@ export default function EditPaymentScreen() {
                   },
                 ]}>
                 <Text style={[styles.disabledText, { color: colors.text.secondary }]}>
-                  {bedInfo}
+                  {roomNumber}
                 </Text>
               </View>
             </View>
@@ -283,31 +279,6 @@ export default function EditPaymentScreen() {
                   editable={!loading}
                 />
               </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Payment Date</Text>
-              <View style={styles.dateInputContainer}>
-                <Calendar size={20} color={colors.text.tertiary} style={styles.dateIcon} />
-                <TextInput
-                  style={[
-                    styles.dateInput,
-                    {
-                      backgroundColor: colors.white,
-                      color: colors.text.primary,
-                      borderColor: colors.border.medium,
-                    },
-                  ]}
-                  placeholder="YYYY-MM-DD (optional)"
-                  placeholderTextColor={colors.text.tertiary}
-                  value={paymentDate}
-                  onChangeText={setPaymentDate}
-                  editable={!loading}
-                />
-              </View>
-              <Text style={[styles.helperText, { color: colors.text.tertiary }]}>
-                Leave empty if not yet paid
-              </Text>
             </View>
 
             <View style={styles.inputContainer}>

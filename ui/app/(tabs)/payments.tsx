@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import ScreenContainer from '@/components/ScreenContainer';
-import PropertySwitcher from '@/components/PropertySwitcher';
 import StatusBadge from '@/components/StatusBadge';
 import Card from '@/components/Card';
 import EmptyState from '@/components/EmptyState';
@@ -34,7 +34,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
 import { paymentService } from '@/services/apiClient';
 import type { Payment, PaginatedResponse } from '@/services/apiTypes';
-import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
+import { cacheKeys, getScreenCache, setScreenCache, clearScreenCache } from '@/services/screenCache';
 
 const PAYMENTS_CACHE_STALE_MS = 30 * 1000;
 
@@ -121,19 +121,32 @@ export default function PaymentsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!propertyLoading) {
+      if (!propertyLoading && selectedPropertyId) {
+        // Clear cache when focusing on screen
+        clearScreenCache('payments:');
+        // Reset to current month when screen is focused
+        setSelectedDate(new Date());
         setCurrentPage(1);
-        fetchPayments();
+        setError(null);
       }
-    }, [selectedPropertyId, propertyLoading, monthKey])
+    }, [selectedPropertyId, propertyLoading])
   );
 
+  // Refetch payments when month changes
+  useEffect(() => {
+    if (selectedPropertyId && !propertyLoading) {
+      fetchPayments();
+    }
+  }, [monthKey, selectedPropertyId, propertyLoading]);
+
   const handlePreviousMonth = () => {
+    clearScreenCache('payments:');
     setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1));
     setCurrentPage(1);
   };
 
   const handleNextMonth = () => {
+    clearScreenCache('payments:');
     setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1));
     setCurrentPage(1);
   };
@@ -141,6 +154,25 @@ export default function PaymentsScreen() {
   const handleRetry = () => {
     fetchPayments();
   };
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    setError(null);
+    
+    // Clear cache immediately
+    clearScreenCache('payments:');
+    
+    // Reset to current month
+    setSelectedDate(new Date());
+    setCurrentPage(1);
+    
+    try {
+      // Fetch with fresh data (cache is cleared)
+      await fetchPayments();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [selectedPropertyId]);
 
   const handleFabPress = () => {
     router.push('/add-payment');
@@ -195,7 +227,6 @@ export default function PaymentsScreen() {
   if (propertyLoading || isInitialLoad) {
     return (
       <ScreenContainer edges={['top']}>
-        <PropertySwitcher />
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Payments</Text>
           <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[100] }]} activeOpacity={0.7}>
@@ -217,7 +248,6 @@ export default function PaymentsScreen() {
   if (!selectedProperty) {
     return (
       <ScreenContainer edges={['top']}>
-        <PropertySwitcher />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
@@ -237,7 +267,6 @@ export default function PaymentsScreen() {
 
   return (
     <ScreenContainer edges={['top']}>
-      <PropertySwitcher />
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Payments</Text>
         <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[100] }]} activeOpacity={0.7}>
@@ -278,7 +307,15 @@ export default function PaymentsScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={isRefreshing} 
+            onRefresh={handleRefresh}
+            colors={[colors.primary[500]]}
+            tintColor={colors.primary[500]}
+          />
+        }>
         {error ? (
           <ApiErrorCard error={error} onRetry={handleRetry} />
         ) : payments.length === 0 ? (
@@ -321,9 +358,10 @@ export default function PaymentsScreen() {
                         {getStatusIcon(payment.status)}
                       </View>
                       <View style={styles.paymentInfo}>
-                        {/* Removed tenantName field */}
-                        {/* Removed property field from payment, using selectedProperty.name for display only */}
-                        <Text style={[styles.bedNumber, { color: colors.text.tertiary }]}>Bed: {payment.bed}</Text>
+                        <Text style={[styles.tenantName, { color: colors.text.primary }]}>
+                          {payment.tenantName || 'Unknown Tenant'}
+                        </Text>
+                        <Text style={[styles.bedNumber, { color: colors.text.tertiary }]}>Room: {payment.roomNumber || 'N/A'}</Text>
                       </View>
                       <View style={styles.amountContainer}>
                         <Text style={[styles.amount, { color: colors.text.primary }]}>{payment.amount}</Text>
