@@ -175,7 +175,7 @@ export default function AddTenantScreen() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background.primary }]}
         edges={['top', 'bottom']}>
-        <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+        <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -203,7 +203,7 @@ export default function AddTenantScreen() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background.primary }]}
         edges={['top', 'bottom']}>
-        <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+        <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -224,7 +224,7 @@ export default function AddTenantScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={['top', 'bottom']}>
-      <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+      <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -271,7 +271,7 @@ export default function AddTenantScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     color: colors.text.primary,
                     borderColor: colors.border.medium,
                   },
@@ -291,7 +291,7 @@ export default function AddTenantScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     color: colors.text.primary,
                     borderColor: colors.border.medium,
                   },
@@ -311,7 +311,7 @@ export default function AddTenantScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     color: colors.text.primary,
                     borderColor: colors.border.medium,
                   },
@@ -331,7 +331,7 @@ export default function AddTenantScreen() {
                 style={[
                   styles.pickerButton,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     borderColor: colors.border.medium,
                   },
                 ]}
@@ -362,7 +362,7 @@ export default function AddTenantScreen() {
                 style={[
                   styles.pickerButton,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     borderColor: colors.border.medium,
                     opacity: !selectedRoom || fetchingBeds ? 0.5 : 1,
                   },
@@ -400,7 +400,7 @@ export default function AddTenantScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     color: colors.text.primary,
                     borderColor: colors.border.medium,
                   },
@@ -461,7 +461,7 @@ export default function AddTenantScreen() {
         animationType="fade"
         onRequestClose={() => setShowRoomPicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
                 Select Room
@@ -524,7 +524,7 @@ export default function AddTenantScreen() {
         animationType="fade"
         onRequestClose={() => setShowBedPicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
                 Select Bed

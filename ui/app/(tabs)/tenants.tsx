@@ -216,7 +216,7 @@ export default function TenantsScreen() {
 
       {selectedProperty && (
         <View style={styles.searchContainer}>
-          <View style={[styles.searchBar, { backgroundColor: colors.white, borderColor: colors.border.medium }]}>
+          <View style={[styles.searchBar, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium }]}>
             <Search size={20} color={colors.text.tertiary} />
             <TextInput
               style={[styles.searchInput, { color: colors.text.primary }]}
@@ -344,7 +344,7 @@ export default function TenantsScreen() {
             
             {/* Pagination Controls */}
             {total > pageSize && (
-              <View style={[styles.paginationContainer, { backgroundColor: colors.white, borderTopColor: colors.border.light }]}>
+              <View style={[styles.paginationContainer, { backgroundColor: colors.background.secondary, borderTopColor: colors.border.light }]}>
                 <TouchableOpacity
                   style={[
                     styles.paginationButton,

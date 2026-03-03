@@ -36,7 +36,7 @@ interface TenantWithLatestPayment extends Tenant {
 }
 
 export default function AddPaymentScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
   const { selectedPropertyId } = useProperty();
@@ -164,7 +164,7 @@ export default function AddPaymentScreen() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background.primary }]}
         edges={['top', 'bottom']}>
-        <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+        <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -193,7 +193,7 @@ export default function AddPaymentScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={['top', 'bottom']}>
-      <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+      <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -233,7 +233,7 @@ export default function AddPaymentScreen() {
                 style={[
                   styles.pickerButton, 
                   { 
-                    backgroundColor: !autoGeneratePayments ? colors.neutral[100] : colors.white, 
+                    backgroundColor: !autoGeneratePayments ? colors.neutral[700] : colors.background.secondary, 
                     borderColor: colors.border.medium 
                   }
                 ]} 
@@ -266,7 +266,7 @@ export default function AddPaymentScreen() {
                 ) : (
                   // If status is 'paid', allow selection
                   <TouchableOpacity
-                    style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]}
+                    style={[styles.pickerButton, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium }]}
                     onPress={() => setShowAnchorDayPicker(true)}
                     activeOpacity={0.7}
                     disabled={loading}>
@@ -286,7 +286,7 @@ export default function AddPaymentScreen() {
             )}
 
             {/* Auto-generate Payments Toggle */}
-            <View style={[styles.toggleContainer, { backgroundColor: colors.neutral[50], borderColor: colors.border.light }]}>
+            <View style={[styles.toggleContainer, { backgroundColor: isDark ? colors.neutral[800] : colors.neutral[50], borderColor: colors.border.light }]}>
               <View style={styles.toggleTextContainer}>
                 <Text style={[styles.toggleLabel, { color: colors.text.primary }]}>Auto-Generate Payment</Text>
                 <Text style={[styles.toggleDescription, { color: colors.text.secondary }]}>
@@ -342,7 +342,7 @@ export default function AddPaymentScreen() {
         animationType="fade"
         onRequestClose={() => setShowStatusPicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
                 Select Payment Status
@@ -398,7 +398,7 @@ export default function AddPaymentScreen() {
           animationType="fade"
           onRequestClose={() => setShowAnchorDayPicker(false)}>
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
+            <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
               <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
                 <Text style={[styles.modalTitle, { color: colors.text.primary }]}>When is rent due?</Text>
               </View>

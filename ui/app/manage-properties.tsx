@@ -61,7 +61,7 @@ export default function ManagePropertiesScreen() {
 
   return (
     <ScreenContainer edges={['top']}>
-      <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+      <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}

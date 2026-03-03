@@ -32,7 +32,7 @@ const PAYMENT_STATUSES = [
 const PAYMENT_DETAIL_CACHE_STALE_MS = 60 * 1000;
 
 export default function EditPaymentScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const { paymentId } = useLocalSearchParams<{ paymentId: string }>();
   const isOnline = useNetworkStatus();
@@ -205,7 +205,7 @@ export default function EditPaymentScreen() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background.primary }]}
         edges={['top', 'bottom']}>
-        <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+        <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -226,7 +226,7 @@ export default function EditPaymentScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={['top', 'bottom']}>
-      <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+      <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -294,7 +294,7 @@ export default function EditPaymentScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     color: colors.text.primary,
                     borderColor: colors.border.medium,
                   },
@@ -316,7 +316,7 @@ export default function EditPaymentScreen() {
                   style={[
                     styles.dateInput,
                     {
-                      backgroundColor: colors.white,
+                      backgroundColor: colors.background.secondary,
                       color: colors.text.primary,
                       borderColor: colors.border.medium,
                     },
@@ -336,7 +336,7 @@ export default function EditPaymentScreen() {
                 style={[
                   styles.pickerButton,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     borderColor: colors.border.medium,
                   },
                 ]}
@@ -362,7 +362,7 @@ export default function EditPaymentScreen() {
                 style={[
                   styles.pickerButton,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     borderColor: colors.border.medium,
                   },
                 ]}
@@ -419,7 +419,7 @@ export default function EditPaymentScreen() {
         animationType="fade"
         onRequestClose={() => setShowMethodPicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
                 Select Payment Method
@@ -475,7 +475,7 @@ export default function EditPaymentScreen() {
         animationType="fade"
         onRequestClose={() => setShowStatusPicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
                 Select Payment Status
@@ -529,9 +529,9 @@ export default function EditPaymentScreen() {
         animationType="fade"
         onRequestClose={handleCancelStatusChange}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.confirmModalContainer, { backgroundColor: colors.white }]}>
+          <View style={[styles.confirmModalContainer, { backgroundColor: colors.background.secondary }]}>
             <View style={styles.confirmIconContainer}>
-              <View style={[styles.confirmIcon, { backgroundColor: pendingStatus === 'paid' ? colors.success[50] : colors.warning[50] }]}>
+              <View style={[styles.confirmIcon, { backgroundColor: pendingStatus === 'paid' ? (isDark ? colors.success[900] : colors.success[50]) : (isDark ? colors.warning[900] : colors.warning[50]) }]}>
                 <AlertTriangle size={32} color={pendingStatus === 'paid' ? colors.success[500] : colors.warning[500]} />
               </View>
             </View>

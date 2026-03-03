@@ -9,23 +9,23 @@ interface LimitBannerProps {
 }
 
 export default function LimitBanner({ message, onUpgrade }: LimitBannerProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   return (
     <View
       style={[
         styles.container,
         {
-          backgroundColor: colors.warning[50],
-          borderColor: colors.warning[200],
+          backgroundColor: isDark ? colors.warning[900] : colors.warning[50],
+          borderColor: isDark ? colors.warning[700] : colors.warning[200],
         },
       ]}>
       <View style={styles.content}>
-        <AlertCircle size={18} color={colors.warning[600]} />
-        <Text style={[styles.message, { color: colors.warning[800] }]}>{message}</Text>
+        <AlertCircle size={18} color={isDark ? colors.warning[400] : colors.warning[600]} />
+        <Text style={[styles.message, { color: isDark ? colors.warning[100] : colors.warning[800] }]}>{message}</Text>
       </View>
       <TouchableOpacity onPress={onUpgrade} activeOpacity={0.7}>
-        <Text style={[styles.upgradeText, { color: colors.warning[700] }]}>Upgrade</Text>
+        <Text style={[styles.upgradeText, { color: isDark ? colors.warning[300] : colors.warning[700] }]}>Upgrade</Text>
       </TouchableOpacity>
     </View>
   );

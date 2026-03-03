@@ -141,7 +141,7 @@ export default function PropertyDetailScreen() {
 
   return (
     <ScreenContainer edges={['top']}>
-      <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+      <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -157,7 +157,7 @@ export default function PropertyDetailScreen() {
         </View>
       </View>
 
-      <View style={[styles.tabsContainer, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+      <View style={[styles.tabsContainer, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'rooms' && { ...styles.tabActive, borderBottomColor: colors.primary[500] }]}
           onPress={() => setActiveTab('rooms')}

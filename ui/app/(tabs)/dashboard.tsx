@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import ScreenContainer from '@/components/ScreenContainer';
@@ -41,7 +41,7 @@ interface DashboardData {
 const DASHBOARD_CACHE_STALE_MS = 60 * 1000;
 
 export default function DashboardScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const { selectedProperty, selectedPropertyId, loading: propertyLoading } = useProperty();
   const [loading, setLoading] = useState(true);
@@ -309,8 +309,8 @@ export default function DashboardScreen() {
                               <Text style={[styles.paymentAmount, { color: colors.text.primary }]}>
                                 {payment.amount}
                               </Text>
-                              <View style={[styles.overdueTag, { backgroundColor: colors.danger[100] }]}>
-                                <Text style={[styles.overdueText, { color: colors.danger[700] }]}>
+                            <View style={[styles.overdueTag, { backgroundColor: isDark ? colors.danger[900] : colors.danger[100] }]}>
+                              <Text style={[styles.overdueText, { color: isDark ? colors.danger[200] : colors.danger[700] }]}>
                                   {diffDays} {diffDays === 1 ? 'day' : 'days'}
                                 </Text>
                               </View>

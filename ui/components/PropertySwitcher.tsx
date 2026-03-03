@@ -24,7 +24,7 @@ export default function PropertySwitcher() {
   return (
     <>
       <TouchableOpacity
-        style={[styles.container, { backgroundColor: colors.white, borderColor: colors.border.light }]}
+        style={[styles.container, { backgroundColor: colors.background.secondary, borderColor: colors.border.light }]}
         onPress={() => setModalVisible(true)}
         activeOpacity={0.7}>
         <Building2 size={20} color={colors.primary[500]} />
@@ -42,7 +42,7 @@ export default function PropertySwitcher() {
         animationType="fade"
         onRequestClose={() => setModalVisible(false)}>
         <View style={styles.overlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
             <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
               <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
                 Switch Property

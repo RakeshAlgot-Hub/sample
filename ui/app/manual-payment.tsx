@@ -35,7 +35,7 @@ const PAYMENT_STATUSES = [
 type PaymentStatus = (typeof PAYMENT_STATUSES)[number]['value'];
 
 export default function ManualPaymentScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams<{ tenantId?: string }>();
   const { selectedPropertyId } = useProperty();
@@ -165,7 +165,7 @@ export default function ManualPaymentScreen() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background.primary }]}
         edges={['top', 'bottom']}>
-        <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+        <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -193,7 +193,7 @@ export default function ManualPaymentScreen() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background.primary }]}
         edges={['top', 'bottom']}>
-        <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+        <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -214,7 +214,7 @@ export default function ManualPaymentScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={['top', 'bottom']}>
-      <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+      <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -253,7 +253,7 @@ export default function ManualPaymentScreen() {
                 <View style={styles.inputContainer}>
                   <Text style={[styles.label, { color: colors.text.primary }]}>Tenant *</Text>
                   <TouchableOpacity
-                    style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]}
+                    style={[styles.pickerButton, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium }]}
                     onPress={() => setShowTenantPicker(true)}
                     activeOpacity={0.7}
                     disabled={loading}>
@@ -270,7 +270,7 @@ export default function ManualPaymentScreen() {
                     style={[
                       styles.input,
                       {
-                        backgroundColor: colors.white,
+                      backgroundColor: colors.background.secondary,
                         color: colors.text.primary,
                         borderColor: colors.border.medium,
                       },
@@ -295,7 +295,7 @@ export default function ManualPaymentScreen() {
                 <View style={styles.inputContainer}>
                   <Text style={[styles.label, { color: colors.text.primary }]}>Status *</Text>
                   <TouchableOpacity
-                    style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]}
+                    style={[styles.pickerButton, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium }]}
                     onPress={() => setShowStatusPicker(true)}
                     activeOpacity={0.7}
                     disabled={loading}>
@@ -309,7 +309,7 @@ export default function ManualPaymentScreen() {
                 <View style={styles.inputContainer}>
                   <Text style={[styles.label, { color: colors.text.primary }]}>Payment Method *</Text>
                   <TouchableOpacity
-                    style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]}
+                    style={[styles.pickerButton, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium }]}
                     onPress={() => setShowMethodPicker(true)}
                     activeOpacity={0.7}
                     disabled={loading}>
@@ -353,7 +353,7 @@ export default function ManualPaymentScreen() {
         animationType="fade"
         onRequestClose={() => setShowTenantPicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}> 
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}> 
             <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}> 
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Select Tenant</Text>
             </View>
@@ -397,7 +397,7 @@ export default function ManualPaymentScreen() {
         animationType="fade"
         onRequestClose={() => setShowStatusPicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}> 
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}> 
             <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}> 
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Select Payment Status</Text>
             </View>
@@ -443,7 +443,7 @@ export default function ManualPaymentScreen() {
         animationType="fade"
         onRequestClose={() => setShowMethodPicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}> 
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}> 
             <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}> 
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Select Payment Method</Text>
             </View>

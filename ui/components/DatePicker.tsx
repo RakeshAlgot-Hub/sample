@@ -185,7 +185,7 @@ export default function DatePicker({
         style={[
           styles.input,
           {
-            backgroundColor: disabled ? colors.background.tertiary : colors.white,
+            backgroundColor: disabled ? colors.background.tertiary : colors.background.secondary,
             borderColor: colors.border.medium,
             opacity: disabled ? 0.6 : 1,
           },
@@ -211,7 +211,7 @@ export default function DatePicker({
         animationType="fade"
         onRequestClose={() => setShowModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
               <TouchableOpacity onPress={handlePreviousMonth} activeOpacity={0.7}>
                 <ChevronLeft size={24} color={colors.primary[500]} />

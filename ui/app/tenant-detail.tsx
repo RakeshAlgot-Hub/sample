@@ -349,7 +349,7 @@ export default function TenantDetailScreen() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background.primary }]}
         edges={['top', 'bottom']}>
-        <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+        <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -373,7 +373,7 @@ export default function TenantDetailScreen() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background.primary }]}
         edges={['top', 'bottom']}>
-        <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+        <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -402,7 +402,7 @@ export default function TenantDetailScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={['top', 'bottom']}>
-      <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+      <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -682,7 +682,7 @@ export default function TenantDetailScreen() {
         animationType="slide"
         onRequestClose={() => setShowEditTenantModal(false)}>
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background.primary }]}>
-          <View style={[styles.modalHeader, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => setShowEditTenantModal(false)}
@@ -698,7 +698,7 @@ export default function TenantDetailScreen() {
               <View style={styles.inputContainer}>
                 <Text style={[styles.label, { color: colors.text.primary }]}>Name</Text>
                 <TextInput
-                  style={[styles.textInput, { backgroundColor: colors.white, borderColor: colors.border.medium, color: colors.text.primary }]}
+                  style={[styles.textInput, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium, color: colors.text.primary }]}
                   value={editTenantName}
                   onChangeText={setEditTenantName}
                   placeholder="Enter tenant name"
@@ -710,7 +710,7 @@ export default function TenantDetailScreen() {
               <View style={styles.inputContainer}>
                 <Text style={[styles.label, { color: colors.text.primary }]}>Phone</Text>
                 <TextInput
-                  style={[styles.textInput, { backgroundColor: colors.white, borderColor: colors.border.medium, color: colors.text.primary }]}
+                  style={[styles.textInput, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium, color: colors.text.primary }]}
                   value={editTenantPhone}
                   onChangeText={setEditTenantPhone}
                   keyboardType="number-pad"
@@ -724,7 +724,7 @@ export default function TenantDetailScreen() {
               <View style={styles.inputContainer}>
                 <Text style={[styles.label, { color: colors.text.primary }]}>Rent</Text>
                 <TextInput
-                  style={[styles.textInput, { backgroundColor: colors.white, borderColor: colors.border.medium, color: colors.text.primary }]}
+                  style={[styles.textInput, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium, color: colors.text.primary }]}
                   value={editTenantRent}
                   onChangeText={setEditTenantRent}
                   placeholder="Enter rent amount"
@@ -761,7 +761,7 @@ export default function TenantDetailScreen() {
         animationType="slide"
         onRequestClose={() => setShowEditBillingModal(false)}>
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background.primary }]}>
-          <View style={[styles.modalHeader, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => setShowEditBillingModal(false)}
@@ -774,7 +774,7 @@ export default function TenantDetailScreen() {
 
           <ScrollView contentContainerStyle={styles.modalScrollContent}>
             <View style={styles.formContainer}>
-              <View style={[styles.toggleContainer, { backgroundColor: colors.white, borderColor: colors.border.medium }]}>
+              <View style={[styles.toggleContainer, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium }]}>
                 <View style={styles.toggleLabel}>
                   <Text style={[styles.label, { color: colors.text.primary }]}>Enable Auto-Generate</Text>
                   <Text style={[styles.toggleHint, { color: colors.text.secondary }]}>
@@ -795,7 +795,7 @@ export default function TenantDetailScreen() {
                   <View style={styles.inputContainer}>
                     <Text style={[styles.label, { color: colors.text.primary }]}>When is rent due each month?</Text>
                     <TouchableOpacity
-                      style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.border.medium }]}
+                      style={[styles.pickerButton, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium }]}
                       onPress={() => setShowAnchorDayPicker(true)}
                       activeOpacity={0.7}
                       disabled={editLoading}>
@@ -838,7 +838,7 @@ export default function TenantDetailScreen() {
         animationType="fade"
         onRequestClose={() => setShowAnchorDayPicker(false)}>
         <View style={styles.pickerOverlay}>
-          <View style={[styles.pickerContainer, { backgroundColor: colors.white }]}>
+          <View style={[styles.pickerContainer, { backgroundColor: colors.background.secondary }]}>
             <View style={[styles.pickerHeader, { borderBottomColor: colors.border.light }]}>
               <Text style={[styles.pickerTitle, { color: colors.text.primary }]}>When is rent due each month?</Text>
             </View>

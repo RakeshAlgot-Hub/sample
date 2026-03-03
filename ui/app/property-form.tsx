@@ -69,7 +69,7 @@ export default function PropertyFormScreen() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background.primary }]}
         edges={['top', 'bottom']}>
-      <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+      <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -117,7 +117,7 @@ export default function PropertyFormScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     color: colors.text.primary,
                     borderColor: colors.border.medium,
                   },
@@ -137,7 +137,7 @@ export default function PropertyFormScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     color: colors.text.primary,
                     borderColor: colors.border.medium,
                   },

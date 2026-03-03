@@ -23,7 +23,7 @@ interface SubscriptionCardCachePayload {
 }
 
 export default function SubscriptionSummaryCard() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
@@ -115,9 +115,9 @@ export default function SubscriptionSummaryCard() {
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <View style={[styles.planBadge, { backgroundColor: colors.warning[50] }]}>
-          <Crown size={16} color={colors.warning[600]} />
-          <Text style={[styles.planText, { color: colors.warning[700] }]}>
+        <View style={[styles.planBadge, { backgroundColor: isDark ? colors.warning[900] : colors.warning[50] }]}>
+          <Crown size={16} color={isDark ? colors.warning[400] : colors.warning[600]} />
+          <Text style={[styles.planText, { color: isDark ? colors.warning[200] : colors.warning[700] }]}>
             {formatPlanName(subscription.plan)} Plan
           </Text>
         </View>
@@ -148,7 +148,7 @@ export default function SubscriptionSummaryCard() {
               {usage.properties} / {formatLimit(subscription.propertyLimit)}
             </Text>
           </View>
-          <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
+          <View style={[styles.progressBar, { backgroundColor: isDark ? colors.neutral[700] : colors.neutral[200] }]}>
             <View
               style={[
                 styles.progressFill,
@@ -172,7 +172,7 @@ export default function SubscriptionSummaryCard() {
               {usage.tenants} / {formatLimit(subscription.tenantLimit)}
             </Text>
           </View>
-          <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
+          <View style={[styles.progressBar, { backgroundColor: isDark ? colors.neutral[700] : colors.neutral[200] }]}>
             <View
               style={[
                 styles.progressFill,
@@ -196,7 +196,7 @@ export default function SubscriptionSummaryCard() {
               {usage.rooms} / {formatLimit(subscription.roomLimit)}
             </Text>
           </View>
-          <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
+          <View style={[styles.progressBar, { backgroundColor: isDark ? colors.neutral[700] : colors.neutral[200] }]}>
             <View
               style={[
                 styles.progressFill,
@@ -220,7 +220,7 @@ export default function SubscriptionSummaryCard() {
               {usage.staff ?? 0} / {formatLimit(subscription.staffLimit)}
             </Text>
           </View>
-          <View style={[styles.progressBar, { backgroundColor: colors.neutral[200] }]}>
+          <View style={[styles.progressBar, { backgroundColor: isDark ? colors.neutral[700] : colors.neutral[200] }]}>
             <View
               style={[
                 styles.progressFill,
@@ -239,10 +239,10 @@ export default function SubscriptionSummaryCard() {
 
       {subscription.plan === 'free' && (
         <TouchableOpacity
-          style={[styles.upgradeButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}
+          style={[styles.upgradeButton, { backgroundColor: isDark ? colors.primary[900] : colors.primary[50], borderColor: isDark ? colors.primary[700] : colors.primary[200] }]}
           onPress={() => router.push('/subscription')}
           activeOpacity={0.7}>
-          <Text style={[styles.upgradeButtonText, { color: colors.primary[700] }]}>Upgrade for More</Text>
+          <Text style={[styles.upgradeButtonText, { color: isDark ? colors.primary[300] : colors.primary[700] }]}>Upgrade for More</Text>
         </TouchableOpacity>
       )}
     </Card>

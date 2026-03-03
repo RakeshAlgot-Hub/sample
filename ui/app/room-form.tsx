@@ -106,7 +106,7 @@ export default function RoomFormScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={['top', 'bottom']}>
-      <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.border.light }]}>
+      <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -153,7 +153,7 @@ export default function RoomFormScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     color: colors.text.primary,
                     borderColor: colors.border.medium,
                   },
@@ -173,7 +173,7 @@ export default function RoomFormScreen() {
                 style={[
                   styles.pickerButton,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     borderColor: colors.border.medium,
                   },
                 ]}
@@ -202,7 +202,7 @@ export default function RoomFormScreen() {
                   style={[
                     styles.input,
                     {
-                      backgroundColor: colors.white,
+                      backgroundColor: colors.background.secondary,
                       color: colors.text.primary,
                       borderColor: colors.border.medium,
                     },
@@ -222,7 +222,7 @@ export default function RoomFormScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     color: colors.text.primary,
                     borderColor: colors.border.medium,
                   },
@@ -242,7 +242,7 @@ export default function RoomFormScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.background.secondary,
                     color: colors.text.primary,
                     borderColor: colors.border.medium,
                   },
@@ -293,7 +293,7 @@ export default function RoomFormScreen() {
         animationType="fade"
         onRequestClose={() => setShowFloorPicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.white }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
                 Select Floor
