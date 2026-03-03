@@ -57,13 +57,17 @@ export default function TenantsScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50;
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastFocusRefreshRef = useRef<number>(0);
-  const isInitialMountRef = useRef(true);
-  const isInitialFocusRef = useRef(true);
+  const lastFocusRefreshRef = useRef<number>(Date.now());
+  const isFetchingRef = useRef(false);
 
   const fetchTenants = useCallback(async (page: number = 1, search: string = '', status: string = 'all') => {
     if (!selectedPropertyId) {
       setLoading(false);
+      return;
+    }
+
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
       return;
     }
 
@@ -73,12 +77,15 @@ export default function TenantsScreen() {
       setTenants(cachedResponse.data || []);
       setTotal(cachedResponse.meta?.total || 0);
       setError(null);
-      setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      isFetchingRef.current = true;
+      // Only show loading if we don't already have data
+      if (!tenants.length) {
+        setLoading(true);
+      }
       setError(null);
       
       const statusFilter = status !== 'all' ? status : undefined;
@@ -99,43 +106,28 @@ export default function TenantsScreen() {
       }
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [selectedPropertyId]);
+  }, [selectedPropertyId, tenants.length]);
 
-  // Reset state when property changes
+  // Fetch data on property change or initial mount
   useEffect(() => {
     if (!selectedPropertyId || propertyLoading) {
       return;
     }
 
-    // Skip on initial mount if we already have cached data
-    if (isInitialMountRef.current && initialTenants.length > 0) {
-      isInitialMountRef.current = false;
-      return;
-    }
-    isInitialMountRef.current = false;
-
-    setCurrentPage(1);
-    setSearchQuery('');
-    setSelectedStatus('all');
-
     // Check for cached data first
     const cacheKey = cacheKeys.tenants(selectedPropertyId, 1, '', 'all');
     const cachedResponse = getScreenCache<PaginatedResponse<Tenant>>(cacheKey, TENANTS_CACHE_STALE_MS);
     
-    if (cachedResponse) {
-      // Use cached data immediately - no skeleton needed
-      setTenants(cachedResponse.data || []);
-      setTotal(cachedResponse.meta?.total || 0);
-      setLoading(false);
-    } else {
-      // No cache - clear state and show skeleton
+    if (!cachedResponse && !tenants.length) {
+      // Only show skeleton if we have no cached data and no current data
+      setLoading(true);
       setTenants([]);
       setTotal(0);
-      setLoading(true);
       fetchTenants(1, '', 'all');
     }
-  }, [selectedPropertyId, propertyLoading, fetchTenants]);
+  }, [selectedPropertyId, propertyLoading, tenants.length, fetchTenants]);
 
   // Debounced search handler
   useEffect(() => {
@@ -156,22 +148,14 @@ export default function TenantsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!propertyLoading && selectedPropertyId) {
-        // Skip on initial focus if we already have cached data
-        if (isInitialFocusRef.current && initialTenants.length > 0) {
-          isInitialFocusRef.current = false;
-          return;
-        }
-        isInitialFocusRef.current = false;
-        
         const now = Date.now();
-        const shouldRefresh = now - lastFocusRefreshRef.current > TENANTS_CACHE_STALE_MS;
+        const timeSinceLastRefresh = now - lastFocusRefreshRef.current;
+        const shouldRefresh = timeSinceLastRefresh > TENANTS_CACHE_STALE_MS;
 
-        if (!shouldRefresh) {
-          return;
+        if (shouldRefresh) {
+          lastFocusRefreshRef.current = now;
+          fetchTenants(currentPage, searchQuery, selectedStatus);
         }
-
-        lastFocusRefreshRef.current = now;
-        fetchTenants(currentPage, searchQuery, selectedStatus);
       }
     }, [propertyLoading, selectedPropertyId, currentPage, searchQuery, selectedStatus, fetchTenants])
   );

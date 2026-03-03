@@ -41,3 +41,59 @@ class BedService:
     async def delete_bed(self, bed_id: str) -> bool:
         result = await self.db["beds"].delete_one({"id": bed_id})
         return result.deleted_count == 1
+
+    async def get_available_beds_with_rooms(self, property_id: str) -> List[dict]:
+        """Get all available beds for a property, grouped by rooms with room information"""
+        # Get all available beds for the property
+        beds_cursor = self.db["beds"].find({
+            "propertyId": property_id,
+            "status": "available"
+        })
+        beds = []
+        async for doc in beds_cursor:
+            beds.append(doc)
+        
+        if not beds:
+            return []
+        
+        # Get unique room IDs
+        room_ids = list(set(bed["roomId"] for bed in beds))
+        
+        # Fetch room details
+        rooms_cursor = self.db["rooms"].find({
+            "id": {"$in": room_ids},
+            "active": True
+        })
+        rooms_dict = {}
+        async for room_doc in rooms_cursor:
+            rooms_dict[room_doc["id"]] = {
+                "id": room_doc["id"],
+                "roomNumber": room_doc["roomNumber"],
+                "floor": room_doc["floor"],
+                "price": room_doc["price"],
+            }
+        
+        # Group beds by room
+        result = []
+        beds_by_room = {}
+        for bed in beds:
+            room_id = bed["roomId"]
+            if room_id not in beds_by_room:
+                beds_by_room[room_id] = []
+            beds_by_room[room_id].append({
+                "id": bed["id"],
+                "bedNumber": bed["bedNumber"],
+                "status": bed["status"],
+            })
+        
+        # Build response with room info and available beds
+        for room_id, room_beds in beds_by_room.items():
+            if room_id in rooms_dict:
+                result.append({
+                    "room": rooms_dict[room_id],
+                    "availableBeds": room_beds
+                })
+        
+        # Sort by room number
+        result.sort(key=lambda x: x["room"]["roomNumber"])
+        return result

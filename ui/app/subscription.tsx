@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -56,6 +57,7 @@ export default function SubscriptionScreen() {
   const [allSubscriptions, setAllSubscriptions] = useState<Subscription[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showArchivedResources, setShowArchivedResources] = useState(false);
@@ -126,6 +128,15 @@ export default function SubscriptionScreen() {
   const handleRetry = () => {
     fetchSubscriptionData();
   };
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchSubscriptionData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   const fetchArchivedResources = async () => {
     try {
@@ -211,7 +222,15 @@ export default function SubscriptionScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary[500]]}
+            tintColor={colors.primary[500]}
+          />
+        }>
         {loading ? (
           <>
             <Skeleton height={120} count={1} />

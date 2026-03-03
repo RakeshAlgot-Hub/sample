@@ -24,7 +24,7 @@ import UpgradeModal from '@/components/UpgradeModal';
 export default function PropertyFormScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { refreshProperties } = useProperty();
+  const { refreshProperties, switchProperty } = useProperty();
   const { user } = useAuth();
   const isOnline = useNetworkStatus();
   const [name, setName] = useState('');
@@ -45,16 +45,27 @@ export default function PropertyFormScreen() {
     try {
       setLoading(true);
       setError(null);
-      await propertyService.createProperty({
+      const response = await propertyService.createProperty({
         name,
         address,
         ownerId: user.id,
         active: true,
       });
+      
+      // Get the newly created property ID
+      const newPropertyId = response.data?.id;
+      
       await refreshProperties();
-      router.back();
+      
+      // Switch to the newly created property and navigate to add room
+      if (newPropertyId) {
+        switchProperty(newPropertyId);
+        router.replace('/room-form');
+      } else {
+        router.back();
+      }
     } catch (err: any) {
-      if (err?.code === 'SUBSCRIPTION_LIMIT_EXCEEDED') {
+      if (err?.code === 'SUBSCRIPTION_LIMIT_EXCEEDED' || err?.details?.status === 402) {
         setShowUpgradeModal(true);
       } else {
         setError(err?.message || 'Failed to create property');

@@ -87,7 +87,8 @@ export default function PaymentsScreen() {
     return `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`;
   }, [selectedDate]);
 
-  const isInitialMountRef = useRef(true);
+  const isFetchingRef = useRef(false);
+  const lastFocusRefreshRef = useRef<number>(Date.now());
 
   const fetchPayments = async () => {
     if (!selectedPropertyId) {
@@ -95,6 +96,11 @@ export default function PaymentsScreen() {
       setTotal(0);
       setError(null);
       setIsRefreshing(false);
+      return;
+    }
+
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
       return;
     }
 
@@ -110,7 +116,11 @@ export default function PaymentsScreen() {
     }
 
     try {
-      setIsRefreshing(true);
+      isFetchingRef.current = true;
+      // Only show loading if we don't already have data
+      if (!payments.length) {
+        setIsRefreshing(true);
+      }
       setError(null);
 
       const response = await paymentService.getPayments(selectedPropertyId, {
@@ -130,35 +140,33 @@ export default function PaymentsScreen() {
       } else {
         setError(err?.message || 'Failed to load payments');
       }
-      setPayments([]);
+      if (!payments.length) {
+        setPayments([]);
+      }
     } finally {
       setIsRefreshing(false);
+      isFetchingRef.current = false;
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       if (!propertyLoading && selectedPropertyId) {
-        // Don't clear cache on focus - just refresh in background
-        // This keeps cached data visible while fetching new data
-        // Reset to current month when screen is focused
-        setSelectedDate(new Date());
-        setCurrentPage(1);
-        setError(null);
+        const now = Date.now();
+        const timeSinceLastRefresh = now - lastFocusRefreshRef.current;
+        const shouldRefresh = timeSinceLastRefresh > PAYMENTS_CACHE_STALE_MS;
+
+        if (shouldRefresh) {
+          lastFocusRefreshRef.current = now;
+          fetchPayments();
+        }
       }
-    }, [selectedPropertyId, propertyLoading])
+    }, [selectedPropertyId, propertyLoading, monthKey, currentPage])
   );
 
-  // Refetch payments when month changes (and resolve empty-property initial state)
+  // Refetch payments when month changes
   useEffect(() => {
     if (!propertyLoading && selectedPropertyId) {
-      // Skip on initial mount if we already have cached data
-      if (isInitialMountRef.current && initialPayments.length > 0) {
-        isInitialMountRef.current = false;
-        return;
-      }
-      isInitialMountRef.current = false;
-      
       // Check cache synchronously first to avoid skeleton flash
       const cacheKey = cacheKeys.payments(selectedPropertyId, monthKey);
       const cachedResponse = getScreenCache<PaginatedResponse<Payment>>(cacheKey, PAYMENTS_CACHE_STALE_MS);
@@ -169,8 +177,9 @@ export default function PaymentsScreen() {
         setTotal(cachedResponse.meta?.total || 0);
         setError(null);
         setIsRefreshing(false);
-      } else {
-        // No cache - fetch data
+      } else if (!payments.length) {
+        // Only show skeleton if we have no data yet
+        setIsRefreshing(true);
         fetchPayments();
       }
     } else if (!selectedPropertyId && !propertyLoading) {

@@ -40,14 +40,13 @@ export default function AddTenantScreen() {
   const [rent, setRent] = useState('5000');
   const [joinDate, setJoinDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomsWithBeds, setRoomsWithBeds] = useState<Array<{ room: Room; availableBeds: Bed[] }>>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [beds, setBeds] = useState<Bed[]>([]);
+  const [availableBedsForRoom, setAvailableBedsForRoom] = useState<Bed[]>([]);
   const [selectedBed, setSelectedBed] = useState<Bed | null>(null);
 
   const [loading, setLoading] = useState(false);
-  const [fetchingRooms, setFetchingRooms] = useState(true);
-  const [fetchingBeds, setFetchingBeds] = useState(false);
+  const [fetchingData, setFetchingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [showRoomPicker, setShowRoomPicker] = useState(false);
@@ -56,73 +55,44 @@ export default function AddTenantScreen() {
 
   useEffect(() => {
     if (selectedPropertyId) {
-      fetchRooms();
+      fetchAvailableBeds();
     }
   }, [selectedPropertyId]);
 
   useEffect(() => {
     if (selectedRoom) {
-      fetchBeds(selectedRoom.id);
-      setRent(selectedRoom.price.toString());
+      // Find available beds for the selected room
+      const roomData = roomsWithBeds.find(r => r.room.id === selectedRoom.id);
+      if (roomData) {
+        setAvailableBedsForRoom(roomData.availableBeds);
+        setRent(roomData.room.price.toString());
+      } else {
+        setAvailableBedsForRoom([]);
+      }
+      setSelectedBed(null);
     } else {
-      setBeds([]);
+      setAvailableBedsForRoom([]);
       setSelectedBed(null);
     }
-  }, [selectedRoom]);
+  }, [selectedRoom, roomsWithBeds]);
 
-  useEffect(() => {
-    // Billing anchor date logic removed
-  }, [joinDate]);
-
-  const fetchRooms = async () => {
+  const fetchAvailableBeds = async () => {
     if (!selectedPropertyId) return;
 
-    const roomsCacheKey = cacheKeys.rooms(selectedPropertyId);
-    const cachedRooms = getScreenCache<PaginatedResponse<Room>>(roomsCacheKey, FORM_CACHE_STALE_MS);
-    if (cachedRooms?.data) {
-      setRooms(cachedRooms.data);
-      setFetchingRooms(false);
-      return;
-    }
-
     try {
-      setFetchingRooms(true);
-      const response = await roomService.getRooms(selectedPropertyId);
+      setFetchingData(true);
+      setError(null);
+      const response = await bedService.getAvailableBedsByProperty(selectedPropertyId);
       if (response.data) {
-        setRooms(response.data);
-        setScreenCache(roomsCacheKey, response);
+        setRoomsWithBeds(response.data);
+      } else {
+        setRoomsWithBeds([]);
       }
     } catch (err: any) {
-      setError(err?.message || 'Failed to load rooms');
+      setError(err?.message || 'Failed to load available beds');
+      setRoomsWithBeds([]);
     } finally {
-      setFetchingRooms(false);
-    }
-  };
-
-  const fetchBeds = async (roomId: string) => {
-    if (!selectedPropertyId) return;
-
-    const bedsCacheKey = cacheKeys.roomBeds(selectedPropertyId, roomId);
-    const cachedBeds = getScreenCache<PaginatedResponse<Bed>>(bedsCacheKey, FORM_CACHE_STALE_MS);
-    if (cachedBeds?.data) {
-      setBeds(cachedBeds.data);
-      setSelectedBed(null);
-      setFetchingBeds(false);
-      return;
-    }
-
-    try {
-      setFetchingBeds(true);
-      const response = await bedService.getBeds(roomId, selectedPropertyId, 'available');
-      if (response.data) {
-        setBeds(response.data);
-        setSelectedBed(null);
-        setScreenCache(bedsCacheKey, response);
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load beds');
-    } finally {
-      setFetchingBeds(false);
+      setFetchingData(false);
     }
   };
 
@@ -198,7 +168,7 @@ export default function AddTenantScreen() {
     );
   }
 
-  if (fetchingRooms) {
+  if (fetchingData) {
     return (
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background.primary }]}
@@ -215,6 +185,34 @@ export default function AddTenantScreen() {
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[500]} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (roomsWithBeds.length === 0) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background.primary }]}
+        edges={['top', 'bottom']}>
+        <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}>
+            <ChevronLeft size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Add Tenant</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={styles.emptyContainer}>
+          <EmptyState
+            icon={UserPlus}
+            title="No Available Beds"
+            subtitle="All beds are occupied or no rooms exist yet. Please add rooms and beds first."
+            actionLabel="Go Back"
+            onActionPress={() => router.back()}
+          />
         </View>
       </SafeAreaView>
     );
@@ -337,7 +335,7 @@ export default function AddTenantScreen() {
                 ]}
                 onPress={() => setShowRoomPicker(true)}
                 activeOpacity={0.7}
-                disabled={loading || rooms.length === 0}>
+                disabled={loading || roomsWithBeds.length === 0}>
                 <Text
                   style={[
                     styles.pickerButtonText,
@@ -349,11 +347,6 @@ export default function AddTenantScreen() {
                 </Text>
                 <ChevronDown size={20} color={colors.text.tertiary} />
               </TouchableOpacity>
-              {rooms.length === 0 && (
-                <Text style={[styles.helperText, { color: colors.text.tertiary }]}>
-                  No rooms available. Please add rooms first.
-                </Text>
-              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -364,12 +357,12 @@ export default function AddTenantScreen() {
                   {
                     backgroundColor: colors.background.secondary,
                     borderColor: colors.border.medium,
-                    opacity: !selectedRoom || fetchingBeds ? 0.5 : 1,
+                    opacity: !selectedRoom ? 0.5 : 1,
                   },
                 ]}
                 onPress={() => setShowBedPicker(true)}
                 activeOpacity={0.7}
-                disabled={loading || !selectedRoom || fetchingBeds || beds.length === 0}>
+                disabled={loading || !selectedRoom || availableBedsForRoom.length === 0}>
                 <Text
                   style={[
                     styles.pickerButtonText,
@@ -377,15 +370,13 @@ export default function AddTenantScreen() {
                       color: selectedBed ? colors.text.primary : colors.text.tertiary,
                     },
                   ]}>
-                  {fetchingBeds
-                    ? 'Loading beds...'
-                    : selectedBed
+                  {selectedBed
                     ? `Bed ${selectedBed.bedNumber}`
                     : 'Select Bed'}
                 </Text>
                 <ChevronDown size={20} color={colors.text.tertiary} />
               </TouchableOpacity>
-              {selectedRoom && beds.length === 0 && !fetchingBeds && (
+              {selectedRoom && availableBedsForRoom.length === 0 && (
                 <View style={[styles.infoContainer, { backgroundColor: colors.warning[50], borderColor: colors.warning[200] }]}>
                   <Text style={[styles.infoText, { color: colors.warning[700] }]}>
                     No available beds in this room
@@ -469,7 +460,7 @@ export default function AddTenantScreen() {
             </View>
 
             <ScrollView style={styles.modalScrollView}>
-              {rooms.map((room, index) => (
+              {roomsWithBeds.map((roomData, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
@@ -477,7 +468,7 @@ export default function AddTenantScreen() {
                     { borderBottomColor: colors.border.light },
                   ]}
                   onPress={() => {
-                    setSelectedRoom(room);
+                    setSelectedRoom(roomData.room);
                     setShowRoomPicker(false);
                   }}
                   activeOpacity={0.7}>
@@ -487,19 +478,19 @@ export default function AddTenantScreen() {
                         styles.modalOptionText,
                         {
                           color:
-                            selectedRoom?.id === room.id
+                            selectedRoom?.id === roomData.room.id
                               ? colors.primary[500]
                               : colors.text.primary,
                           fontWeight:
-                            selectedRoom?.id === room.id
+                            selectedRoom?.id === roomData.room.id
                               ? typography.fontWeight.semibold
                               : typography.fontWeight.regular,
                         },
                       ]}>
-                      Room {room.roomNumber}
+                      Room {roomData.room.roomNumber}
                     </Text>
                     <Text style={[styles.modalOptionSubtext, { color: colors.text.secondary }]}>
-                      Floor {room.floor} • {room.numberOfBeds} beds • ₹{room.price}
+                      Floor {roomData.room.floor} • {roomData.availableBeds.length} available • ₹{roomData.room.price}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -532,7 +523,7 @@ export default function AddTenantScreen() {
             </View>
 
             <ScrollView style={styles.modalScrollView}>
-              {beds.map((bed, index) => (
+              {availableBedsForRoom.map((bed, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[

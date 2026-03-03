@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -41,6 +42,7 @@ export default function ManageBedsScreen() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = async () => {
     if (!roomId || !selectedPropertyId) {
@@ -110,6 +112,15 @@ export default function ManageBedsScreen() {
     fetchData();
   };
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [roomId, selectedPropertyId]);
+
   const getTenantForBed = (bedId: string) => {
     return tenants.find(t => t.bedId === bedId);
   };
@@ -177,7 +188,15 @@ export default function ManageBedsScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary[500]]}
+            tintColor={colors.primary[500]}
+          />
+        }>
         {error ? (
           <ApiErrorCard error={error} onRetry={handleRetry} />
         ) : (

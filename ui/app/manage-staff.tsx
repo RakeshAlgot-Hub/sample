@@ -12,6 +12,7 @@ import {
   Platform,
   FlatList,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -55,6 +56,7 @@ export default function ManageStaffScreen() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
@@ -106,6 +108,15 @@ export default function ManageStaffScreen() {
       loadStaff();
     }, [loadStaff])
   );
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadStaff();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadStaff]);
 
   useEffect(() => {
     if (!subscription) {
@@ -502,6 +513,14 @@ export default function ManageStaffScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           scrollEnabled={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[colors.primary[500]]}
+              tintColor={colors.primary[500]}
+            />
+          }
         />
       )}
 

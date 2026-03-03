@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -51,9 +51,8 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(initialDashboardData);
-  const lastFocusRefreshRef = useRef<number>(0);
-  const isInitialFocusRef = useRef(true);
-  const isFirstFetchRef = useRef(true);
+  const lastFocusRefreshRef = useRef<number>(Date.now());
+  const isFetchingRef = useRef(false);
 
   const fetchDashboardData = async () => {
     if (!selectedPropertyId) {
@@ -61,17 +60,25 @@ export default function DashboardScreen() {
       return;
     }
 
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      return;
+    }
+
     const cacheKey = cacheKeys.dashboard(selectedPropertyId);
     const cachedData = getScreenCache<DashboardData>(cacheKey, DASHBOARD_CACHE_STALE_MS);
     if (cachedData) {
       setDashboardData(cachedData);
-      setLoading(false);
       setError(null);
       return;
     }
 
     try {
-      setLoading(true);
+      isFetchingRef.current = true;
+      // Only show loading if we don't already have data
+      if (!dashboardData) {
+        setLoading(true);
+      }
       setError(null);
 
       // Fetch aggregated stats and payments data
@@ -105,36 +112,40 @@ export default function DashboardScreen() {
       setError(err?.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       if (!propertyLoading && selectedPropertyId) {
-        // Skip on initial focus if we already have cached data
-        if (isInitialFocusRef.current && initialDashboardData) {
-          isInitialFocusRef.current = false;
-          isFirstFetchRef.current = false;
-          return;
-        }
-        isInitialFocusRef.current = false;
-        isFirstFetchRef.current = false;
-        
         const now = Date.now();
-        const shouldRefresh = now - lastFocusRefreshRef.current > DASHBOARD_CACHE_STALE_MS;
+        const timeSinceLastRefresh = now - lastFocusRefreshRef.current;
+        const shouldRefresh = timeSinceLastRefresh > DASHBOARD_CACHE_STALE_MS;
 
-        if (!shouldRefresh && dashboardData) {
-          return;
+        // Only fetch if data is stale
+        if (shouldRefresh) {
+          lastFocusRefreshRef.current = now;
+          fetchDashboardData();
         }
-
-        lastFocusRefreshRef.current = now;
-        fetchDashboardData();
       } else if (!propertyLoading && !selectedPropertyId) {
         // If property loading is done but there are no properties, set loading to false
         setLoading(false);
       }
     }, [selectedPropertyId, propertyLoading, dashboardData])
   );
+
+  // Fetch data on initial mount or when property changes
+  useEffect(() => {
+    if (!propertyLoading && selectedPropertyId && !dashboardData) {
+      // Only fetch if we don't have any data yet
+      const cacheKey = cacheKeys.dashboard(selectedPropertyId);
+      const cachedData = getScreenCache<DashboardData>(cacheKey, DASHBOARD_CACHE_STALE_MS);
+      if (!cachedData) {
+        fetchDashboardData();
+      }
+    }
+  }, [selectedPropertyId, propertyLoading, dashboardData]);
 
   const handleRetry = () => {
     fetchDashboardData();
@@ -191,7 +202,7 @@ export default function DashboardScreen() {
             tintColor={colors.primary[500]}
           />
         }>
-          {loading && !dashboardData && !isFirstFetchRef.current ? (
+          {loading && !dashboardData ? (
           <>
             <View style={styles.header}>
               <Text style={[styles.greeting, { color: colors.text.secondary }]}>Welcome back,</Text>

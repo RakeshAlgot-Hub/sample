@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ interface UpgradeModalProps {
   onClose: () => void;
   onSelectPlan?: (plan: 'free' | 'pro' | 'premium') => void;
   subscriptions?: Subscription[];
+  currentPlan?: 'free' | 'pro' | 'premium';
 }
 
 type Plan = 'free' | 'pro' | 'premium';
@@ -43,6 +44,7 @@ export default function UpgradeModal({
   onClose,
   onSelectPlan = () => {},
   subscriptions = [],
+  currentPlan = 'free',
 }: UpgradeModalProps) {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -51,25 +53,38 @@ export default function UpgradeModal({
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [liveSubscriptions, setLiveSubscriptions] = useState<Subscription[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const isFetchingPlansRef = useRef(false);
+  const hasLoadedRef = useRef(false);
 
   const fetchAvailablePlans = useCallback(async () => {
+    if (isFetchingPlansRef.current) return;
+    
     try {
+      isFetchingPlansRef.current = true;
       setLoadingPlans(true);
       const response = await subscriptionService.getAllSubscriptions();
       setLiveSubscriptions(response.data.subscriptions || []);
+      hasLoadedRef.current = true;
     } catch (err: any) {
       setError(err?.message || 'Failed to load subscription plans');
     } finally {
       setLoadingPlans(false);
+      isFetchingPlansRef.current = false;
     }
   }, []);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      hasLoadedRef.current = false;
+      return;
+    }
+    
+    if (hasLoadedRef.current) return;
     setError(null);
 
     if (subscriptions.length > 0) {
       setLiveSubscriptions(subscriptions);
+      hasLoadedRef.current = true;
       return;
     }
 
@@ -175,8 +190,10 @@ export default function UpgradeModal({
 
   const plans = useMemo<PlanWithLimits[]>(() => {
     const source = subscriptions.length > 0 ? subscriptions : liveSubscriptions;
-    const order: Record<Plan, number> = { free: 0, pro: 1, premium: 2 };
+    const planHierarchy: Record<Plan, number> = { free: 0, pro: 1, premium: 2 };
+    const currentTier = planHierarchy[currentPlan];
 
+    // Filter and sort plans
     return source
       .map((sub) => ({
         id: sub.plan as Plan,
@@ -189,8 +206,22 @@ export default function UpgradeModal({
           price: sub.price,
         },
       }))
-      .sort((a, b) => order[a.id] - order[b.id]);
-  }, [subscriptions, liveSubscriptions]);
+      .filter((plan) => {
+        const planTier = planHierarchy[plan.id];
+        // Show only plans higher than current, or free if on paid plan (for downgrade option)
+        if (currentPlan === 'free') {
+          // If on free, show pro and premium only
+          return planTier > currentTier;
+        } else {
+          // If on paid plan, show higher plans and include free at the bottom
+          return planTier !== currentTier;
+        }
+      })
+      .sort((a, b) => {
+        // Sort descending (premium first, free last)
+        return planHierarchy[b.id] - planHierarchy[a.id];
+      });
+  }, [subscriptions, liveSubscriptions, currentPlan]);
 
   return (
     <Modal
@@ -271,7 +302,7 @@ export default function UpgradeModal({
                         style={[
                           styles.selectButton,
                           {
-                            backgroundColor: plan.id === 'premium' ? colors.primary[500] : colors.white,
+                            backgroundColor: plan.id === 'premium' ? colors.primary[500] : plan.id === 'free' ? colors.neutral[100] : colors.white,
                             borderColor: plan.id === 'premium' ? colors.primary[500] : colors.border.medium,
                             opacity: isDisabled ? 0.5 : 1,
                           },
@@ -288,7 +319,7 @@ export default function UpgradeModal({
                           <Text
                             style={[
                               styles.selectButtonText,
-                              { color: plan.id === 'premium' ? colors.white : colors.text.primary },
+                              { color: plan.id === 'premium' ? colors.white : plan.id === 'free' ? colors.text.tertiary : colors.text.primary },
                             ]}>
                             {plan.id === 'free' ? 'Downgrade to Free' : `Upgrade to ${plan.name}`}
                           </Text>

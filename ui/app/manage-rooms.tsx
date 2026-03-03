@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -35,6 +36,7 @@ export default function ManageRoomsScreen() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [showArchiveWarning, setShowArchiveWarning] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [warningAction, setWarningAction] = useState<'edit' | 'delete' | null>(null);
@@ -81,6 +83,15 @@ export default function ManageRoomsScreen() {
   const handleRetry = () => {
     fetchRooms();
   };
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchRooms();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [selectedPropertyId]);
 
   const handleAddRoom = () => {
     if (!selectedPropertyId) {
@@ -172,7 +183,15 @@ export default function ManageRoomsScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary[500]]}
+            tintColor={colors.primary[500]}
+          />
+        }>
         {error ? (
           <ApiErrorCard error={error} onRetry={handleRetry} />
         ) : rooms.length === 0 ? (

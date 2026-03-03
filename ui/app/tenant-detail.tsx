@@ -10,6 +10,7 @@ import {
   TextInput,
   Switch,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -63,6 +64,7 @@ export default function TenantDetailScreen() {
   const [beds, setBeds] = useState<Bed[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [showEditBillingModal, setShowEditBillingModal] = useState(false);
   const [editAnchorDay, setEditAnchorDay] = useState<number>(1);
@@ -140,6 +142,15 @@ export default function TenantDetailScreen() {
   const handleRetry = () => {
     fetchTenantData();
   };
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchTenantData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [tenantId]);
 
   const calculateNextBillingDate = (anchorDay: number, frequency: BillingFrequency): string => {
     const today = new Date();
@@ -430,7 +441,15 @@ export default function TenantDetailScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary[500]]}
+            tintColor={colors.primary[500]}
+          />
+        }>
         {error ? (
           <ApiErrorCard error={error} onRetry={handleRetry} />
         ) : (
