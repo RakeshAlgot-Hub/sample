@@ -180,7 +180,7 @@ export default function PaymentsScreen() {
   }, [selectedPropertyId]);
 
   const handleFabPress = () => {
-    router.push('/add-payment');
+    router.push('/manual-payment');
   };
 
   const computeStats = () => {

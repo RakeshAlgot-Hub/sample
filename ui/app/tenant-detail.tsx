@@ -231,26 +231,28 @@ export default function TenantDetailScreen() {
     if (latestPayment && latestPayment.status !== 'paid') {
       router.push(`/edit-payment?paymentId=${latestPayment.id}`);
     } else {
-      router.push(`/add-payment?tenantId=${tenantId}`);
+      router.push(`/manual-payment?tenantId=${tenantId}`);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+  const getDayWithOrdinal = (day: number) => {
+    const remainder10 = day % 10;
+    const remainder100 = day % 100;
+
+    if (remainder10 === 1 && remainder100 !== 11) return `${day}st`;
+    if (remainder10 === 2 && remainder100 !== 12) return `${day}nd`;
+    if (remainder10 === 3 && remainder100 !== 13) return `${day}rd`;
+    return `${day}th`;
   };
 
-  const formatDateYYYYMMMDD = (dateString: string) => {
+  const formatDateWithOrdinal = (dateString: string) => {
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '-';
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const year = date.getFullYear();
     const month = months[date.getMonth()];
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const day = getDayWithOrdinal(date.getDate());
+    const year = date.getFullYear();
+    return `${month} ${day} ${year}`;
   };
 
   const calculateNextDueDate = (lastDueDate: string): string => {
@@ -269,7 +271,7 @@ export default function TenantDetailScreen() {
   };
 
   const handleGenerateDue = () => {
-    router.push(`/add-payment?tenantId=${tenantId}`);
+    router.push(`/manual-payment?tenantId=${tenantId}`);
   };
 
   const openEditTenantModal = () => {
@@ -468,7 +470,7 @@ export default function TenantDetailScreen() {
                 <View style={styles.contactItem}>
                   <Calendar size={16} color={colors.text.secondary} />
                   <Text style={[styles.contactText, { color: colors.text.primary }]}>
-                    Joined {formatDate(tenant.joinDate)}
+                    Joined {formatDateWithOrdinal(tenant.joinDate)}
                   </Text>
                 </View>
                 {tenant.roomNumber && tenant.bedNumber && (
@@ -555,7 +557,7 @@ export default function TenantDetailScreen() {
                         Anchor Day
                       </Text>
                       <Text style={[styles.billingValue, { color: colors.text.primary }]}>
-                        {tenant.billingConfig.anchorDay}th of every month
+                        {getDayWithOrdinal(tenant.billingConfig.anchorDay)} of every month
                       </Text>
                     </View>
 
@@ -566,7 +568,7 @@ export default function TenantDetailScreen() {
                         Next Billing Date
                       </Text>
                       <Text style={[styles.billingValue, { color: colors.primary[600] }]}>
-                        {formatDateYYYYMMMDD(calculateNextBillingDate(tenant.billingConfig.anchorDay || 1, 'monthly'))}
+                        {formatDateWithOrdinal(calculateNextBillingDate(tenant.billingConfig.anchorDay || 1, 'monthly'))}
                       </Text>
                     </View>
 
@@ -611,7 +613,7 @@ export default function TenantDetailScreen() {
                   <View style={[styles.nextDueContainer, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}>
                     <Calendar size={14} color={colors.primary[600]} />
                     <Text style={[styles.nextDueText, { color: colors.primary[700] }]}>
-                      Next Due: {formatDateYYYYMMMDD(calculateNextDueDate(latestPayment.dueDate ?? ''))}
+                      Next Due: {formatDateWithOrdinal(calculateNextDueDate(latestPayment.dueDate ?? ''))}
                     </Text>
                   </View>
                 ) : (
@@ -659,7 +661,7 @@ export default function TenantDetailScreen() {
                             Due Date:
                           </Text>
                           <Text style={[styles.paymentDetailValue, { color: colors.text.primary }]}>
-                            {formatDate(payment.dueDate ?? '')}
+                            {formatDateWithOrdinal(payment.dueDate ?? '')}
                           </Text>
                         </View>
 

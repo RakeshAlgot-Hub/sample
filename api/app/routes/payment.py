@@ -9,6 +9,35 @@ from ..services.payment_service import PaymentService
 router = APIRouter(prefix="/payments", tags=["payments"])
 payment_service = PaymentService()
 
+@router.post("", response_model=Payment)
+@router.post("/", response_model=Payment)
+async def create_payment(request: Request, payment_create: PaymentCreate = Body(...)):
+    property_ids = getattr(request.state, "property_ids", [])
+
+    if payment_create.propertyId not in property_ids:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    try:
+        tenant_doc = await payment_service.get_tenants_collection().find_one({"_id": ObjectId(payment_create.tenantId)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tenantId")
+
+    if not tenant_doc:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    tenant_property_id = str(tenant_doc.get("propertyId", ""))
+    if tenant_property_id != payment_create.propertyId:
+        raise HTTPException(status_code=400, detail="Tenant does not belong to the selected property")
+
+    if tenant_doc.get("autoGeneratePayments", True):
+        raise HTTPException(
+            status_code=400,
+            detail="Manual payment is only allowed for tenants with auto-generate disabled"
+        )
+
+    created_payment = await payment_service.create_payment(payment_create)
+    return created_payment
+
 @router.patch("/{payment_id}", response_model=Payment)
 async def update_payment(request: Request, payment_id: str, payment_update: PaymentUpdate = Body(...)):
     updated_payment = await payment_service.update_payment(payment_id, payment_update)
