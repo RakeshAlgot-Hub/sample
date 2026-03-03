@@ -473,6 +473,14 @@ export default function TenantDetailScreen() {
                     Joined {formatDateWithOrdinal(tenant.joinDate)}
                   </Text>
                 </View>
+                {latestPayment && latestPayment.status === 'paid' && (
+                  <View style={styles.contactItem}>
+                    <Calendar size={16} color={colors.primary[500]} />
+                    <Text style={[styles.contactText, { color: colors.primary[600] }]}>
+                      Next Due: {formatDateWithOrdinal(calculateNextDueDate(latestPayment.dueDate ?? ''))}
+                    </Text>
+                  </View>
+                )}
                 {tenant.roomNumber && tenant.bedNumber && (
                   <View style={styles.contactItem}>
                     <BedIcon size={16} color={colors.text.secondary} />
@@ -609,13 +617,6 @@ export default function TenantDetailScreen() {
                       Generate Due
                     </Text>
                   </TouchableOpacity>
-                ) : latestPayment.status === 'paid' ? (
-                  <View style={[styles.nextDueContainer, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}>
-                    <Calendar size={14} color={colors.primary[600]} />
-                    <Text style={[styles.nextDueText, { color: colors.primary[700] }]}>
-                      Next Due: {formatDateWithOrdinal(calculateNextDueDate(latestPayment.dueDate ?? ''))}
-                    </Text>
-                  </View>
                 ) : (
                   <TouchableOpacity
                     style={[styles.actionButton, { backgroundColor: colors.warning[500] }]}
@@ -656,16 +657,25 @@ export default function TenantDetailScreen() {
                       <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
 
                       <View style={styles.paymentDetails}>
-                        <View style={styles.paymentDetailRow}>
-                          <Text style={[styles.paymentDetailLabel, { color: colors.text.secondary }]}>
-                            Due Date:
-                          </Text>
-                          <Text style={[styles.paymentDetailValue, { color: colors.text.primary }]}>
-                            {formatDateWithOrdinal(payment.dueDate ?? '')}
-                          </Text>
-                        </View>
-
-                        {/* Removed payment.date logic, not present in Payment type */}
+                        {payment.status === 'paid' ? (
+                          <View style={styles.paymentDetailRow}>
+                            <Text style={[styles.paymentDetailLabel, { color: colors.text.tertiary }]}>
+                              Paid On:
+                            </Text>
+                            <Text style={[styles.paymentDetailValue, { color: colors.text.secondary }]}>
+                              {formatDateWithOrdinal(payment.paidDate ?? payment.dueDate ?? '')}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={styles.paymentDetailRow}>
+                            <Text style={[styles.paymentDetailLabel, { color: colors.text.tertiary }]}>
+                              Due:
+                            </Text>
+                            <Text style={[styles.paymentDetailValue, { color: payment.status === 'overdue' ? colors.warning[600] : colors.text.secondary }]}>
+                              {formatDateWithOrdinal(payment.dueDate ?? '')}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </Card>
                   ))}
@@ -1016,27 +1026,27 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   paymentCard: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   paymentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   paymentLeft: {
     flex: 1,
   },
   paymentAmount: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   paymentMethod: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
   },
   paymentDetails: {
-    gap: spacing.sm,
+    gap: 2,
   },
   paymentDetailRow: {
     flexDirection: 'row',
@@ -1044,11 +1054,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   paymentDetailLabel: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
+    color: 'rgba(0,0,0,0.5)',
   },
   paymentDetailValue: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
   },
   actionButton: {
     flexDirection: 'row',
@@ -1067,10 +1078,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     borderRadius: radius.md,
     borderWidth: 1,
-    gap: spacing.xs,
+    gap: spacing.sm,
+    ...shadows.md,
   },
   nextDueText: {
     fontSize: typography.fontSize.sm,

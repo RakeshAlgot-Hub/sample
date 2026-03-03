@@ -256,7 +256,25 @@ export default function ManageStaffScreen() {
     <Card style={{ ...styles.staffCard, marginBottom: spacing.md } as any}>
       <View style={styles.staffHeader}>
         <View style={styles.staffInfo}>
-          <Text style={[styles.staffName, { color: colors.text.primary }]}>{item.name}</Text>
+          <View style={styles.staffNameRow}>
+            <Text style={[styles.staffName, { color: colors.text.primary }]}>{item.name}</Text>
+            <View style={styles.staffActionIcons}>
+              <TouchableOpacity
+                style={styles.staffIconButton}
+                onPress={() => openEditModal(item)}
+                activeOpacity={0.6}
+                disabled={!isOnline}>
+                <Edit2 size={16} color={colors.primary[500]} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.staffIconButton}
+                onPress={() => handleDelete(item)}
+                activeOpacity={0.6}
+                disabled={!isOnline}>
+                <Trash2 size={16} color={colors.danger[500]} />
+              </TouchableOpacity>
+            </View>
+          </View>
           <Text style={[styles.staffRole, { color: colors.text.secondary }]}>
             {STAFF_ROLES.find((r) => r.value === item.role)?.label || item.role}
           </Text>
@@ -333,27 +351,6 @@ export default function ManageStaffScreen() {
             </Text>
           </View>
         )}
-      </View>
-
-      <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
-
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primary[50], opacity: !isOnline ? 0.5 : 1 }]}
-          onPress={() => openEditModal(item)}
-          activeOpacity={0.7}
-          disabled={!isOnline}>
-          <Edit2 size={18} color={colors.primary[500]} />
-          <Text style={[styles.actionText, { color: colors.primary[500] }]}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.danger[50], opacity: !isOnline ? 0.5 : 1 }]}
-          onPress={() => handleDelete(item)}
-          activeOpacity={0.7}
-          disabled={!isOnline}>
-          <Trash2 size={18} color={colors.danger[500]} />
-          <Text style={[styles.actionText, { color: colors.danger[500] }]}>Remove</Text>
-        </TouchableOpacity>
       </View>
     </Card>
   );
@@ -875,6 +872,23 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     marginBottom: spacing.xs,
+  },
+  staffNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  staffActionIcons: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginLeft: 'auto',
+  },
+  staffIconButton: {
+    padding: spacing.xs,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   staffRole: {
     fontSize: typography.fontSize.sm,

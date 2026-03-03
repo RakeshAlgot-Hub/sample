@@ -238,50 +238,8 @@ export default function PaymentsScreen() {
     }
   };
 
-  if (propertyLoading || (isInitialLoad && !!selectedPropertyId)) {
-    return (
-      <ScreenContainer edges={['top']}>
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Payments</Text>
-          <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[100] }]} activeOpacity={0.7}>
-            <Filter size={20} color={colors.primary[500]} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
-          <View style={styles.statsContainer}>
-            <Skeleton height={80} count={3} />
-          </View>
-          <Skeleton height={150} count={2} />
-        </ScrollView>
-      </ScreenContainer>
-    );
-  }
-
   const stats = computeStats();
-
-  if (!selectedProperty) {
-    return (
-      <ScreenContainer edges={['top']}>
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Payments</Text>
-          <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[100] }]} activeOpacity={0.7}>
-            <Filter size={20} color={colors.primary[500]} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <EmptyState
-            icon={Building2}
-            title="No Properties Found"
-            subtitle="Create your first property to start managing payments"
-            actionLabel="Create Property"
-            onActionPress={() => router.push('/property-form')}
-          />
-        </ScrollView>
-      </ScreenContainer>
-    );
-  }
+  const isLoadingState = propertyLoading || (isInitialLoad && !!selectedPropertyId);
 
   return (
     <ScreenContainer edges={['top']}>
@@ -292,7 +250,7 @@ export default function PaymentsScreen() {
         </TouchableOpacity>
       </View>
 
-      {selectedProperty && (
+      {selectedProperty && !isLoadingState && (
         <View style={[styles.monthNavigator, { backgroundColor: colors.background.secondary, borderColor: colors.border.light }]}>
           <TouchableOpacity
             onPress={handlePreviousMonth}
@@ -300,11 +258,11 @@ export default function PaymentsScreen() {
             activeOpacity={0.7}
             disabled={isRefreshing}
           >
-            <ChevronLeft size={24} color={colors.primary[500]} />
+            <ChevronLeft size={18} color={colors.primary[500]} />
           </TouchableOpacity>
           
           <View style={styles.monthDisplay}>
-            <Calendar size={18} color={colors.primary[500]} />
+            <Calendar size={14} color={colors.primary[500]} />
             <Text style={[styles.monthYearText, { color: colors.text.primary }]}>
               {monthYearString}
             </Text>
@@ -319,7 +277,7 @@ export default function PaymentsScreen() {
             activeOpacity={0.7}
             disabled={isRefreshing}
           >
-            <ChevronRight size={24} color={colors.primary[500]} />
+            <ChevronRight size={18} color={colors.primary[500]} />
           </TouchableOpacity>
         </View>
       )}
@@ -335,8 +293,13 @@ export default function PaymentsScreen() {
             tintColor={colors.primary[500]}
           />
         }>
-        {error ? (
-          <ApiErrorCard error={error} onRetry={handleRetry} />
+        {isLoadingState ? (
+          <>
+            <View style={styles.statsContainer}>
+              <Skeleton height={80} count={3} />
+            </View>
+            <Skeleton height={150} count={2} />
+          </>
         ) : !selectedProperty ? (
           <EmptyState
             icon={Building2}
@@ -345,6 +308,8 @@ export default function PaymentsScreen() {
             actionLabel="Create Property"
             onActionPress={() => router.push('/property-form')}
           />
+        ) : error ? (
+          <ApiErrorCard error={error} onRetry={handleRetry} />
         ) : payments.length === 0 ? (
           <EmptyState
             icon={Wallet}
@@ -428,7 +393,7 @@ export default function PaymentsScreen() {
           </View>
         )}
       </ScrollView>
-      <FAB onPress={handleFabPress} />
+      {selectedProperty && !isLoadingState && <FAB onPress={handleFabPress} />}
       <UpgradeModal
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
@@ -464,25 +429,25 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
     gap: spacing.sm,
   },
   statCard: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   statLabel: {
     fontSize: typography.fontSize.xs,
-    marginBottom: spacing.sm,
+    marginBottom: 2,
     fontWeight: typography.fontWeight.semibold,
   },
   statAmount: {
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
   },
   paymentsSection: {
@@ -494,23 +459,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   paymentCard: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
   paymentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   statusIconContainer: {
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
   },
   paymentInfo: {
     flex: 1,
   },
   tenantName: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   propertyName: {
     fontSize: typography.fontSize.sm,
@@ -523,28 +488,28 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   amount: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.sm,
+    marginBottom: 2,
   },
   divider: {
     height: 1,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   paymentFooter: {
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   dateLabel: {
-    fontSize: typography.fontSize.sm,
-    marginLeft: spacing.sm,
-    marginRight: spacing.xs,
+    fontSize: typography.fontSize.xs,
+    marginLeft: spacing.xs,
+    marginRight: 2,
   },
   dateValue: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
   },
   methodRow: {
@@ -552,28 +517,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   methodLabel: {
-    fontSize: typography.fontSize.sm,
-    marginRight: spacing.xs,
+    fontSize: typography.fontSize.xs,
+    marginRight: 2,
   },
   methodValue: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
   },
   monthNavigator: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: spacing.md,
+    marginVertical: spacing.sm,
     marginHorizontal: spacing.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.sm,
     borderRadius: radius.lg,
     borderWidth: 1,
     ...shadows.sm,
   },
   monthNavButton: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -581,12 +546,12 @@ const styles = StyleSheet.create({
   monthDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 2,
   },
   monthYearText: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
-    minWidth: 150,
+    minWidth: 120,
     textAlign: 'center',
   },
   monthLoader: {

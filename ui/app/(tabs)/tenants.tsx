@@ -22,8 +22,8 @@ import { Search, Filter, Phone, Users, Archive } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
-import { tenantService, roomService } from '@/services/apiClient';
-import type { Tenant, PaginatedResponse, Room } from '@/services/apiTypes';
+import { tenantService } from '@/services/apiClient';
+import type { Tenant, PaginatedResponse } from '@/services/apiTypes';
 import { cacheKeys, getScreenCache, setScreenCache, clearScreenCache } from '@/services/screenCache';
 
 const TENANTS_CACHE_STALE_MS = 30 * 1000;
@@ -33,7 +33,6 @@ export default function TenantsScreen() {
   const router = useRouter();
   const { selectedProperty, selectedPropertyId, loading: propertyLoading } = useProperty();
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,19 +46,7 @@ export default function TenantsScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50;
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const fetchRooms = useCallback(async () => {
-    if (!selectedPropertyId) return;
-
-    try {
-      const roomsRes = await roomService.getRooms(selectedPropertyId, undefined, 1, 1000);
-      if (roomsRes.data) {
-        setRooms(roomsRes.data);
-      }
-    } catch (err: any) {
-      console.error('Failed to load rooms:', err?.message);
-    }
-  }, [selectedPropertyId]);
+  const lastFocusRefreshRef = useRef<number>(0);
 
   const fetchTenants = useCallback(async (page: number = 1, search: string = '', status: string = 'all') => {
     if (!selectedPropertyId) {
@@ -112,13 +99,11 @@ export default function TenantsScreen() {
     setSelectedStatus('all');
     setTenants([]);
     setTotal(0);
-    setRooms([]);
      setLoading(true); // Ensure skeleton shows during fetch
     if (selectedPropertyId && !propertyLoading) {
       fetchTenants(1, '', 'all');
-      fetchRooms();
     }
-  }, [selectedPropertyId, propertyLoading, fetchTenants, fetchRooms]);
+  }, [selectedPropertyId, propertyLoading, fetchTenants]);
 
   // Debounced search handler
   useEffect(() => {
@@ -139,12 +124,17 @@ export default function TenantsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!propertyLoading && selectedPropertyId) {
-        // Don't clear cache on focus - just refresh in background
-        // This keeps cached data visible while fetching new data
-        fetchRooms();
+        const now = Date.now();
+        const shouldRefresh = now - lastFocusRefreshRef.current > TENANTS_CACHE_STALE_MS;
+
+        if (!shouldRefresh) {
+          return;
+        }
+
+        lastFocusRefreshRef.current = now;
         fetchTenants(currentPage, searchQuery, selectedStatus);
       }
-    }, [propertyLoading, selectedPropertyId, currentPage, searchQuery, selectedStatus, fetchTenants, fetchRooms])
+    }, [propertyLoading, selectedPropertyId, currentPage, searchQuery, selectedStatus, fetchTenants])
   );
 
   const handleRetry = () => {
@@ -163,10 +153,9 @@ export default function TenantsScreen() {
     setTenants([]);
     setTotal(0);
     
-    // Re-fetch both tenants and rooms
+    // Re-fetch tenants
     if (selectedPropertyId) {
       try {
-        await fetchRooms();
         await fetchTenants(1, '', 'all');
       } finally {
         setRefreshing(false);
@@ -174,7 +163,7 @@ export default function TenantsScreen() {
     } else {
       setRefreshing(false);
     }
-  }, [selectedPropertyId, fetchRooms, fetchTenants]);
+  }, [selectedPropertyId, fetchTenants]);
 
   const handleFabPress = () => {
     router.push('/add-tenant');
@@ -193,7 +182,6 @@ export default function TenantsScreen() {
   };
 
   const showEmptyState = !!selectedProperty && !loading && tenants.length === 0 && !error;
-  const showNoRoomsState = !!selectedProperty && !loading && tenants.length === 0 && rooms.length === 0 && !error;
 
   return (
     <ScreenContainer edges={['top']}>
@@ -263,14 +251,6 @@ export default function TenantsScreen() {
             subtitle="Create your first property to start managing tenants"
             actionLabel="Create Property"
             onActionPress={() => router.push('/property-form')}
-          />
-        ) : showNoRoomsState ? (
-          <EmptyState
-            icon={Users}
-            title="No Tenants or Rooms"
-            subtitle="Create rooms first, then add tenants to track rent payments and occupancy"
-            actionLabel="Add Room"
-            onActionPress={handleAddRoom}
           />
         ) : showEmptyState ? (
           <EmptyState
@@ -391,7 +371,7 @@ export default function TenantsScreen() {
           </>
         )}
       </ScrollView>
-      {selectedProperty && !showNoRoomsState && <FAB onPress={handleFabPress} />}
+      {selectedProperty && !showEmptyState && <FAB onPress={handleFabPress} />}
       <UpgradeModal
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}

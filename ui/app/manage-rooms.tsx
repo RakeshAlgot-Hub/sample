@@ -211,6 +211,24 @@ export default function ManageRoomsScreen() {
                           <Text style={[styles.archivedBadgeText, { color: colors.warning[600] }]}>Archived</Text>
                         </View>
                       )}
+                      {room.active !== false && (
+                        <View style={styles.roomActionIcons}>
+                          <TouchableOpacity
+                            style={styles.roomIconButton}
+                            onPress={() => handleEditRoom(room)}
+                            activeOpacity={0.6}
+                            disabled={!isOnline}>
+                            <Edit size={16} color={colors.primary[600]} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.roomIconButton}
+                            onPress={() => handleDeleteRoom(room)}
+                            activeOpacity={0.6}
+                            disabled={!isOnline}>
+                            <Trash2 size={16} color={colors.danger[600]} />
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
                     <Text style={[styles.roomFloor, { color: colors.text.secondary }]}>
                       Floor: {room.floor}
@@ -259,28 +277,6 @@ export default function ManageRoomsScreen() {
                       View Beds
                     </Text>
                   </TouchableOpacity>
-
-                  {room.active !== false && (
-                    <>
-                      <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[200], opacity: !isOnline ? 0.5 : 1 }]}
-                        onPress={() => handleEditRoom(room)}
-                        activeOpacity={0.7}
-                        disabled={!isOnline}>
-                        <Edit size={16} color={colors.primary[600]} />
-                        <Text style={[styles.actionText, { color: colors.primary[600] }]}>Edit</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: colors.danger[50], borderColor: colors.danger[200], opacity: !isOnline ? 0.5 : 1 }]}
-                        onPress={() => handleDeleteRoom(room)}
-                        activeOpacity={0.7}
-                        disabled={!isOnline}>
-                        <Trash2 size={16} color={colors.danger[600]} />
-                        <Text style={[styles.actionText, { color: colors.danger[600] }]}>Delete</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
                 </View>
               </Card>
             ))}
@@ -409,6 +405,18 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.xs,
   },
+  roomActionIcons: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginLeft: 'auto',
+    alignItems: 'center',
+  },
+  roomIconButton: {
+    padding: spacing.xs,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   archivedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -424,7 +432,6 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     gap: spacing.sm,
-    flexWrap: 'wrap',
   },
   actionButton: {
     flex: 1,

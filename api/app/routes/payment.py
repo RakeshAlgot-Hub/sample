@@ -197,11 +197,17 @@ async def list_payments(
                 "amount": 1,
                 "status": 1,
                 "dueDate": 1,
+                "paidDate": 1,
                 "method": 1,
                 "createdAt": 1,
                 "updatedAt": 1,
                 "tenantName": {"$arrayElemAt": ["$tenant.name", 0]},
-                "roomNumber": {"$arrayElemAt": ["$bed_info.roomNumber", 0]}
+                "roomNumber": {
+                    "$ifNull": [
+                        {"$arrayElemAt": ["$bed_info.roomNumber", 0]},
+                        "N/A"
+                    ]
+                }
             }
         }
     ]

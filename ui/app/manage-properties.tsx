@@ -100,6 +100,24 @@ export default function ManagePropertiesScreen() {
                         <Text style={[styles.archivedBadgeText, { color: colors.warning[600] }]}>Archived</Text>
                       </View>
                     )}
+                    {property.active !== false && (
+                      <View style={styles.iconButtonsRow}>
+                        <TouchableOpacity
+                          style={[styles.iconButton, { opacity: !isOnline ? 0.5 : 1 }]}
+                          onPress={() => handleEditProperty(property)}
+                          activeOpacity={0.6}
+                          disabled={!isOnline}>
+                          <Edit size={18} color={colors.primary[600]} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.iconButton, { opacity: !isOnline ? 0.5 : 1 }]}
+                          onPress={() => handleDeleteProperty(property)}
+                          activeOpacity={0.6}
+                          disabled={!isOnline}>
+                          <Trash2 size={18} color={colors.danger[600]} />
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                   <View style={styles.addressRow}>
                     <MapPin size={14} color={colors.text.secondary} />
@@ -108,26 +126,6 @@ export default function ManagePropertiesScreen() {
                     </Text>
                   </View>
                 </View>
-              </View>
-
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[200], opacity: !isOnline ? 0.5 : 1 }]}
-                  onPress={() => handleEditProperty(property)}
-                  activeOpacity={0.7}
-                  disabled={!isOnline}>
-                  <Edit size={16} color={colors.primary[600]} />
-                  <Text style={[styles.actionText, { color: colors.primary[600] }]}>Edit</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: colors.danger[50], borderColor: colors.danger[200], opacity: !isOnline ? 0.5 : 1 }]}
-                  onPress={() => handleDeleteProperty(property)}
-                  activeOpacity={0.7}
-                  disabled={!isOnline}>
-                  <Trash2 size={16} color={colors.danger[600]} />
-                  <Text style={[styles.actionText, { color: colors.danger[600] }]}>Delete</Text>
-                </TouchableOpacity>
               </View>
             </Card>
           ))
@@ -199,23 +197,16 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs,
     flex: 1,
   },
-  actionsRow: {
+  iconButtonsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+    alignItems: 'center',
   },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
+  iconButton: {
+    padding: spacing.sm,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  actionText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    marginLeft: spacing.xs,
   },
   nameRow: {
     flexDirection: 'row',

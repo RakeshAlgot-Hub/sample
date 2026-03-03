@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,11 +7,8 @@ import PropertySwitcher from '@/components/PropertySwitcher';
 import SectionHeader from '@/components/SectionHeader';
 import Card from '@/components/Card';
 import EmptyState from '@/components/EmptyState';
-import SubscriptionSummaryCard from '@/components/SubscriptionSummaryCard';
-import LimitBanner from '@/components/LimitBanner';
 import Skeleton from '@/components/Skeleton';
 import ApiErrorCard from '@/components/ApiErrorCard';
-import UpgradeModal from '@/components/UpgradeModal';
 import {
   Building2,
   Users,
@@ -26,16 +23,14 @@ import { useProperty } from '@/context/PropertyContext';
 import {
   paymentService,
   dashboardService,
-  subscriptionService,
 } from '@/services/apiClient';
-import type { Payment, DashboardStats, QuotaWarningsResponse } from '@/services/apiTypes';
+import type { Payment, DashboardStats } from '@/services/apiTypes';
 import { cacheKeys, getScreenCache, setScreenCache, clearScreenCache } from '@/services/screenCache';
 
 interface DashboardData {
   stats: DashboardStats;
   duePayments: Payment[];
   overduePayments: Payment[];
-  quotaWarnings?: QuotaWarningsResponse | null;
 }
 
 const DASHBOARD_CACHE_STALE_MS = 60 * 1000;
@@ -46,16 +41,13 @@ export default function DashboardScreen() {
   const { selectedProperty, selectedPropertyId, loading: propertyLoading } = useProperty();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-    const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [quotaWarnings, setQuotaWarnings] = useState<QuotaWarningsResponse | null>(null);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const lastFocusRefreshRef = useRef<number>(0);
 
   const fetchDashboardData = async () => {
     if (!selectedPropertyId) {
       setLoading(false);
-       setIsInitialLoad(false);
       return;
     }
 
@@ -63,9 +55,7 @@ export default function DashboardScreen() {
     const cachedData = getScreenCache<DashboardData>(cacheKey, DASHBOARD_CACHE_STALE_MS);
     if (cachedData) {
       setDashboardData(cachedData);
-      setQuotaWarnings(cachedData.quotaWarnings || null);
       setLoading(false);
-       setIsInitialLoad(false);
       setError(null);
       return;
     }
@@ -75,11 +65,10 @@ export default function DashboardScreen() {
       setError(null);
 
       // Fetch aggregated stats and payments data
-      const [statsRes, dueRes, overdueRes, warningsRes] = await Promise.all([
+      const [statsRes, dueRes, overdueRes] = await Promise.all([
         dashboardService.getStats(selectedPropertyId),
         paymentService.getPayments(selectedPropertyId, { status: 'due', page: 1, pageSize: 10 }),
         paymentService.getPayments(selectedPropertyId, { status: 'overdue', page: 1, pageSize: 10 }),
-        subscriptionService.getQuotaWarnings(),
       ]);
 
       const stats = statsRes.data || {
@@ -91,46 +80,38 @@ export default function DashboardScreen() {
       };
       const duePayments = dueRes.data || [];
       const overduePayments = overdueRes.data || [];
-      const warnings = warningsRes.data
-        ? {
-            ...warningsRes.data,
-            warnings: warningsRes.data.warnings || [],
-          }
-        : null;
 
       setDashboardData({
         stats,
         duePayments,
         overduePayments,
-        quotaWarnings: warnings,
       });
-      setQuotaWarnings(warnings);
       setScreenCache(cacheKey, {
         stats,
         duePayments,
         overduePayments,
-        quotaWarnings: warnings,
       });
     } catch (err: any) {
-      if (err?.code === 'upgrade_required') {
-        setShowUpgradeModal(true);
-      } else {
-        setError(err?.message || 'Failed to load dashboard data');
-      }
+      setError(err?.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
-       setIsInitialLoad(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
-      if (!propertyLoading) {
-        // Don't clear cache on focus - just refresh in background
-        // This keeps cached data visible while fetching new data
+      if (!propertyLoading && selectedPropertyId) {
+        const now = Date.now();
+        const shouldRefresh = now - lastFocusRefreshRef.current > DASHBOARD_CACHE_STALE_MS;
+
+        if (!shouldRefresh && dashboardData) {
+          return;
+        }
+
+        lastFocusRefreshRef.current = now;
         fetchDashboardData();
       }
-    }, [selectedPropertyId, propertyLoading])
+    }, [selectedPropertyId, propertyLoading, dashboardData])
   );
 
   const handleRetry = () => {
@@ -188,7 +169,7 @@ export default function DashboardScreen() {
             tintColor={colors.primary[500]}
           />
         }>
-          {propertyLoading || (isInitialLoad && !!selectedPropertyId) ? (
+          {propertyLoading || loading ? (
           <>
             <View style={styles.header}>
               <Text style={[styles.greeting, { color: colors.text.secondary }]}>Welcome back,</Text>
@@ -221,16 +202,6 @@ export default function DashboardScreen() {
               />
             ) : (
               <>
-                {quotaWarnings?.warnings && quotaWarnings.warnings.length > 0 && (
-                  quotaWarnings.warnings.map((warning, index) => (
-                    <LimitBanner
-                      key={index}
-                      message={warning.message}
-                      onUpgrade={() => router.push('/subscription')}
-                    />
-                  ))
-                )}
-
                 <View style={styles.statsGrid}>
                   {stats.map((stat, index) => (
                     <Card key={index} style={styles.statCard}>
@@ -242,8 +213,6 @@ export default function DashboardScreen() {
                     </Card>
                   ))}
                 </View>
-
-                <SubscriptionSummaryCard />
 
                 {dashboardData && dashboardData.duePayments.length > 0 && (
                   <View style={styles.section}>
@@ -314,11 +283,6 @@ export default function DashboardScreen() {
           </>
         )}
       </ScrollView>
-      <UpgradeModal
-        visible={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        onSelectPlan={() => setShowUpgradeModal(false)}
-      />
     </ScreenContainer>
   );
 }

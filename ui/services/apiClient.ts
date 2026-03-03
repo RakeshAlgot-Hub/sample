@@ -573,7 +573,7 @@ export const subscriptionService = {
 
 export const roomService = {
   async getRooms(propertyId?: string, search?: string, page: number = 1, pageSize: number = 50): Promise<PaginatedResponse<Room>> {
-    let endpoint = '/rooms?';
+    let endpoint = '/rooms/?';
     const params: string[] = [];
     
     if (propertyId) params.push(`property_id=${encodeURIComponent(propertyId)}`);

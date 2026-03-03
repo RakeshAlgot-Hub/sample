@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { propertyService } from '@/services/apiClient';
 import { useAuth } from '@/context/AuthContext';
 import type { Property } from '@/services/apiTypes';
@@ -21,10 +21,17 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const isFetchingPropertiesRef = useRef(false);
 
   const selectedProperty = properties.find(p => p.id === selectedPropertyId) || null;
 
   const fetchProperties = useCallback(async () => {
+    if (isFetchingPropertiesRef.current) {
+      return;
+    }
+
+    isFetchingPropertiesRef.current = true;
+
     try {
       setLoading(true);
       const response = await propertyService.getProperties();
@@ -60,8 +67,9 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
       await propertyStorage.clearSelectedPropertyId();
     } finally {
       setLoading(false);
+      isFetchingPropertiesRef.current = false;
     }
-  }, [selectedPropertyId]);
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
