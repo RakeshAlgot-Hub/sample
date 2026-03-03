@@ -20,6 +20,7 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarHideOnKeyboard: true,
+          lazy: true,
         }}>
       <Tabs.Screen
         name="dashboard"

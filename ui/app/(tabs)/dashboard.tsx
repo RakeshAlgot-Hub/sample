@@ -39,11 +39,21 @@ export default function DashboardScreen() {
   const { colors, isDark } = useTheme();
   const router = useRouter();
   const { selectedProperty, selectedPropertyId, loading: propertyLoading } = useProperty();
-  const [loading, setLoading] = useState(true);
+  
+  // Initialize with cached data synchronously to avoid glitch
+  const initialDashboardData = (() => {
+    if (!selectedPropertyId) return null;
+    const cacheKey = cacheKeys.dashboard(selectedPropertyId);
+    return getScreenCache<DashboardData>(cacheKey, DASHBOARD_CACHE_STALE_MS);
+  })();
+  
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(initialDashboardData);
   const lastFocusRefreshRef = useRef<number>(0);
+  const isInitialFocusRef = useRef(true);
+  const isFirstFetchRef = useRef(true);
 
   const fetchDashboardData = async () => {
     if (!selectedPropertyId) {
@@ -101,6 +111,15 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!propertyLoading && selectedPropertyId) {
+        // Skip on initial focus if we already have cached data
+        if (isInitialFocusRef.current && initialDashboardData) {
+          isInitialFocusRef.current = false;
+          isFirstFetchRef.current = false;
+          return;
+        }
+        isInitialFocusRef.current = false;
+        isFirstFetchRef.current = false;
+        
         const now = Date.now();
         const shouldRefresh = now - lastFocusRefreshRef.current > DASHBOARD_CACHE_STALE_MS;
 
@@ -172,7 +191,7 @@ export default function DashboardScreen() {
             tintColor={colors.primary[500]}
           />
         }>
-          {propertyLoading || loading ? (
+          {loading && !dashboardData && !isFirstFetchRef.current ? (
           <>
             <View style={styles.header}>
               <Text style={[styles.greeting, { color: colors.text.secondary }]}>Welcome back,</Text>

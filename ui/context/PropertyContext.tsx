@@ -20,10 +20,28 @@ const PropertyContext = createContext<PropertyContextType | undefined>(undefined
 
 export function PropertyProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  
+  // Initialize synchronously with cached data to avoid loading flicker
+  const { initialProperties, initialSelectedId } = (() => {
+    const cacheKey = cacheKeys.properties();
+    const cachedProperties = getScreenCache<Property[]>(cacheKey, PROPERTIES_CACHE_STALE_MS);
+    const propertiesData = Array.isArray(cachedProperties) ? cachedProperties : [];
+    
+    let selectedId: string | null = null;
+    if (propertiesData.length > 0) {
+      // Use first property as default on initial mount
+      // Will be validated/updated from persisted storage in useEffect
+      selectedId = propertiesData[0].id;
+    }
+    
+    return { initialProperties: propertiesData, initialSelectedId: selectedId };
+  })();
+  
+  const [properties, setProperties] = useState<Property[]>(initialProperties);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(initialSelectedId);
   const [loading, setLoading] = useState(false);
   const isFetchingPropertiesRef = useRef(false);
+  const hasInitializedRef = useRef(initialProperties.length > 0);
 
   const selectedProperty = properties.find(p => p.id === selectedPropertyId) || null;
 
@@ -115,7 +133,23 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchProperties();
+      // If we have cached properties, just validate selectedPropertyId
+      if (hasInitializedRef.current) {
+        propertyStorage.getSelectedPropertyId().then((persistedPropertyId) => {
+          if (persistedPropertyId && properties.some(p => p.id === persistedPropertyId)) {
+            setSelectedPropertyId(persistedPropertyId);
+            propertyStorage.setSelectedPropertyId(persistedPropertyId).catch(() => {});
+          } else {
+            // Current selectedPropertyId is already set correctly, just save it
+            if (selectedPropertyId) {
+              propertyStorage.setSelectedPropertyId(selectedPropertyId).catch(() => {});
+            }
+          }
+        });
+        hasInitializedRef.current = false; // Only do this once
+      } else {
+        fetchProperties();
+      }
     } else {
       setProperties([]);
       setSelectedPropertyId(null);
@@ -124,6 +158,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
         // ignore storage errors
       });
       setLoading(false);
+      hasInitializedRef.current = false;
     }
   }, [isAuthenticated, fetchProperties]);
 

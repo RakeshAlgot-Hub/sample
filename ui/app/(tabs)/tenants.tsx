@@ -32,11 +32,23 @@ export default function TenantsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { selectedProperty, selectedPropertyId, loading: propertyLoading } = useProperty();
-  const [tenants, setTenants] = useState<Tenant[]>([]);
+  
+  // Initialize with cached data synchronously to avoid glitch
+  const { initialTenants, initialTotal } = (() => {
+    if (!selectedPropertyId) return { initialTenants: [], initialTotal: 0 };
+    const cacheKey = cacheKeys.tenants(selectedPropertyId, 1, '', 'all');
+    const cachedResponse = getScreenCache<PaginatedResponse<Tenant>>(cacheKey, TENANTS_CACHE_STALE_MS);
+    return {
+      initialTenants: cachedResponse?.data || [],
+      initialTotal: cachedResponse?.meta?.total || 0
+    };
+  })();
+  
+  const [tenants, setTenants] = useState<Tenant[]>(initialTenants);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState(initialTotal);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   
   // Filter & Pagination
@@ -46,6 +58,8 @@ export default function TenantsScreen() {
   const pageSize = 50;
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFocusRefreshRef = useRef<number>(0);
+  const isInitialMountRef = useRef(true);
+  const isInitialFocusRef = useRef(true);
 
   const fetchTenants = useCallback(async (page: number = 1, search: string = '', status: string = 'all') => {
     if (!selectedPropertyId) {
@@ -94,6 +108,13 @@ export default function TenantsScreen() {
       return;
     }
 
+    // Skip on initial mount if we already have cached data
+    if (isInitialMountRef.current && initialTenants.length > 0) {
+      isInitialMountRef.current = false;
+      return;
+    }
+    isInitialMountRef.current = false;
+
     setCurrentPage(1);
     setSearchQuery('');
     setSelectedStatus('all');
@@ -135,6 +156,13 @@ export default function TenantsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!propertyLoading && selectedPropertyId) {
+        // Skip on initial focus if we already have cached data
+        if (isInitialFocusRef.current && initialTenants.length > 0) {
+          isInitialFocusRef.current = false;
+          return;
+        }
+        isInitialFocusRef.current = false;
+        
         const now = Date.now();
         const shouldRefresh = now - lastFocusRefreshRef.current > TENANTS_CACHE_STALE_MS;
 
@@ -199,46 +227,46 @@ export default function TenantsScreen() {
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Tenants</Text>
         <Text style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium as any, color: colors.text.secondary }}>
-          {propertyLoading || (loading && tenants.length === 0) ? '0' : total} Total
+          {loading && tenants.length === 0 ? '0' : total} Total
         </Text>
       </View>
 
-      {!propertyLoading && !loading && selectedProperty && !error && (
-        <View style={styles.searchContainer}>
-          <View style={[styles.searchBar, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium }]}>
-            <Search size={20} color={colors.text.tertiary} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text.primary }]}
-              placeholder="Search by name, phone..."
-              placeholderTextColor={colors.text.tertiary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              {
-                backgroundColor: selectedStatus !== 'all' ? colors.primary[100] : colors.primary[50],
-                borderColor: selectedStatus !== 'all' ? colors.primary[300] : colors.primary[100]
-              }
-            ]}
-            activeOpacity={0.7}
-            onPress={() => {
-              // Show status filter menu
-              const statusOptions = [
-                { label: 'All', value: 'all' },
-                { label: 'Paid', value: 'paid' },
-                { label: 'Due', value: 'due' },
-                { label: 'Overdue', value: 'overdue' }
-              ];
-              // You can use Alert for this or a custom modal
-              alert('Filter by payment status - Consider adding a modal for better UX');
-            }}>
-            <Filter size={20} color={selectedStatus !== 'all' ? colors.primary[700] : colors.primary[500]} />
-          </TouchableOpacity>
+      <View style={styles.searchContainer}>
+        <View style={[styles.searchBar, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium }]}>
+          <Search size={20} color={colors.text.tertiary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text.primary }]}
+            placeholder="Search by name, phone..."
+            placeholderTextColor={colors.text.tertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            editable={!!selectedProperty && !loading && !error}
+          />
         </View>
-      )}
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            {
+              backgroundColor: selectedStatus !== 'all' ? colors.primary[100] : colors.primary[50],
+              borderColor: selectedStatus !== 'all' ? colors.primary[300] : colors.primary[100]
+            }
+          ]}
+          activeOpacity={0.7}
+          onPress={() => {
+            // Show status filter menu
+            const statusOptions = [
+              { label: 'All', value: 'all' },
+              { label: 'Paid', value: 'paid' },
+              { label: 'Due', value: 'due' },
+              { label: 'Overdue', value: 'overdue' }
+            ];
+            // You can use Alert for this or a custom modal
+            alert('Filter by payment status - Consider adding a modal for better UX');
+          }}
+          disabled={loading || !selectedProperty || !!error}>
+          <Filter size={20} color={selectedStatus !== 'all' ? colors.primary[700] : colors.primary[500]} />
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -251,7 +279,7 @@ export default function TenantsScreen() {
             tintColor={colors.primary[500]}
           />
         }>
-          {propertyLoading || (loading && tenants.length === 0) ? (
+          {loading && tenants.length === 0 ? (
           <Skeleton height={200} count={3} />
         ) : (error && selectedProperty) ? (
           <ApiErrorCard error={error} onRetry={handleRetry} />

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -42,10 +42,24 @@ export default function PaymentsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { selectedProperty, selectedPropertyId, loading: propertyLoading } = useProperty();
-  const [payments, setPayments] = useState<Payment[]>([]);
+  
+  // Initialize with cached data synchronously to avoid glitch
+  const { initialPayments, initialTotal } = (() => {
+    if (!selectedPropertyId) return { initialPayments: [], initialTotal: 0 };
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const cacheKey = cacheKeys.payments(selectedPropertyId, monthKey);
+    const cachedResponse = getScreenCache<PaginatedResponse<Payment>>(cacheKey, PAYMENTS_CACHE_STALE_MS);
+    return {
+      initialPayments: cachedResponse?.data || [],
+      initialTotal: cachedResponse?.meta?.total || 0
+    };
+  })();
+  
+  const [payments, setPayments] = useState<Payment[]>(initialPayments);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState(initialTotal);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   
   // Month navigation state
@@ -72,6 +86,8 @@ export default function PaymentsScreen() {
   const monthKey = useMemo(() => {
     return `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`;
   }, [selectedDate]);
+
+  const isInitialMountRef = useRef(true);
 
   const fetchPayments = async () => {
     if (!selectedPropertyId) {
@@ -136,6 +152,13 @@ export default function PaymentsScreen() {
   // Refetch payments when month changes (and resolve empty-property initial state)
   useEffect(() => {
     if (!propertyLoading && selectedPropertyId) {
+      // Skip on initial mount if we already have cached data
+      if (isInitialMountRef.current && initialPayments.length > 0) {
+        isInitialMountRef.current = false;
+        return;
+      }
+      isInitialMountRef.current = false;
+      
       // Check cache synchronously first to avoid skeleton flash
       const cacheKey = cacheKeys.payments(selectedPropertyId, monthKey);
       const cachedResponse = getScreenCache<PaginatedResponse<Payment>>(cacheKey, PAYMENTS_CACHE_STALE_MS);
@@ -253,7 +276,7 @@ export default function PaymentsScreen() {
   };
 
   const stats = computeStats();
-  const isLoadingState = propertyLoading || (isRefreshing && payments.length === 0);
+  const isLoadingState = isRefreshing && payments.length === 0;
 
   return (
     <ScreenContainer edges={['top']}>
@@ -264,37 +287,35 @@ export default function PaymentsScreen() {
         </TouchableOpacity>
       </View>
 
-      {selectedProperty && !isLoadingState && (
-        <View style={[styles.monthNavigator, { backgroundColor: colors.background.secondary, borderColor: colors.border.light }]}>
-          <TouchableOpacity
-            onPress={handlePreviousMonth}
-            style={[styles.monthNavButton, { backgroundColor: colors.primary[50] }]}
-            activeOpacity={0.7}
-            disabled={isRefreshing}
-          >
-            <ChevronLeft size={18} color={colors.primary[500]} />
-          </TouchableOpacity>
-          
-          <View style={styles.monthDisplay}>
-            <Calendar size={14} color={colors.primary[500]} />
-            <Text style={[styles.monthYearText, { color: colors.text.primary }]}>
-              {monthYearString}
-            </Text>
-            {isRefreshing && (
-              <ActivityIndicator size="small" color={colors.primary[500]} style={styles.monthLoader} />
-            )}
-          </View>
-
-          <TouchableOpacity
-            onPress={handleNextMonth}
-            style={[styles.monthNavButton, { backgroundColor: colors.primary[50] }]}
-            activeOpacity={0.7}
-            disabled={isRefreshing}
-          >
-            <ChevronRight size={18} color={colors.primary[500]} />
-          </TouchableOpacity>
+      <View style={[styles.monthNavigator, { backgroundColor: colors.background.secondary, borderColor: colors.border.light, opacity: selectedProperty && !isLoadingState ? 1 : 0.5 }]}>
+        <TouchableOpacity
+          onPress={handlePreviousMonth}
+          style={[styles.monthNavButton, { backgroundColor: colors.primary[50] }]}
+          activeOpacity={0.7}
+          disabled={isRefreshing || !selectedProperty || isLoadingState}
+        >
+          <ChevronLeft size={18} color={colors.primary[500]} />
+        </TouchableOpacity>
+        
+        <View style={styles.monthDisplay}>
+          <Calendar size={14} color={colors.primary[500]} />
+          <Text style={[styles.monthYearText, { color: colors.text.primary }]}>
+            {monthYearString}
+          </Text>
+          {isRefreshing && (
+            <ActivityIndicator size="small" color={colors.primary[500]} style={styles.monthLoader} />
+          )}
         </View>
-      )}
+
+        <TouchableOpacity
+          onPress={handleNextMonth}
+          style={[styles.monthNavButton, { backgroundColor: colors.primary[50] }]}
+          activeOpacity={0.7}
+          disabled={isRefreshing || !selectedProperty || isLoadingState}
+        >
+          <ChevronRight size={18} color={colors.primary[500]} />
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
