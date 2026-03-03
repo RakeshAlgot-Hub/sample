@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -19,6 +20,7 @@ import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { paymentService } from '@/services/apiClient';
+import type { Payment } from '@/services/apiTypes';
 import ApiErrorCard from '@/components/ApiErrorCard';
 import { cacheKeys, clearScreenCache, getScreenCache, setScreenCache } from '@/services/screenCache';
 
@@ -26,7 +28,6 @@ const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Other'];
 const PAYMENT_STATUSES = [
   { value: 'paid', label: 'Paid' },
   { value: 'due', label: 'Due' },
-  { value: 'overdue', label: 'Overdue' },
 ];
 
 const PAYMENT_DETAIL_CACHE_STALE_MS = 60 * 1000;
@@ -37,17 +38,21 @@ export default function EditPaymentScreen() {
   const { paymentId } = useLocalSearchParams<{ paymentId: string }>();
   const isOnline = useNetworkStatus();
 
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const [selectedPaymentId, setSelectedPaymentId] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [paidDate, setPaidDate] = useState('');
   const [method, setMethod] = useState('Cash');
-  const [status, setStatus] = useState<'paid' | 'due' | 'overdue'>('paid');
-  const [originalStatus, setOriginalStatus] = useState<'paid' | 'due' | 'overdue'>('paid');
-  const [pendingStatus, setPendingStatus] = useState<'paid' | 'due' | 'overdue' | null>(null);
+  const [status, setStatus] = useState<'paid' | 'due'>('paid');
+  const [pendingStatus, setPendingStatus] = useState<'paid' | 'due' | null>(null);
+  const [isFullEditEnabled, setIsFullEditEnabled] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [fetchingPayment, setFetchingPayment] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showStatusConfirmModal, setShowStatusConfirmModal] = useState(false);
@@ -61,41 +66,72 @@ export default function EditPaymentScreen() {
     }
   }, [paymentId]);
 
+  const getEffectiveStatus = (paymentStatus: Payment['status']): 'paid' | 'due' => {
+    return paymentStatus === 'paid' ? 'paid' : 'due';
+  };
+
+  const getMonthLabel = (dateValue?: string | null) => {
+    if (!dateValue) return 'Unknown Month';
+    const parsedDate = new Date(dateValue);
+    if (isNaN(parsedDate.getTime())) return 'Unknown Month';
+    return parsedDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  };
+
+  const getAmountNumberString = (amountValue?: string) => {
+    if (!amountValue) return '';
+    return amountValue.replace(/[^0-9]/g, '');
+  };
+
+  const applyPaymentToForm = (payment: Payment) => {
+    setSelectedPaymentId(payment.id);
+    setAmount(getAmountNumberString(payment.amount));
+    setDueDate(payment.dueDate || '');
+    setPaidDate(payment.paidDate || '');
+    setMethod(payment.method || 'Cash');
+    setStatus(getEffectiveStatus(payment.status));
+    setTenantName(payment.tenantName || '');
+    setRoomNumber(payment.roomNumber || 'N/A');
+  };
+
+  const sortPaymentsByMonth = (payments: Payment[]) => {
+    return [...payments].sort((a, b) => {
+      const aTime = new Date(a.dueDate || a.createdAt).getTime();
+      const bTime = new Date(b.dueDate || b.createdAt).getTime();
+      return bTime - aTime;
+    });
+  };
+
   const fetchPayment = async () => {
     if (!paymentId) return;
 
     const paymentCacheKey = cacheKeys.paymentDetail(paymentId);
     const cachedPayment = getScreenCache<any>(paymentCacheKey, PAYMENT_DETAIL_CACHE_STALE_MS);
-    if (cachedPayment) {
-      const amountStr = cachedPayment.amount.replace(/[^0-9]/g, '');
-      setAmount(amountStr);
-      setDueDate(cachedPayment.dueDate || '');
-      setMethod(cachedPayment.method || 'Cash');
-      setStatus(cachedPayment.status);
-      setOriginalStatus(cachedPayment.status);
-      setTenantName((cachedPayment as any).tenantName || '');
-      setRoomNumber((cachedPayment as any).roomNumber || 'N/A');
-      setFetchingPayment(false);
-      return;
-    }
 
     try {
       setFetchingPayment(true);
       setError(null);
 
-      const response = await paymentService.getPaymentById(paymentId);
-      const payment: any = response.data;
+      const initialPayment: Payment = cachedPayment
+        ? cachedPayment
+        : (await paymentService.getPaymentById(paymentId)).data;
 
-      const amountStr = payment.amount.replace(/[^0-9]/g, '');
+      if (!cachedPayment) {
+        setScreenCache(paymentCacheKey, initialPayment);
+      }
 
-      setAmount(amountStr);
-      setDueDate(payment.dueDate || '');
-      setMethod(payment.method || 'Cash');
-      setStatus(payment.status);
-      setOriginalStatus(payment.status);
-      setTenantName(payment.tenantName);
-      setRoomNumber(payment.roomNumber || 'N/A');
-      setScreenCache(paymentCacheKey, payment);
+      let history = [initialPayment];
+      if (initialPayment.propertyId && initialPayment.tenantId) {
+        const historyRes = await paymentService.getPayments(initialPayment.propertyId, {
+          tenantId: initialPayment.tenantId,
+          page: 1,
+          pageSize: 100,
+        });
+        history = historyRes.data && historyRes.data.length > 0 ? historyRes.data : [initialPayment];
+      }
+
+      const sortedHistory = sortPaymentsByMonth(history);
+      setPaymentHistory(sortedHistory);
+      applyPaymentToForm(sortedHistory[0]);
     } catch (err: any) {
       setError(err?.message || 'Failed to load payment');
     } finally {
@@ -107,7 +143,13 @@ export default function EditPaymentScreen() {
     fetchPayment();
   };
 
-  const handleStatusSelection = (newStatus: 'paid' | 'due' | 'overdue') => {
+  const handleMonthSelection = (payment: Payment) => {
+    applyPaymentToForm(payment);
+    setIsFullEditEnabled(false);
+    setShowMonthPicker(false);
+  };
+
+  const handleStatusSelection = (newStatus: 'paid' | 'due') => {
     // If status is changing, show confirmation
     if (newStatus !== status) {
       setPendingStatus(newStatus);
@@ -136,7 +178,7 @@ export default function EditPaymentScreen() {
     
     if (pendingStatus === 'paid') {
       return 'Mark this payment as Paid? The payment date will be recorded as today. This action should only be confirmed once payment is received.';
-    } else if (status === 'paid' && (pendingStatus === 'due' || pendingStatus === 'overdue')) {
+    } else if (status === 'paid' && pendingStatus === 'due') {
       return 'Change status from Paid to Due? This will remove the paid record.';
     } else {
       return `Change payment status to ${PAYMENT_STATUSES.find(s => s.value === pendingStatus)?.label}?`;
@@ -144,20 +186,27 @@ export default function EditPaymentScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!amount || !dueDate || !method || !status) {
-      setError('Amount, due date, method, and status are required');
+    if (!selectedPaymentId) {
+      setError('Payment month is missing');
       return;
     }
 
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      setError('Please enter a valid amount greater than 0');
+    if (!method) {
+      setError('Payment method is required');
       return;
     }
 
-    if (!paymentId) {
-      setError('Payment ID is missing');
-      return;
+    if (isFullEditEnabled) {
+      if (!amount || !dueDate || !method || !status) {
+        setError('Amount, due date, method, and status are required');
+        return;
+      }
+
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        setError('Please enter a valid amount greater than 0');
+        return;
+      }
     }
 
     try {
@@ -165,21 +214,26 @@ export default function EditPaymentScreen() {
       setError(null);
 
       const updateData: any = {
-        amount: `₹${amountNum.toLocaleString()}`,
-        dueDate,
-        method,
         status,
+        method,
       };
+
+      if (isFullEditEnabled) {
+        const amountNum = parseFloat(amount);
+        updateData.amount = `₹${amountNum.toLocaleString()}`;
+        updateData.dueDate = dueDate;
+        updateData.method = method;
+      }
 
       // If changing to paid and there's no paidDate, backend will auto-set it
       // If changing away from paid, let backend handle it (paidDate can remain)
 
-      await paymentService.updatePayment(paymentId, updateData);
+      await paymentService.updatePayment(selectedPaymentId, updateData);
 
       clearScreenCache('payments:');
       clearScreenCache('dashboard:');
       clearScreenCache('tenant-detail:');
-      clearScreenCache(`payment-detail:${paymentId}`);
+      clearScreenCache(`payment-detail:${selectedPaymentId}`);
 
       router.back();
     } catch (err: any) {
@@ -190,14 +244,11 @@ export default function EditPaymentScreen() {
   };
 
   const isFormValid = () => {
-    return (
-      amount.trim() &&
-      dueDate &&
-      method &&
-      status &&
-      !isNaN(parseFloat(amount)) &&
-      parseFloat(amount) > 0
-    );
+    if (!status || !selectedPaymentId || !method) return false;
+
+    if (!isFullEditEnabled) return true;
+
+    return amount.trim() && dueDate && method && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0;
   };
 
   if (fetchingPayment) {
@@ -289,72 +340,147 @@ export default function EditPaymentScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Amount *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.background.secondary,
-                    color: colors.text.primary,
-                    borderColor: colors.border.medium,
-                  },
-                ]}
-                placeholder="e.g., 5000"
-                keyboardType="numeric"
-                placeholderTextColor={colors.text.tertiary}
-                value={amount}
-                onChangeText={setAmount}
-                editable={!loading}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Due Date *</Text>
-              <View style={styles.dateInputContainer}>
-                <Calendar size={20} color={colors.text.tertiary} style={styles.dateIcon} />
-                <TextInput
-                  style={[
-                    styles.dateInput,
-                    {
-                      backgroundColor: colors.background.secondary,
-                      color: colors.text.primary,
-                      borderColor: colors.border.medium,
-                    },
-                  ]}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.text.tertiary}
-                  value={dueDate}
-                  onChangeText={setDueDate}
-                  editable={!loading}
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleTextContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary, marginBottom: 0 }]}>Enable Full Edit</Text>
+                  <Text style={[styles.toggleHint, { color: colors.text.secondary }]}>Off: status only • On: edit all fields</Text>
+                  <Text style={[styles.toggleHint, { color: colors.text.tertiary }]}>Status-only mode is safer for routine updates.</Text>
+                </View>
+                <Switch
+                  value={isFullEditEnabled}
+                  onValueChange={setIsFullEditEnabled}
+                  disabled={loading}
+                  thumbColor={isFullEditEnabled ? colors.primary[500] : colors.text.tertiary}
+                  trackColor={{ false: colors.border.medium, true: colors.primary[100] }}
                 />
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Payment Method *</Text>
-              <TouchableOpacity
-                style={[
-                  styles.pickerButton,
-                  {
-                    backgroundColor: colors.background.secondary,
-                    borderColor: colors.border.medium,
-                  },
-                ]}
-                onPress={() => setShowMethodPicker(true)}
-                activeOpacity={0.7}
-                disabled={loading}>
-                <Text
+            {isFullEditEnabled ? (
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Payment Month *</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerButton,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        borderColor: colors.border.medium,
+                      },
+                    ]}
+                    onPress={() => setShowMonthPicker(true)}
+                    activeOpacity={0.7}
+                    disabled={loading || paymentHistory.length === 0}>
+                    <Text
+                      style={[
+                        styles.pickerButtonText,
+                        {
+                          color: selectedPaymentId ? colors.text.primary : colors.text.tertiary,
+                        },
+                      ]}>
+                      {selectedPaymentId
+                        ? getMonthLabel(paymentHistory.find(item => item.id === selectedPaymentId)?.dueDate)
+                        : 'Select Month'}
+                    </Text>
+                    <ChevronDown size={20} color={colors.text.tertiary} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Amount *</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        color: colors.text.primary,
+                        borderColor: colors.border.medium,
+                      },
+                    ]}
+                    placeholder="e.g., 5000"
+                    keyboardType="numeric"
+                    placeholderTextColor={colors.text.tertiary}
+                    value={amount}
+                    onChangeText={setAmount}
+                    editable={!loading}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Due Date *</Text>
+                  <View style={styles.dateInputContainer}>
+                    <Calendar size={20} color={colors.text.tertiary} style={styles.dateIcon} />
+                    <TextInput
+                      style={[
+                        styles.dateInput,
+                        {
+                          backgroundColor: colors.background.secondary,
+                          color: colors.text.primary,
+                          borderColor: colors.border.medium,
+                        },
+                      ]}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={colors.text.tertiary}
+                      value={dueDate}
+                      onChangeText={setDueDate}
+                      editable={!loading}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Payment Method *</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerButton,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        borderColor: colors.border.medium,
+                      },
+                    ]}
+                    onPress={() => setShowMethodPicker(true)}
+                    activeOpacity={0.7}
+                    disabled={loading}>
+                    <Text
+                      style={[
+                        styles.pickerButtonText,
+                        {
+                          color: method ? colors.text.primary : colors.text.tertiary,
+                        },
+                      ]}>
+                      {method || 'Select Method'}
+                    </Text>
+                    <ChevronDown size={20} color={colors.text.tertiary} />
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Paid Method</Text>
+                <TouchableOpacity
                   style={[
-                    styles.pickerButtonText,
+                    styles.pickerButton,
                     {
-                      color: method ? colors.text.primary : colors.text.tertiary,
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.medium,
                     },
-                  ]}>
-                  {method || 'Select Method'}
-                </Text>
-                <ChevronDown size={20} color={colors.text.tertiary} />
-              </TouchableOpacity>
-            </View>
+                  ]}
+                  onPress={() => setShowMethodPicker(true)}
+                  activeOpacity={0.7}
+                  disabled={loading}>
+                  <Text
+                    style={[
+                      styles.pickerButtonText,
+                      {
+                        color: method ? colors.text.primary : colors.text.tertiary,
+                      },
+                    ]}>
+                    {method || 'Select Method'}
+                  </Text>
+                  <ChevronDown size={20} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              </View>
+            )}
 
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.text.primary }]}>Status *</Text>
@@ -382,6 +508,24 @@ export default function EditPaymentScreen() {
               </TouchableOpacity>
             </View>
 
+            {isFullEditEnabled && (
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Paid Date (Reference)</Text>
+                <View
+                  style={[
+                    styles.disabledInput,
+                    {
+                      backgroundColor: colors.background.tertiary,
+                      borderColor: colors.border.medium,
+                    },
+                  ]}>
+                  <Text style={[styles.disabledText, { color: colors.text.secondary }]}>
+                    {paidDate || '-'}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {!isOnline && (
               <View style={[styles.offlineWarning, { backgroundColor: colors.warning[50], borderColor: colors.warning[200] }]}>
                 <Text style={[styles.offlineWarningText, { color: colors.warning[900] }]}>
@@ -405,13 +549,69 @@ export default function EditPaymentScreen() {
                 <ActivityIndicator color={colors.white} size="small" />
               ) : (
                 <Text style={[styles.submitButtonText, { color: colors.white }]}>
-                  {isOnline ? 'Update Payment' : 'Offline'}
+                  {isOnline ? (isFullEditEnabled ? 'Update Payment' : 'Update Status') : 'Offline'}
                 </Text>
               )}
             </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={showMonthPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMonthPicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Select Payment Month</Text>
+            </View>
+
+            <ScrollView style={styles.modalScrollView}>
+              {paymentHistory.map((payment, index) => {
+                const effectiveStatus = getEffectiveStatus(payment.status);
+                const amountText = payment.amount || '-';
+                return (
+                  <TouchableOpacity
+                    key={payment.id || index}
+                    style={[
+                      styles.modalOption,
+                      { borderBottomColor: colors.border.light },
+                    ]}
+                    onPress={() => handleMonthSelection(payment)}
+                    activeOpacity={0.7}>
+                    <View style={styles.monthOptionHeader}>
+                      <Text
+                        style={[
+                          styles.modalOptionText,
+                          {
+                            color: selectedPaymentId === payment.id ? colors.primary[500] : colors.text.primary,
+                            fontWeight: selectedPaymentId === payment.id
+                              ? typography.fontWeight.semibold
+                              : typography.fontWeight.regular,
+                          },
+                        ]}>
+                        {getMonthLabel(payment.dueDate)}
+                      </Text>
+                      <Text style={[styles.monthOptionMeta, { color: colors.text.secondary }]}>
+                        {amountText} • {effectiveStatus === 'paid' ? 'Paid' : 'Due'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.modalCloseButton, { borderTopColor: colors.border.light }]}
+              onPress={() => setShowMonthPicker(false)}
+              activeOpacity={0.7}>
+              <Text style={[styles.modalCloseButtonText, { color: colors.text.secondary }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={showMethodPicker}
@@ -490,7 +690,7 @@ export default function EditPaymentScreen() {
                     styles.modalOption,
                     { borderBottomColor: colors.border.light },
                   ]}
-                  onPress={() => handleStatusSelection(s.value as 'paid' | 'due' | 'overdue')}
+                  onPress={() => handleStatusSelection(s.value as 'paid' | 'due')}
                   activeOpacity={0.7}>
                   <Text
                     style={[
@@ -667,6 +867,19 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     marginTop: spacing.xs,
   },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  toggleTextContainer: {
+    flex: 1,
+  },
+  toggleHint: {
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
+  },
   dateInputContainer: {
     position: 'relative',
   },
@@ -737,6 +950,12 @@ const styles = StyleSheet.create({
   },
   modalOptionText: {
     fontSize: typography.fontSize.md,
+  },
+  monthOptionHeader: {
+    gap: spacing.xs,
+  },
+  monthOptionMeta: {
+    fontSize: typography.fontSize.sm,
   },
   modalCloseButton: {
     padding: spacing.lg,
