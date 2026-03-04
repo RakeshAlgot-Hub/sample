@@ -23,11 +23,12 @@ import { useProperty } from '@/context/PropertyContext';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { staffService, subscriptionService } from '@/services/apiClient';
 import { Staff, Subscription, PlanLimits } from '@/services/apiTypes';
-import { ChevronLeft, Plus, Trash2, Edit2, X, Users, AlertCircle } from 'lucide-react-native';
+import { ChevronLeft, Plus, Trash2, Edit2, X, Users, AlertCircle, Calendar, ChevronDown, MapPin } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Card from '@/components/Card';
 import EmptyState from '@/components/EmptyState';
 import UpgradeModal from '@/components/UpgradeModal';
+import DatePicker from '@/components/DatePicker';
 
 const STAFF_ROLES = [
   { label: 'Cooker', value: 'cooker' },
@@ -64,6 +65,10 @@ export default function ManageStaffScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showRolePicker, setShowRolePicker] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [staffToDelete, setStaffToDelete] = useState<Staff | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -72,25 +77,23 @@ export default function ManageStaffScreen() {
     mobileNumber: '',
     address: '',
     status: 'active',
-    joiningDate: '',
+    joiningDate: new Date().toISOString().split('T')[0],
     salary: '',
-    emergencyContact: '',
-    emergencyContactNumber: '',
-    notes: '',
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const loadStaff = useCallback(async () => {
+  // Load all staff data (without filters)
+  const loadAllStaff = useCallback(async () => {
     if (!selectedProperty?.id) return;
     try {
       setLoading(true);
       const [staffResponse, subResponse] = await Promise.all([
         staffService.getStaff(
           selectedProperty.id,
-          search || undefined,
-          selectedRole || undefined,
-          selectedStatus || undefined,
+          undefined, // Don't filter on API - we'll do it client-side
+          undefined,
+          undefined,
           1,
           100
         ),
@@ -103,22 +106,45 @@ export default function ManageStaffScreen() {
     } finally {
       setLoading(false);
     }
-  }, [selectedProperty?.id, search, selectedRole, selectedStatus]);
+  }, [selectedProperty?.id]);
 
+  // Filter staff data based on search and role (client-side)
+  const getFilteredStaff = useCallback(() => {
+    let filtered = staffList;
+
+    // Filter by search term (name or mobile)
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(
+        (staff) =>
+          staff.name?.toLowerCase().includes(searchLower) ||
+          staff.mobileNumber?.includes(searchLower)
+      );
+    }
+
+    // Filter by role
+    if (selectedRole) {
+      filtered = filtered.filter((staff) => staff.role === selectedRole);
+    }
+
+    return filtered;
+  }, [staffList, search, selectedRole]);
+
+  // Load staff on component focus (not on filter changes)
   useFocusEffect(
     useCallback(() => {
-      loadStaff();
-    }, [loadStaff])
+      loadAllStaff();
+    }, [loadAllStaff])
   );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadStaff();
+      await loadAllStaff();
     } finally {
       setRefreshing(false);
     }
-  }, [loadStaff]);
+  }, [loadAllStaff]);
 
   useEffect(() => {
     if (!subscription) {
@@ -144,11 +170,8 @@ export default function ManageStaffScreen() {
       mobileNumber: '',
       address: '',
       status: 'active',
-      joiningDate: '',
+      joiningDate: new Date().toISOString().split('T')[0],
       salary: '',
-      emergencyContact: '',
-      emergencyContactNumber: '',
-      notes: '',
     });
     setFormError(null);
     setEditingStaff(null);
@@ -166,11 +189,8 @@ export default function ManageStaffScreen() {
       mobileNumber: staff.mobileNumber || '',
       address: staff.address || '',
       status: staff.status || 'active',
-      joiningDate: staff.joiningDate || '',
+      joiningDate: staff.joiningDate || new Date().toISOString().split('T')[0],
       salary: staff.salary ? staff.salary.toString() : '',
-      emergencyContact: staff.emergencyContact || '',
-      emergencyContactNumber: staff.emergencyContactNumber || '',
-      notes: staff.notes || '',
     });
     setEditingStaff(staff);
     setShowAddModal(true);
@@ -189,12 +209,24 @@ export default function ManageStaffScreen() {
       setFormError('Mobile number is required');
       return false;
     }
+    if (!/^\d{10}$/.test(formData.mobileNumber)) {
+      setFormError('Mobile number must be 10 digits');
+      return false;
+    }
     if (!formData.address.trim()) {
       setFormError('Address is required');
       return false;
     }
-    if (!/^\d{10}$/.test(formData.mobileNumber)) {
-      setFormError('Mobile number must be 10 digits');
+    if (!formData.joiningDate) {
+      setFormError('Joining date is required');
+      return false;
+    }
+    if (!formData.salary.trim()) {
+      setFormError('Salary is required');
+      return false;
+    }
+    if (isNaN(parseFloat(formData.salary)) || parseFloat(formData.salary) <= 0) {
+      setFormError('Please enter a valid salary amount');
       return false;
     }
     return true;
@@ -217,9 +249,6 @@ export default function ManageStaffScreen() {
         status: formData.status as Staff['status'],
         joiningDate: formData.joiningDate || undefined,
         salary: formData.salary ? parseFloat(formData.salary) : undefined,
-        emergencyContact: formData.emergencyContact || undefined,
-        emergencyContactNumber: formData.emergencyContactNumber || undefined,
-        notes: formData.notes || undefined,
       };
 
       if (editingStaff?.id) {
@@ -228,7 +257,7 @@ export default function ManageStaffScreen() {
         await staffService.createStaff(staffData);
       }
 
-      await loadStaff();
+      await loadAllStaff();
       setShowAddModal(false);
       resetForm();
     } catch (error: any) {
@@ -248,126 +277,114 @@ export default function ManageStaffScreen() {
   };
 
   const handleDelete = (staff: Staff) => {
-    Alert.alert(
-      'Remove Staff',
-      `Are you sure you want to remove ${staff.name}? This action cannot be undone.`,
-      [
-        { text: 'Cancel', onPress: () => {} },
-        {
-          text: 'Remove',
-          onPress: async () => {
-            try {
-              await staffService.deleteStaff(staff.id);
-              await loadStaff();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to remove staff member');
-            }
-          },
-          style: 'destructive',
-        },
-      ]
-    );
+    setStaffToDelete(staff);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!staffToDelete) return;
+    try {
+      setDeleting(true);
+      await staffService.deleteStaff(staffToDelete.id);
+      setShowDeleteConfirm(false);
+      setStaffToDelete(null);
+      await loadAllStaff();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to remove staff member');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const StaffCard = ({ item }: { item: Staff }) => (
-    <Card style={{ ...styles.staffCard, marginBottom: spacing.md } as any}>
-      <View style={styles.staffHeader}>
-        <View style={styles.staffInfo}>
-          <View style={styles.staffNameRow}>
-            <Text style={[styles.staffName, { color: colors.text.primary }]}>{item.name}</Text>
-            <View style={styles.staffActionIcons}>
-              <TouchableOpacity
-                style={styles.staffIconButton}
-                onPress={() => openEditModal(item)}
-                activeOpacity={0.6}
-                disabled={!isOnline}>
-                <Edit2 size={16} color={colors.primary[500]} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.staffIconButton}
-                onPress={() => handleDelete(item)}
-                activeOpacity={0.6}
-                disabled={!isOnline}>
-                <Trash2 size={16} color={colors.danger[500]} />
-              </TouchableOpacity>
-            </View>
-          </View>
+    <Card style={styles.staffCard as any}>
+      {/* Card Header with Icon and Name */}
+      <View style={styles.cardHeader}>
+        <View style={[styles.iconContainer, { backgroundColor: colors.background.tertiary }]}>
+          <Users size={24} color={colors.primary[600]} strokeWidth={1.5} />
+        </View>
+        <View style={styles.headerInfo}>
+          <Text style={[styles.staffName, { color: colors.text.primary }]} numberOfLines={1}>
+            {item.name}
+          </Text>
           <Text style={[styles.staffRole, { color: colors.text.secondary }]}>
             {STAFF_ROLES.find((r) => r.value === item.role)?.label || item.role}
           </Text>
         </View>
-        <View
-          style={[
-            styles.statusBadge,
-            {
-              backgroundColor:
-                item.status === 'active'
-                  ? colors.background.tertiary
-                  : item.status === 'on_leave'
-                    ? colors.background.tertiary
-                    : colors.background.tertiary,
-            },
-          ]}>
-          <Text
-            style={[
-              styles.statusText,
-              {
-                color:
-                  item.status === 'active'
-                    ? colors.success[500]
-                    : item.status === 'on_leave'
-                      ? colors.warning[500]
-                      : colors.danger[500],
-              },
-            ]}>
-            {STAFF_STATUS.find((s) => s.value === item.status)?.label || item.status}
-          </Text>
+      </View>
+
+      {/* Details Section */}
+      <View style={styles.detailsGrid}>
+        <View style={styles.detailItem}>
+          <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>Mobile</Text>
+          <Text style={[styles.detailValue, { color: colors.text.primary }]}>{item.mobileNumber}</Text>
+        </View>
+        <View style={[styles.detailDivider, { backgroundColor: colors.border.light }]} />
+        <View style={styles.detailItem}>
+          <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>Salary</Text>
+          <Text style={[styles.detailValue, { color: colors.text.primary }]}>₹ {item.salary}</Text>
         </View>
       </View>
 
-      <View style={[styles.divider, { backgroundColor: colors.border.light }]} />
+      {/* Address Section */}
+      <View style={styles.addressSection}>
+        <MapPin size={14} color={colors.text.tertiary} strokeWidth={2} />
+        <Text style={[styles.addressText, { color: colors.text.secondary }]} numberOfLines={2}>
+          {item.address}
+        </Text>
+      </View>
 
-      <View style={styles.staffDetails}>
-        <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>Mobile</Text>
-          <Text style={[styles.detailValue, { color: colors.text.primary }]}>{item.mobileNumber}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>Address</Text>
-          <Text style={[styles.detailValue, { color: colors.text.primary }]} numberOfLines={2}>
-            {item.address}
+      {/* Date Section */}
+      {item.joiningDate && (
+        <View style={styles.dateSection}>
+          <Calendar size={14} color={colors.text.tertiary} strokeWidth={2} />
+          <Text style={[styles.dateText, { color: colors.text.secondary }]}>
+            Joined {new Date(item.joiningDate).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}
           </Text>
         </View>
-        {item.joiningDate && (
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>Joined</Text>
-            <Text style={[styles.detailValue, { color: colors.text.primary }]}>
-              {new Date(item.joiningDate).toLocaleDateString()}
-            </Text>
-          </View>
-        )}
-        {item.salary && (
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>Salary</Text>
-            <Text style={[styles.detailValue, { color: colors.text.primary }]}>₹ {item.salary}</Text>
-          </View>
-        )}
-        {item.emergencyContact && (
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>Emergency Contact</Text>
-            <Text style={[styles.detailValue, { color: colors.text.primary }]}>
-              {item.emergencyContact}
-            </Text>
-          </View>
-        )}
-        {item.notes && (
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>Notes</Text>
-            <Text style={[styles.detailValue, { color: colors.text.primary }]} numberOfLines={2}>
-              {item.notes}
-            </Text>
-          </View>
-        )}
+      )}
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.editButton,
+            {
+              backgroundColor: colors.background.tertiary,
+              opacity: !isOnline ? 0.5 : 1,
+            },
+          ]}
+          onPress={() => openEditModal(item)}
+          activeOpacity={0.6}
+          disabled={!isOnline}>
+          <Edit2 size={18} color={colors.primary[600]} strokeWidth={2} />
+          <Text style={[styles.actionButtonText, { color: colors.primary[600] }]}>
+            Edit
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.deleteButton,
+            {
+              backgroundColor: colors.background.tertiary,
+              opacity: !isOnline ? 0.5 : 1,
+            },
+          ]}
+          onPress={() => handleDelete(item)}
+          activeOpacity={0.6}
+          disabled={!isOnline}>
+          <Trash2 size={18} color={colors.danger[500]} strokeWidth={2} />
+          <Text style={[styles.actionButtonText, { color: colors.danger[500] }]}>
+            Delete
+          </Text>
+        </TouchableOpacity>
       </View>
     </Card>
   );
@@ -383,118 +400,88 @@ export default function ManageStaffScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={['top', 'bottom']}>
+      {/* Modern Header */}
       <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
         <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-          <ChevronLeft size={24} color={colors.text.primary} />
+          <ChevronLeft size={24} color={colors.text.primary} strokeWidth={2.5} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Manage Staff</Text>
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Staff Members</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.text.secondary }]}>
+            {staffList.length} {staffList.length === 1 ? 'member' : 'members'}
+          </Text>
+        </View>
         <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary[500], opacity: subscription && hasReachedStaffLimit ? 0.5 : 1 }]}
+          style={[
+            styles.addHeaderButton,
+            {
+              backgroundColor: colors.primary[50],
+              opacity: subscription && hasReachedStaffLimit ? 0.5 : 1,
+            },
+          ]}
           onPress={openAddModal}
           disabled={!!(subscription && hasReachedStaffLimit)}
           activeOpacity={0.8}>
-          <Plus size={20} color={colors.white} />
+          <Plus size={20} color={colors.primary[600]} strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
 
       {/* Quota Banner */}
       {subscription && (
-        <View style={[styles.quotaContainer, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
-          <View style={styles.quotaRow}>
+        <View style={[styles.quotaBanner, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
+          <View style={styles.quotaContent}>
             <View style={styles.quotaInfo}>
-              <Text style={[styles.quotaLabel, { color: colors.text.secondary }]}>Staff Members</Text>
-              <View style={styles.quotaBar}>
-                <View
-                  style={[
-                    styles.quotaFill,
-                    {
-                      backgroundColor: hasReachedStaffLimit ? colors.danger[500] : colors.primary[500],
-                      width: `${staffUsagePercent}%`,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.quotaText, { color: colors.text.primary }]}>
-                {hasPlanLimits ? `${staffList.length} / ${staffLimit}` : 'Loading limits...'}
+              <Text style={[styles.quotaLabel, { color: colors.text.secondary }]}>Staff Quota</Text>
+              <Text style={[styles.quotaValue, { color: colors.text.primary }]}>
+                {staffList.length} <Text style={[styles.quotaTotal, { color: colors.text.tertiary }]}>/ {staffLimit}</Text>
               </Text>
             </View>
-            {subscription.plan !== 'premium' && (
-              <TouchableOpacity
-                onPress={() => router.push('/subscription')}
-                style={[styles.upgradeButton, { backgroundColor: colors.background.tertiary }]}
-                activeOpacity={0.7}>
-                <Text style={[styles.upgradeText, { color: colors.primary[500] }]}>Upgrade</Text>
-              </TouchableOpacity>
-            )}
+            <View style={styles.quotaBar}>
+              <View
+                style={[
+                  styles.quotaFill,
+                  {
+                    backgroundColor: hasReachedStaffLimit ? colors.danger[500] : colors.primary[500],
+                    width: `${staffUsagePercent}%`,
+                  },
+                ]}
+              />
+            </View>
           </View>
           {hasReachedStaffLimit && (
-            <View style={[styles.limitWarning, { backgroundColor: colors.background.tertiary, borderLeftColor: colors.danger[500] }]}>
-              <AlertCircle size={16} color={colors.danger[500]} />
-              <Text style={[styles.limitWarningText, { color: colors.danger[500] }]}>
-                You've reached your staff limit. Upgrade to add more.
+            <View style={[styles.quotaWarning, { backgroundColor: colors.danger[50] }]}>
+              <AlertCircle size={16} color={colors.danger[600]} />
+              <Text style={[styles.quotaWarningText, { color: colors.danger[600] }]}>
+                Quota limit reached. Upgrade to add more staff.
               </Text>
+              <TouchableOpacity
+                onPress={() => router.push('/subscription')}
+                activeOpacity={0.7}>
+                <Text style={[styles.upgradeLink, { color: colors.danger[600] }]}>Upgrade →</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
       )}
 
-      {/* Filters */}
-      <View style={[styles.filterContainer, { backgroundColor: colors.background.secondary }]}>
-        <TextInput
+      {/* Search Section */}
+      <View style={[styles.searchSection, { backgroundColor: colors.background.primary }]}>
+        <View
           style={[
-            styles.searchInput,
+            styles.searchInputContainer,
             {
               backgroundColor: colors.background.secondary,
-              color: colors.text.primary,
               borderColor: colors.border.light,
             },
-          ]}
-          placeholder="Search by name or mobile..."
-          placeholderTextColor={colors.text.tertiary}
-          value={search}
-          onChangeText={setSearch}
-        />
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          <TouchableOpacity
-            style={[
-              styles.filterChip,
-              {
-                backgroundColor: selectedRole === null ? colors.primary[500] : colors.background.secondary,
-                borderColor: selectedRole === null ? colors.primary[500] : colors.border.light,
-              },
-            ]}
-            onPress={() => setSelectedRole(null)}>
-            <Text
-              style={[
-                styles.filterChipText,
-                { color: selectedRole === null ? colors.white : colors.text.secondary },
-              ]}>
-              All Roles
-            </Text>
-          </TouchableOpacity>
-
-          {STAFF_ROLES.map((role) => (
-            <TouchableOpacity
-              key={role.value}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: selectedRole === role.value ? colors.primary[500] : colors.background.secondary,
-                  borderColor: selectedRole === role.value ? colors.primary[500] : colors.border.light,
-                },
-              ]}
-              onPress={() => setSelectedRole(selectedRole === role.value ? null : role.value)}>
-              <Text
-                style={[
-                  styles.filterChipText,
-                  { color: selectedRole === role.value ? colors.white : colors.text.secondary },
-                ]}>
-                {role.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+          ]}>
+          <TextInput
+            style={[styles.searchInput, { color: colors.text.primary }]}
+            placeholder="Search by name or mobile..."
+            placeholderTextColor={colors.text.tertiary}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
       </View>
 
       {/* Staff List */}
@@ -514,7 +501,7 @@ export default function ManageStaffScreen() {
         </ScrollView>
       ) : (
         <FlatList
-          data={staffList}
+          data={getFilteredStaff()}
           renderItem={({ item }) => <StaffCard item={item} />}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
@@ -543,265 +530,311 @@ export default function ManageStaffScreen() {
               <X size={24} color={colors.text.primary} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-              {editingStaff ? 'Edit Staff' : 'Add Staff Member'}
+              {editingStaff ? 'Edit Staff' : 'Add Staff'}
             </Text>
             <View style={styles.placeholder} />
           </View>
 
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.formContainer}>
+            style={styles.keyboardView}>
             <ScrollView
-              contentContainerStyle={styles.formScroll}
+              contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled">
-              {formError && (
-                <View style={[styles.errorBox, { backgroundColor: colors.background.tertiary, borderColor: colors.danger[200] }]}>
-                  <Text style={[styles.errorText, { color: colors.danger[500] }]}>{formError}</Text>
+              <View style={styles.logoContainer}>
+                <View style={[styles.logoCircle, { backgroundColor: colors.background.tertiary }]}>
+                  <Users size={48} color={colors.primary[500]} />
                 </View>
-              )}
-
-              {/* Name */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Staff Name *</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.background.secondary,
-                      color: colors.text.primary,
-                      borderColor: colors.border.light,
-                    },
-                  ]}
-                  placeholder="Enter staff name"
-                  placeholderTextColor={colors.text.tertiary}
-                  value={formData.name}
-                  onChangeText={(text) => setFormData({ ...formData, name: text })}
-                />
+                <Text style={[styles.title, { color: colors.text.primary }]}>{editingStaff ? 'Edit Staff Member' : 'Add New Staff'}</Text>
+                <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+                  Fill in staff member details
+                </Text>
               </View>
 
-              {/* Role */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Role *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {STAFF_ROLES.map((role) => (
-                    <TouchableOpacity
-                      key={role.value}
-                      style={[
-                        styles.roleOption,
-                        {
-                          backgroundColor: formData.role === role.value ? colors.primary[500] : colors.background.secondary,
-                          borderColor: colors.border.light,
-                        },
-                      ]}
-                      onPress={() => setFormData({ ...formData, role: role.value })}
-                      activeOpacity={0.8}>
-                      <Text
-                        style={[
-                          styles.roleOptionText,
-                          { color: formData.role === role.value ? colors.white : colors.text.secondary },
-                        ]}>
-                        {role.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Mobile Number */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Mobile Number *</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.background.secondary,
-                      color: colors.text.primary,
-                      borderColor: colors.border.light,
-                    },
-                  ]}
-                  placeholder="Enter 10-digit mobile number"
-                  placeholderTextColor={colors.text.tertiary}
-                  keyboardType="phone-pad"
-                  value={formData.mobileNumber}
-                  onChangeText={(text) => setFormData({ ...formData, mobileNumber: text })}
-                  maxLength={10}
-                />
-              </View>
-
-              {/* Address */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Address *</Text>
-                <TextInput
-                  style={[
-                    styles.textarea,
-                    {
-                      backgroundColor: colors.background.secondary,
-                      color: colors.text.primary,
-                      borderColor: colors.border.light,
-                    },
-                  ]}
-                  placeholder="Enter residential address"
-                  placeholderTextColor={colors.text.tertiary}
-                  multiline={true}
-                  numberOfLines={3}
-                  value={formData.address}
-                  onChangeText={(text) => setFormData({ ...formData, address: text })}
-                />
-              </View>
-
-              {/* Status */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Status</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {STAFF_STATUS.map((status) => (
-                    <TouchableOpacity
-                      key={status.value}
-                      style={[
-                        styles.roleOption,
-                        {
-                          backgroundColor: formData.status === status.value ? colors.primary[500] : colors.background.secondary,
-                          borderColor: colors.border.light,
-                        },
-                      ]}
-                      onPress={() => setFormData({ ...formData, status: status.value })}
-                      activeOpacity={0.8}>
-                      <Text
-                        style={[
-                          styles.roleOptionText,
-                          { color: formData.status === status.value ? colors.white : colors.text.secondary },
-                        ]}>
-                        {status.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Joining Date */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Joining Date</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.background.secondary,
-                      color: colors.text.primary,
-                      borderColor: colors.border.light,
-                    },
-                  ]}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.text.tertiary}
-                  value={formData.joiningDate}
-                  onChangeText={(text) => setFormData({ ...formData, joiningDate: text })}
-                />
-              </View>
-
-              {/* Salary */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Salary (Optional)</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.background.secondary,
-                      color: colors.text.primary,
-                      borderColor: colors.border.light,
-                    },
-                  ]}
-                  placeholder="Enter monthly salary"
-                  placeholderTextColor={colors.text.tertiary}
-                  keyboardType="decimal-pad"
-                  value={formData.salary}
-                  onChangeText={(text) => setFormData({ ...formData, salary: text })}
-                />
-              </View>
-
-              {/* Emergency Contact */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Emergency Contact Name</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.background.secondary,
-                      color: colors.text.primary,
-                      borderColor: colors.border.light,
-                    },
-                  ]}
-                  placeholder="Enter emergency contact name"
-                  placeholderTextColor={colors.text.tertiary}
-                  value={formData.emergencyContact}
-                  onChangeText={(text) => setFormData({ ...formData, emergencyContact: text })}
-                />
-              </View>
-
-              {/* Emergency Contact Number */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Emergency Contact Number</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.background.secondary,
-                      color: colors.text.primary,
-                      borderColor: colors.border.light,
-                    },
-                  ]}
-                  placeholder="Enter emergency contact mobile"
-                  placeholderTextColor={colors.text.tertiary}
-                  keyboardType="phone-pad"
-                  value={formData.emergencyContactNumber}
-                  onChangeText={(text) => setFormData({ ...formData, emergencyContactNumber: text })}
-                  maxLength={10}
-                />
-              </View>
-
-              {/* Notes */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text.primary }]}>Notes</Text>
-                <TextInput
-                  style={[
-                    styles.textarea,
-                    {
-                      backgroundColor: colors.background.secondary,
-                      color: colors.text.primary,
-                      borderColor: colors.border.light,
-                    },
-                  ]}
-                  placeholder="Add any additional notes"
-                  placeholderTextColor={colors.text.tertiary}
-                  multiline={true}
-                  numberOfLines={3}
-                  value={formData.notes}
-                  onChangeText={(text) => setFormData({ ...formData, notes: text })}
-                />
-              </View>
-
-              {!isOnline && (
-                <View style={[styles.offlineWarning, { backgroundColor: colors.background.tertiary, borderColor: colors.warning[200] }]}>
-                  <Text style={[styles.offlineWarningText, { color: colors.warning[900] }]}>
-                    📡 Offline - You cannot add or update staff without internet connection
-                  </Text>
-                </View>
-              )}
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={[styles.submitButton, { backgroundColor: colors.primary[500], opacity: !isOnline ? 0.6 : 1 }]}
-                onPress={handleSubmit}
-                disabled={formLoading || !isOnline}
-                activeOpacity={0.8}>
-                {formLoading ? (
-                  <ActivityIndicator color={colors.white} />
-                ) : (
-                  <Text style={[styles.submitButtonText, { color: colors.white }]}>
-                    {!isOnline ? 'Offline' : (editingStaff ? 'Update Staff' : 'Add Staff')}
-                  </Text>
+              <View style={styles.form}>
+                {formError && (
+                  <View style={[styles.errorContainer, { backgroundColor: colors.danger[50], borderColor: colors.danger[200] }]}>
+                    <Text style={[styles.errorText, { color: colors.danger[700] }]}>{formError}</Text>
+                  </View>
                 )}
-              </TouchableOpacity>
+
+                {/* Name */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Staff Name *</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        color: colors.text.primary,
+                        borderColor: colors.border.medium,
+                      },
+                    ]}
+                    placeholder="e.g., John Smith"
+                    placeholderTextColor={colors.text.tertiary}
+                    value={formData.name}
+                    onChangeText={(text) => setFormData({ ...formData, name: text })}
+                    editable={!formLoading}
+                    autoFocus
+                  />
+                </View>
+
+                {/* Mobile Number */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Mobile Number *</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        color: colors.text.primary,
+                        borderColor: colors.border.medium,
+                      },
+                    ]}
+                    placeholder="e.g., 9876543210"
+                    placeholderTextColor={colors.text.tertiary}
+                    keyboardType="phone-pad"
+                    value={formData.mobileNumber}
+                    onChangeText={(text) => setFormData({ ...formData, mobileNumber: text })}
+                    maxLength={10}
+                    editable={!formLoading}
+                  />
+                </View>
+
+                {/* Address */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Address *</Text>
+                  <TextInput
+                    style={[
+                      styles.textarea,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        color: colors.text.primary,
+                        borderColor: colors.border.medium,
+                      },
+                    ]}
+                    placeholder="Enter residential address"
+                    placeholderTextColor={colors.text.tertiary}
+                    multiline={true}
+                    numberOfLines={3}
+                    value={formData.address}
+                    onChangeText={(text) => setFormData({ ...formData, address: text })}
+                    editable={!formLoading}
+                  />
+                </View>
+
+                {/* Joining Date */}
+                <DatePicker
+                  value={formData.joiningDate}
+                  onChange={(date) => setFormData({ ...formData, joiningDate: date })}
+                  label="Joining Date *"
+                  disabled={formLoading}
+                  required={true}
+                />
+
+                {/* Salary */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Monthly Salary *</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        color: colors.text.primary,
+                        borderColor: colors.border.medium,
+                      },
+                    ]}
+                    placeholder="e.g., 15000"
+                    placeholderTextColor={colors.text.tertiary}
+                    keyboardType="decimal-pad"
+                    value={formData.salary}
+                    onChangeText={(text) => setFormData({ ...formData, salary: text })}
+                    editable={!formLoading}
+                  />
+                </View>
+
+                {/* Role */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Role *</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerButton,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        borderColor: colors.border.medium,
+                      },
+                    ]}
+                    onPress={() => setShowRolePicker(true)}
+                    activeOpacity={0.7}
+                    disabled={formLoading}>
+                    <Text
+                      style={[
+                        styles.pickerButtonText,
+                        {
+                          color: formData.role ? colors.text.primary : colors.text.tertiary,
+                        },
+                      ]}>
+                      {formData.role ? STAFF_ROLES.find(r => r.value === formData.role)?.label : 'Select Role'}
+                    </Text>
+                    <ChevronDown size={20} color={colors.text.tertiary} />
+                  </TouchableOpacity>
+                </View>
+
+                {!isOnline && (
+                  <View style={[styles.offlineWarning, { backgroundColor: colors.warning[50], borderColor: colors.warning[200] }]}>
+                    <Text style={[styles.offlineWarningText, { color: colors.warning[900] }]}>
+                      📡 Offline - You cannot add or update staff without internet connection
+                    </Text>
+                  </View>
+                )}
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    {
+                      backgroundColor: colors.primary[500],
+                      opacity: formLoading || !isOnline ? 0.6 : 1,
+                    },
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={formLoading || !isOnline}
+                  activeOpacity={0.8}>
+                  {formLoading ? (
+                    <ActivityIndicator color={colors.white} size="small" />
+                  ) : (
+                    <Text style={[styles.submitButtonText, { color: colors.white }]}>
+                      {!isOnline ? 'Offline' : editingStaff ? 'Update Staff' : 'Add Staff'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
+      </Modal>
+
+      {/* Role Picker Modal */}
+      <Modal
+        visible={showRolePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRolePicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+                Select Role
+              </Text>
+            </View>
+
+            <ScrollView style={styles.modalScrollView}>
+              {STAFF_ROLES.map((role) => (
+                <TouchableOpacity
+                  key={role.value}
+                  style={[
+                    styles.modalOption,
+                    { borderBottomColor: colors.border.light },
+                  ]}
+                  onPress={() => {
+                    setFormData({ ...formData, role: role.value });
+                    setShowRolePicker(false);
+                  }}
+                  activeOpacity={0.7}>
+                  <Text
+                    style={[
+                      styles.modalOptionText,
+                      {
+                        color:
+                          formData.role === role.value
+                            ? colors.primary[500]
+                            : colors.text.primary,
+                        fontWeight:
+                          formData.role === role.value
+                            ? typography.fontWeight.semibold
+                            : typography.fontWeight.regular,
+                      },
+                    ]}>
+                    {role.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.modalCloseButton, { borderTopColor: colors.border.light }]}
+              onPress={() => setShowRolePicker(false)}
+              activeOpacity={0.7}>
+              <Text style={[styles.modalCloseButtonText, { color: colors.text.secondary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal visible={showDeleteConfirm} transparent animationType="fade">
+        <View style={[styles.overlay, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
+          <View style={[styles.deleteModal, { backgroundColor: colors.background.secondary }]}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => {
+                setShowDeleteConfirm(false);
+                setStaffToDelete(null);
+              }}>
+              <X size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+
+            <View style={[styles.deleteIconContainer, { backgroundColor: colors.background.tertiary }]}>
+              <AlertCircle size={48} color={colors.danger[500]} />
+            </View>
+
+            <Text style={[styles.deleteTitle, { color: colors.text.primary }]}>
+              Remove Staff?
+            </Text>
+
+            <Text style={[styles.deleteDescription, { color: colors.text.secondary }]}>
+              Are you sure you want to remove {staffToDelete?.name}? This action cannot be undone.
+            </Text>
+
+            <View style={styles.deleteButtonContainer}>
+              <TouchableOpacity
+                style={[styles.cancelButton, { borderColor: colors.border.light }]}
+                onPress={() => {
+                  setShowDeleteConfirm(false);
+                  setStaffToDelete(null);
+                }}
+                disabled={deleting}>
+                <Text style={[styles.cancelButtonText, { color: colors.text.primary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.deleteButtonConfirm,
+                  {
+                    backgroundColor: colors.danger[500],
+                    opacity: deleting ? 0.6 : 1,
+                  },
+                ]}
+                onPress={handleConfirmDelete}
+                disabled={deleting}>
+                {deleting ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <>
+                    <Trash2 size={18} color={colors.white} strokeWidth={2} />
+                    <Text style={[styles.deleteButtonText, { color: colors.white }]}>
+                      Remove Staff
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       <UpgradeModal
@@ -809,7 +842,7 @@ export default function ManageStaffScreen() {
         onClose={() => setShowUpgradeModal(false)}
         onSelectPlan={() => {
           setShowUpgradeModal(false);
-          loadStaff();
+          loadAllStaff();
         }}
       />
     </SafeAreaView>
@@ -822,52 +855,93 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
+    gap: spacing.md,
+  },
+  headerContent: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  headerSubtitle: {
+    fontSize: typography.fontSize.sm,
+    marginTop: spacing.xs,
+  },
+  addHeaderButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  placeholder: {
-    width: 40,
-  },
-  filterContainer: {
+  quotaBanner: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
   },
-  searchInput: {
+  quotaContent: {
+    marginBottom: spacing.md,
+  },
+  quotaInfo: {
+    marginBottom: spacing.md,
+  },
+  quotaLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.xs,
+  },
+  quotaValue: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+  },
+  quotaTotal: {
+    fontSize: typography.fontSize.md,
+  },
+  quotaBar: {
+    height: 6,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    overflow: 'hidden',
+    marginTop: spacing.sm,
+  },
+  quotaFill: {
+    height: '100%',
+    borderRadius: radius.full,
+  },
+  quotaWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    gap: spacing.sm,
+  },
+  quotaWarningText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    flex: 1,
+  },
+  upgradeLink: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
+  searchSection: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  searchInputContainer: {
     borderWidth: 1,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.md,
+  },
+  searchInput: {
     fontSize: typography.fontSize.md,
-  },
-  filterScroll: {
-    marginTop: spacing.sm,
-  },
-  filterChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
-    marginRight: spacing.md,
-    borderWidth: 1,
-  },
-  filterChipText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    paddingVertical: spacing.md,
   },
   scrollView: {
     flex: 1,
@@ -887,125 +961,274 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     paddingBottom: spacing.xl,
+    gap: spacing.md,
   },
   staffCard: {
     overflow: 'hidden',
+    marginBottom: 0,
   },
-  staffHeader: {
+  cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
-  staffInfo: {
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerInfo: {
     flex: 1,
-    marginRight: spacing.md,
   },
   staffName: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     marginBottom: spacing.xs,
   },
-  staffNameRow: {
+  staffRole: {
+    fontSize: typography.fontSize.sm,
+  },
+  detailsGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  detailItem: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  detailLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs,
+    textTransform: 'uppercase',
+  },
+  detailValue: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  detailDivider: {
+    width: 1,
+    height: 40,
+    marginHorizontal: spacing.md,
+  },
+  addressSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  addressText: {
+    fontSize: typography.fontSize.sm,
+    flex: 1,
+    lineHeight: 18,
+  },
+  dateSection: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  staffActionIcons: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginLeft: 'auto',
-  },
-  staffIconButton: {
-    padding: spacing.xs,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  staffRole: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    textTransform: 'capitalize',
-  },
-  statusBadge: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-  },
-  statusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-    textTransform: 'capitalize',
-  },
-  divider: {
-    height: 1,
-    marginHorizontal: spacing.lg,
-  },
-  staffDetails: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     marginBottom: spacing.md,
   },
-  detailLabel: {
+  dateText: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    flex: 0.35,
   },
-  detailValue: {
-    fontSize: typography.fontSize.sm,
-    flex: 0.65,
-    textAlign: 'right',
-  },
-  actions: {
+  actionButtons: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
     gap: spacing.md,
+    marginTop: spacing.md,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     borderRadius: radius.md,
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
-  actionText: {
+  editButton: {
+    // Styling from parent with dynamic backgroundColor
+  },
+  deleteButton: {
+    // Styling from parent with dynamic backgroundColor
+  },
+  actionButtonText: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semibold,
   },
-  formContainer: {
+  // Modal Styles
+  modalOverlay: {
     flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  formScroll: {
+  modalContainer: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    maxHeight: '70%',
+  },
+  modalHeader: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
-    paddingBottom: spacing.xl,
+    borderBottomWidth: 1,
   },
-  errorBox: {
+  modalTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+  },
+  modalScrollView: {
+    paddingVertical: spacing.lg,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
+  modalOptionText: {
+    fontSize: typography.fontSize.md,
+  },
+  modalCloseButton: {
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    alignItems: 'center',
+  },
+  modalCloseButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  // Delete Confirmation Modal
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  deleteModal: {
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+    ...shadows.lg,
+    maxHeight: '90%',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    padding: spacing.sm,
+  },
+  deleteIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  deleteTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  deleteDescription: {
+    fontSize: typography.fontSize.md,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  deleteButtonContainer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  cancelButton: {
+    flex: 1,
     borderWidth: 1,
     borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  deleteButtonConfirm: {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  deleteButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  // Form Modal Styles
+  placeholder: {
+    width: 44,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.xxxl,
+  },
+  logoCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xl,
+  },
+  title: {
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
+  },
+  subtitle: {
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+  },
+  form: {
+    width: '100%',
+  },
+  errorContainer: {
+    borderRadius: radius.md,
     padding: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
   },
   errorText: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semibold,
   },
-  formGroup: {
+  inputContainer: {
     marginBottom: spacing.lg,
   },
   label: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing.sm,
   },
   input: {
@@ -1021,30 +1244,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     fontSize: typography.fontSize.md,
+    minHeight: 100,
     textAlignVertical: 'top',
   },
-  roleOption: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    marginRight: spacing.md,
+  pickerButton: {
     borderWidth: 1,
-    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  roleOptionText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+  pickerButtonText: {
+    fontSize: typography.fontSize.md,
   },
   submitButton: {
-    paddingVertical: spacing.md,
     borderRadius: radius.md,
-    justifyContent: 'center',
+    paddingVertical: spacing.lg,
     alignItems: 'center',
-    marginTop: spacing.lg,
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    ...shadows.lg,
   },
   submitButtonText: {
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semibold,
   },
   offlineWarning: {
     borderRadius: radius.md,
@@ -1056,63 +1281,5 @@ const styles = StyleSheet.create({
   offlineWarningText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
-  },
-  quotaContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-  },
-  quotaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  quotaInfo: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  quotaLabel: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.sm,
-  },
-  quotaBar: {
-    height: 8,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: radius.full,
-    overflow: 'hidden',
-    marginBottom: spacing.sm,
-  },
-  quotaFill: {
-    height: '100%',
-    borderRadius: radius.full,
-  },
-  quotaText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium,
-  },
-  upgradeButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-  },
-  upgradeText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-  },
-  limitWarning: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-    borderLeftWidth: 4,
-    gap: spacing.md,
-  },
-  limitWarningText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    flex: 1,
   },
 });

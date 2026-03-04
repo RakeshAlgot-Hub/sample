@@ -13,7 +13,6 @@ async def get_staff(
     property_id: str = None,
     search: str = None,
     role: str = None,
-    status: str = None,
     page: int = 1,
     page_size: int = 50,
 ):
@@ -26,7 +25,6 @@ async def get_staff(
         property_id=property_id,
         search=search,
         role=role,
-        status=status,
         skip=skip,
         limit=page_size,
     )

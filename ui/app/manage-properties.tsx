@@ -193,8 +193,8 @@ export default function ManagePropertiesScreen() {
                 } as any}>
                 {/* Card Header with Icon and Badge */}
                 <View style={styles.cardHeader}>
-                  <View style={[styles.iconContainer, { backgroundColor: colors.primary[50] }]}>
-                    <Building2 size={24} color={colors.primary[600]} strokeWidth={1.5} />
+                  <View style={[styles.iconContainer, { backgroundColor: colors.background.tertiary }]}>
+                    <Building2 size={24} color={colors.primary[400]} strokeWidth={1.5} />
                   </View>
                   <View style={styles.headerInfo}>
                     <Text style={[styles.propertyName, { color: colors.text.primary }]} numberOfLines={1}>
@@ -265,7 +265,7 @@ export default function ManagePropertiesScreen() {
                         styles.actionButton,
                         styles.editButton,
                         {
-                          backgroundColor: colors.primary[50],
+                          backgroundColor: colors.background.tertiary,
                           opacity: !isOnline ? 0.5 : 1,
                         },
                       ]}

@@ -13,7 +13,6 @@ class StaffService:
         property_id: str = None,
         search: str = None,
         role: str = None,
-        status: str = None,
         skip: int = 0,
         limit: int = 50,
     ):
@@ -32,9 +31,6 @@ class StaffService:
         
         if role:
             query["role"] = role
-        
-        if status:
-            query["status"] = status
 
         # Filter out archived by default
         query["archived"] = False

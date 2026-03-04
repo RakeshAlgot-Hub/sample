@@ -72,12 +72,8 @@ class StaffCreate(BaseModel):
     role: StaffRole
     mobileNumber: str
     address: str
-    status: StaffStatus = StaffStatus.ACTIVE
-    joiningDate: Optional[str] = None
-    salary: Optional[float] = None
-    emergencyContact: Optional[str] = None
-    emergencyContactNumber: Optional[str] = None
-    notes: Optional[str] = None
+    joiningDate: str
+    salary: float
 
 
 class StaffUpdate(BaseModel):
@@ -86,9 +82,5 @@ class StaffUpdate(BaseModel):
     role: Optional[StaffRole] = None
     mobileNumber: Optional[str] = None
     address: Optional[str] = None
-    status: Optional[StaffStatus] = None
     joiningDate: Optional[str] = None
     salary: Optional[float] = None
-    emergencyContact: Optional[str] = None
-    emergencyContactNumber: Optional[str] = None
-    notes: Optional[str] = None
