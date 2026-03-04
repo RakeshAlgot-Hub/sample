@@ -10,18 +10,18 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
-  Alert,
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Wallet, ChevronLeft, ChevronDown, Calendar, AlertTriangle } from 'lucide-react-native';
+import { Wallet, ChevronLeft, ChevronDown, AlertTriangle } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { paymentService } from '@/services/apiClient';
 import type { Payment } from '@/services/apiTypes';
 import ApiErrorCard from '@/components/ApiErrorCard';
+import DatePicker from '@/components/DatePicker';
 import { cacheKeys, clearScreenCache, getScreenCache, setScreenCache } from '@/services/screenCache';
 
 const PAYMENT_STATUSES = [
@@ -165,8 +165,8 @@ export default function EditPaymentScreen() {
       return;
     }
 
-    if (!amount || !status || !method) {
-      setError('Amount, status, and payment method are required');
+    if (!amount || !status || (status === 'paid' && !method)) {
+      setError(status === 'paid' ? 'Amount, status, and payment method are required' : 'Amount and status are required');
       return;
     }
 
@@ -193,9 +193,12 @@ export default function EditPaymentScreen() {
 
       const updateData: any = {
         status,
-        method,
         amount: `₹${amountNum.toLocaleString()}`,
       };
+
+      if (status === 'paid') {
+        updateData.method = method;
+      }
 
       // Only include date if editing is enabled
       if (status === 'paid' && enablePaidDateEdit && paidDate) {
@@ -222,7 +225,8 @@ export default function EditPaymentScreen() {
   };
 
   const isFormValid = () => {
-    if (!status || !selectedPaymentId || !amount || !method) return false;
+    if (!status || !selectedPaymentId || !amount) return false;
+    if (status === 'paid' && !method) return false;
     
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) return false;
@@ -326,31 +330,33 @@ export default function EditPaymentScreen() {
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Payment Method *</Text>
-              <TouchableOpacity
-                style={[
-                  styles.pickerButton,
-                  {
-                    backgroundColor: colors.background.secondary,
-                    borderColor: colors.border.medium,
-                  },
-                ]}
-                onPress={() => setShowMethodPicker(true)}
-                activeOpacity={0.7}
-                disabled={loading}>
-                <Text
+            {status === 'paid' && (
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Payment Method *</Text>
+                <TouchableOpacity
                   style={[
-                    styles.pickerButtonText,
+                    styles.pickerButton,
                     {
-                      color: method ? colors.text.primary : colors.text.tertiary,
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.medium,
                     },
-                  ]}>
-                  {method || 'Select Method'}
-                </Text>
-                <ChevronDown size={20} color={colors.text.tertiary} />
-              </TouchableOpacity>
-            </View>
+                  ]}
+                  onPress={() => setShowMethodPicker(true)}
+                  activeOpacity={0.7}
+                  disabled={loading}>
+                  <Text
+                    style={[
+                      styles.pickerButtonText,
+                      {
+                        color: method ? colors.text.primary : colors.text.tertiary,
+                      },
+                    ]}>
+                    {method || 'Select Method'}
+                  </Text>
+                  <ChevronDown size={20} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              </View>
+            )}
 
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.text.primary }]}>Status *</Text>
@@ -397,24 +403,13 @@ export default function EditPaymentScreen() {
                 </View>
                 {enablePaidDateEdit && (
                   <View style={[styles.inputContainer, { marginTop: spacing.sm, marginBottom: 0 }]}>
-                    <View style={styles.dateInputContainer}>
-                      <Calendar size={20} color={colors.text.tertiary} style={styles.dateIcon} />
-                      <TextInput
-                        style={[
-                          styles.dateInput,
-                          {
-                            backgroundColor: colors.background.secondary,
-                            color: colors.text.primary,
-                            borderColor: colors.border.medium,
-                          },
-                        ]}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor={colors.text.tertiary}
-                        value={paidDate}
-                        onChangeText={setPaidDate}
-                        editable={!loading}
-                      />
-                    </View>
+                    <DatePicker
+                      value={paidDate}
+                      onChange={setPaidDate}
+                      label="Paid Date"
+                      disabled={loading}
+                      required
+                    />
                   </View>
                 )}
               </View>
@@ -439,24 +434,13 @@ export default function EditPaymentScreen() {
                 </View>
                 {enableDueDateEdit && (
                   <View style={[styles.inputContainer, { marginTop: spacing.sm, marginBottom: 0 }]}>
-                    <View style={styles.dateInputContainer}>
-                      <Calendar size={20} color={colors.text.tertiary} style={styles.dateIcon} />
-                      <TextInput
-                        style={[
-                          styles.dateInput,
-                          {
-                            backgroundColor: colors.background.secondary,
-                            color: colors.text.primary,
-                            borderColor: colors.border.medium,
-                          },
-                        ]}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor={colors.text.tertiary}
-                        value={dueDate}
-                        onChangeText={setDueDate}
-                        editable={!loading}
-                      />
-                    </View>
+                    <DatePicker
+                      value={dueDate}
+                      onChange={setDueDate}
+                      label="Due Date"
+                      disabled={loading}
+                      required
+                    />
                   </View>
                 )}
               </View>
@@ -759,23 +743,6 @@ const styles = StyleSheet.create({
   toggleHint: {
     fontSize: typography.fontSize.xs,
     marginTop: spacing.xs,
-  },
-  dateInputContainer: {
-    position: 'relative',
-  },
-  dateIcon: {
-    position: 'absolute',
-    left: spacing.lg,
-    top: spacing.md,
-    zIndex: 1,
-  },
-  dateInput: {
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    paddingLeft: 48,
-    fontSize: typography.fontSize.md,
-    borderWidth: 1,
   },
   submitButton: {
     borderRadius: radius.md,

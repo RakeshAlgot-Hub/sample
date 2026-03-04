@@ -645,7 +645,7 @@ export default function TenantDetailScreen() {
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text.primary }]}> 
                   Payment History
                 </Text>
                 {latestPayment && latestPayment.status === 'due' ? (
@@ -654,7 +654,7 @@ export default function TenantDetailScreen() {
                     onPress={handleMarkAsPaid}
                     activeOpacity={0.7}>
                     <CheckCircle size={16} color={colors.white} />
-                    <Text style={[styles.actionButtonText, { color: colors.white }]}>
+                    <Text style={[styles.actionButtonText, { color: colors.white }]}> 
                       Mark as Paid
                     </Text>
                   </TouchableOpacity>
@@ -664,21 +664,11 @@ export default function TenantDetailScreen() {
                     onPress={handleGenerateDue}
                     activeOpacity={0.7}>
                     <Plus size={16} color={colors.white} />
-                    <Text style={[styles.actionButtonText, { color: colors.white }]}>
+                    <Text style={[styles.actionButtonText, { color: colors.white }]}> 
                       Generate Due
                     </Text>
                   </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: colors.warning[500] }]}
-                    onPress={handleMarkAsPaid}
-                    activeOpacity={0.7}>
-                    <Edit size={16} color={colors.white} />
-                    <Text style={[styles.actionButtonText, { color: colors.white }]}>
-                      Edit Overdue
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                ) : null}
               </View>
 
               {payments.length === 0 ? (

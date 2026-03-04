@@ -64,6 +64,8 @@ async def create_room(request: Request, room: Room):
         return {"data": created.model_dump()}
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error creating room. Please try again.")
 
@@ -81,6 +83,8 @@ async def patch_room(request: Request, room_id: str, room: Room):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error updating room. Please try again.")
 

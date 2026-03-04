@@ -659,14 +659,24 @@ export const roomService = {
   },
 
   async createRoom(data: Partial<Room>): Promise<ApiResponse<Room>> {
-    return await request<Room>('POST', '/rooms', data, true) as ApiResponse<Room>;
+    const response = await request<Room>('POST', '/rooms', data, true) as ApiResponse<Room>;
+    if (data.propertyId) {
+      const propertyId = encodeURIComponent(data.propertyId);
+      await dataCache.remove(`api:/beds/available-by-property?property_id=${propertyId}`);
+    }
+    return response;
   },
 
   async updateRoom(
     id: string,
     data: Partial<Room>
   ): Promise<ApiResponse<Room>> {
-    return await request<Room>('PATCH', `/rooms/${id}`, data, true) as ApiResponse<Room>;
+    const response = await request<Room>('PATCH', `/rooms/${id}`, data, true) as ApiResponse<Room>;
+    if (data.propertyId) {
+      const propertyId = encodeURIComponent(data.propertyId);
+      await dataCache.remove(`api:/beds/available-by-property?property_id=${propertyId}`);
+    }
+    return response;
   },
 
   async deleteRoom(id: string): Promise<ApiResponse<{ success: boolean }>> {
@@ -703,14 +713,24 @@ export const bedService = {
   },
 
   async createBed(data: Partial<Bed>): Promise<ApiResponse<Bed>> {
-    return await request<Bed>('POST', '/beds', data, true) as ApiResponse<Bed>;
+    const response = await request<Bed>('POST', '/beds', data, true) as ApiResponse<Bed>;
+    if (data.propertyId) {
+      const propertyId = encodeURIComponent(data.propertyId);
+      await dataCache.remove(`api:/beds/available-by-property?property_id=${propertyId}`);
+    }
+    return response;
   },
 
   async updateBed(
     id: string,
     data: Partial<Bed>
   ): Promise<ApiResponse<Bed>> {
-    return await request<Bed>('PATCH', `/beds/${id}`, data, true) as ApiResponse<Bed>;
+    const response = await request<Bed>('PATCH', `/beds/${id}`, data, true) as ApiResponse<Bed>;
+    if (data.propertyId) {
+      const propertyId = encodeURIComponent(data.propertyId);
+      await dataCache.remove(`api:/beds/available-by-property?property_id=${propertyId}`);
+    }
+    return response;
   },
 
   async deleteBed(id: string): Promise<ApiResponse<{ success: boolean }>> {

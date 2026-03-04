@@ -30,6 +30,7 @@ const PAYMENT_STATUSES = [
   { value: 'paid', label: 'Paid' },
   { value: 'due', label: 'Due' },
 ];
+const PAYMENT_METHODS = ['Cash', 'Online', 'Bank Transfer', 'UPI', 'Cheque'];
 
 interface TenantWithLatestPayment extends Tenant {
   latestPayment?: Payment;
@@ -52,6 +53,7 @@ export default function AddPaymentScreen() {
   const [propertyId] = useState(typeof params.propertyId === 'string' ? params.propertyId : selectedPropertyId);
   const [amount, setAmount] = useState(params.rent || '');
   const [status, setStatus] = useState<'paid' | 'due'>('paid');
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
   function getTodayDay() {
     return new Date().getDate();
   }
@@ -62,6 +64,7 @@ export default function AddPaymentScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showAnchorDayPicker, setShowAnchorDayPicker] = useState(false);
+  const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
@@ -125,6 +128,7 @@ export default function AddPaymentScreen() {
           status,
           billingCycle: 'monthly',
           anchorDay: anchorDay,
+          ...(status === 'paid' ? { method: paymentMethod } : {}),
         };
       }
 
@@ -160,7 +164,8 @@ export default function AddPaymentScreen() {
       !isNaN(parseFloat(rent)) && 
       parseFloat(rent) > 0;
 
-    return baseValid;
+    const isPaymentMethodValid = !autoGeneratePayments || status !== 'paid' || !!paymentMethod;
+    return baseValid && isPaymentMethodValid;
   };
 
   if (!selectedPropertyId) {
@@ -250,6 +255,34 @@ export default function AddPaymentScreen() {
                 <ChevronDown size={20} color={colors.text.tertiary} />
               </TouchableOpacity>
             </View>
+
+            {autoGeneratePayments && status === 'paid' && (
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Payment Method *</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.pickerButton,
+                    {
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.medium,
+                    },
+                  ]}
+                  onPress={() => setShowMethodPicker(true)}
+                  activeOpacity={0.7}
+                  disabled={loading}>
+                  <Text
+                    style={[
+                      styles.pickerButtonText,
+                      {
+                        color: paymentMethod ? colors.text.primary : colors.text.tertiary,
+                      },
+                    ]}>
+                    {paymentMethod || 'Select Payment Method'}
+                  </Text>
+                  <ChevronDown size={20} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Billing Configuration - Only show when auto-generate is ENABLED */}
             {autoGeneratePayments && (
@@ -436,6 +469,52 @@ export default function AddPaymentScreen() {
               <TouchableOpacity
                 style={[styles.modalCloseButton, { borderTopColor: colors.border.light }]}
                 onPress={() => setShowAnchorDayPicker(false)}
+                activeOpacity={0.7}>
+                <Text style={[styles.modalCloseButtonText, { color: colors.text.secondary }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={showMethodPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowMethodPicker(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContainer, { backgroundColor: colors.background.secondary }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: colors.border.light }]}>
+                <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Select Payment Method</Text>
+              </View>
+              <ScrollView style={styles.modalScrollView}>
+                {PAYMENT_METHODS.map((method) => (
+                  <TouchableOpacity
+                    key={method}
+                    style={[styles.modalOption, { borderBottomColor: colors.border.light }]}
+                    onPress={() => {
+                      setPaymentMethod(method);
+                      setShowMethodPicker(false);
+                    }}
+                    activeOpacity={0.7}>
+                    <Text
+                      style={[
+                        styles.modalOptionText,
+                        {
+                          color: paymentMethod === method ? colors.primary[500] : colors.text.primary,
+                          fontWeight:
+                            paymentMethod === method
+                              ? typography.fontWeight.semibold
+                              : typography.fontWeight.regular,
+                        },
+                      ]}>
+                      {method}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity
+                style={[styles.modalCloseButton, { borderTopColor: colors.border.light }]}
+                onPress={() => setShowMethodPicker(false)}
                 activeOpacity={0.7}>
                 <Text style={[styles.modalCloseButtonText, { color: colors.text.secondary }]}>Cancel</Text>
               </TouchableOpacity>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { UserPlus, ChevronLeft, ChevronDown, Calendar } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -53,30 +54,7 @@ export default function AddTenantScreen() {
   const [showBedPicker, setShowBedPicker] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  useEffect(() => {
-    if (selectedPropertyId) {
-      fetchAvailableBeds();
-    }
-  }, [selectedPropertyId]);
-
-  useEffect(() => {
-    if (selectedRoom) {
-      // Find available beds for the selected room
-      const roomData = roomsWithBeds.find(r => r.room.id === selectedRoom.id);
-      if (roomData) {
-        setAvailableBedsForRoom(roomData.availableBeds);
-        setRent(roomData.room.price.toString());
-      } else {
-        setAvailableBedsForRoom([]);
-      }
-      setSelectedBed(null);
-    } else {
-      setAvailableBedsForRoom([]);
-      setSelectedBed(null);
-    }
-  }, [selectedRoom, roomsWithBeds]);
-
-  const fetchAvailableBeds = async () => {
+  const fetchAvailableBeds = useCallback(async () => {
     if (!selectedPropertyId) return;
 
     try {
@@ -94,7 +72,38 @@ export default function AddTenantScreen() {
     } finally {
       setFetchingData(false);
     }
-  };
+  }, [selectedPropertyId]);
+
+  useEffect(() => {
+    if (selectedPropertyId) {
+      fetchAvailableBeds();
+    }
+  }, [selectedPropertyId, fetchAvailableBeds]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (selectedPropertyId) {
+        fetchAvailableBeds();
+      }
+    }, [selectedPropertyId, fetchAvailableBeds])
+  );
+
+  useEffect(() => {
+    if (selectedRoom) {
+      // Find available beds for the selected room
+      const roomData = roomsWithBeds.find(r => r.room.id === selectedRoom.id);
+      if (roomData) {
+        setAvailableBedsForRoom(roomData.availableBeds);
+        setRent(roomData.room.price.toString());
+      } else {
+        setAvailableBedsForRoom([]);
+      }
+      setSelectedBed(null);
+    } else {
+      setAvailableBedsForRoom([]);
+      setSelectedBed(null);
+    }
+  }, [selectedRoom, roomsWithBeds]);
 
   const handleNext = () => {
     if (!name || !phone || !rent || !joinDate || !selectedRoom || !selectedBed) {
@@ -211,7 +220,7 @@ export default function AddTenantScreen() {
             title="No Available Beds"
             subtitle="Create a room with beds first, then you can add tenants."
             actionLabel="Add Room"
-            onActionPress={() => router.push('/manage-properties')}
+            onActionPress={() => router.push('/room-form')}
           />
         </View>
       </SafeAreaView>

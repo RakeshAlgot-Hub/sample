@@ -162,7 +162,7 @@ async def list_payments(
                             }
                         }
                     },
-                    {"$project": {"_id": 1, "name": 1}}
+                    {"$project": {"_id": 1, "name": 1, "roomId": 1}}
                 ]
             }
         },
@@ -212,6 +212,27 @@ async def list_payments(
                 ]
             }
         },
+        # Fallback: resolve room directly from tenant.roomId for older/incomplete payment records
+        {
+            "$lookup": {
+                "from": "rooms",
+                "let": {"tenantRoomId": {"$arrayElemAt": ["$tenant.roomId", 0]}},
+                "as": "tenant_room_info",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$eq": [
+                                    {"$toString": "$_id"},
+                                    {"$toString": "$$tenantRoomId"}
+                                ]
+                            }
+                        }
+                    },
+                    {"$project": {"roomNumber": 1}}
+                ]
+            }
+        },
         # Project final output
         {
             "$project": {
@@ -230,7 +251,12 @@ async def list_payments(
                 "roomNumber": {
                     "$ifNull": [
                         {"$arrayElemAt": ["$bed_info.roomNumber", 0]},
-                        "N/A"
+                        {
+                            "$ifNull": [
+                                {"$arrayElemAt": ["$tenant_room_info.roomNumber", 0]},
+                                "N/A"
+                            ]
+                        }
                     ]
                 }
             }
@@ -263,16 +289,18 @@ async def get_payment(request: Request, payment_id: str):
         raise HTTPException(status_code=404, detail="Payment not found or forbidden")
     
     payment_dict = payment.model_dump()
+    tenant_room_id = None
     
     # Enrich with tenant name
     if payment.tenantId:
         try:
             tenant_doc = await getCollection("tenants").find_one(
                 {"_id": ObjectId(payment.tenantId)},
-                {"name": 1}
+                {"name": 1, "roomId": 1}
             )
             if tenant_doc:
                 payment_dict["tenantName"] = tenant_doc.get("name", "Unknown")
+                tenant_room_id = tenant_doc.get("roomId")
         except Exception:
             # Skip if tenant ID is invalid
             pass
@@ -293,6 +321,18 @@ async def get_payment(request: Request, payment_id: str):
                     payment_dict["roomNumber"] = room_doc.get("roomNumber", "N/A")
         except Exception:
             # Skip if bed ID is invalid (e.g., UUID or non-MongoDB ID)
+            pass
+
+    # Fallback: resolve room number from tenant.roomId if bed-based lookup failed
+    if not payment_dict.get("roomNumber") and tenant_room_id:
+        try:
+            room_doc = await getCollection("rooms").find_one(
+                {"_id": ObjectId(tenant_room_id)},
+                {"roomNumber": 1}
+            )
+            if room_doc:
+                payment_dict["roomNumber"] = room_doc.get("roomNumber", "N/A")
+        except Exception:
             pass
     
     return Payment(**payment_dict)

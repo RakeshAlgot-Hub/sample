@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -27,6 +28,7 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  X,
 } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -65,6 +67,11 @@ export default function PaymentsScreen() {
   // Month navigation state
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Filter state
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'due' | 'overdue'>('all');
+  const [methodFilter, setMethodFilter] = useState<'all' | 'Cash' | 'Online' | 'Bank Transfer' | 'UPI' | 'Cheque'>('all');
 
   // Get month/year display string
   const monthYearString = useMemo(() => {
@@ -229,50 +236,6 @@ export default function PaymentsScreen() {
     router.push('/manual-payment');
   };
 
-  const computeStats = () => {
-    try {
-      const collected = payments
-        .filter((p) => p.status === 'paid')
-        .reduce((sum, p) => {
-          const amount = typeof p.amount === 'string'
-            ? parseFloat(p.amount.replace(/[^0-9]/g, ''))
-            : p.amount;
-          return sum + (isNaN(amount) ? 0 : amount);
-        }, 0);
-
-      const pending = payments
-        .filter((p) => p.status === 'due')
-        .reduce((sum, p) => {
-          const amount = typeof p.amount === 'string'
-            ? parseFloat(p.amount.replace(/[^0-9]/g, ''))
-            : p.amount;
-          return sum + (isNaN(amount) ? 0 : amount);
-        }, 0);
-
-      const overdue = payments
-        .filter((p) => p.status === 'overdue')
-        .reduce((sum, p) => {
-          const amount = typeof p.amount === 'string'
-            ? parseFloat(p.amount.replace(/[^0-9]/g, ''))
-            : p.amount;
-          return sum + (isNaN(amount) ? 0 : amount);
-        }, 0);
-
-      return {
-        collected: `₹${collected.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-        pending: `₹${pending.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-        overdue: `₹${overdue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-      };
-    } catch (error) {
-      console.error('Error computing stats:', error);
-      return {
-        collected: '₹0',
-        pending: '₹0',
-        overdue: '₹0',
-      };
-    }
-  };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'paid':
@@ -284,45 +247,39 @@ export default function PaymentsScreen() {
     }
   };
 
-  const stats = computeStats();
   const isLoadingState = isRefreshing && payments.length === 0;
+
+  // Apply filters
+  const filteredPayments = useMemo(() => {
+    return payments.filter(payment => {
+      // Status filter
+      if (statusFilter !== 'all' && payment.status !== statusFilter) {
+        return false;
+      }
+      // Method filter
+      if (methodFilter !== 'all' && payment.method !== methodFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [payments, statusFilter, methodFilter]);
+
+  const hasActiveFilters = statusFilter !== 'all' || methodFilter !== 'all';
+
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setMethodFilter('all');
+  };
 
   return (
     <ScreenContainer edges={['top']}>
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Payments</Text>
-        <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary[50], borderColor: colors.primary[100] }]} activeOpacity={0.7}>
-          <Filter size={20} color={colors.primary[500]} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={[styles.monthNavigator, { backgroundColor: colors.background.secondary, borderColor: colors.border.light, opacity: selectedProperty && !isLoadingState ? 1 : 0.5 }]}>
-        <TouchableOpacity
-          onPress={handlePreviousMonth}
-          style={[styles.monthNavButton, { backgroundColor: colors.primary[50] }]}
+        <TouchableOpacity 
+          style={[styles.filterButton, { backgroundColor: hasActiveFilters ? colors.primary[500] : colors.primary[50], borderColor: hasActiveFilters ? colors.primary[500] : colors.primary[100] }]} 
           activeOpacity={0.7}
-          disabled={isRefreshing || !selectedProperty || isLoadingState}
-        >
-          <ChevronLeft size={18} color={colors.primary[500]} />
-        </TouchableOpacity>
-        
-        <View style={styles.monthDisplay}>
-          <Calendar size={14} color={colors.primary[500]} />
-          <Text style={[styles.monthYearText, { color: colors.text.primary }]}>
-            {monthYearString}
-          </Text>
-          {isRefreshing && (
-            <ActivityIndicator size="small" color={colors.primary[500]} style={styles.monthLoader} />
-          )}
-        </View>
-
-        <TouchableOpacity
-          onPress={handleNextMonth}
-          style={[styles.monthNavButton, { backgroundColor: colors.primary[50] }]}
-          activeOpacity={0.7}
-          disabled={isRefreshing || !selectedProperty || isLoadingState}
-        >
-          <ChevronRight size={18} color={colors.primary[500]} />
+          onPress={() => setShowFilterModal(true)}>
+          <Filter size={20} color={hasActiveFilters ? colors.white : colors.primary[500]} />
         </TouchableOpacity>
       </View>
 
@@ -338,12 +295,7 @@ export default function PaymentsScreen() {
           />
         }>
         {isLoadingState ? (
-          <>
-            <View style={styles.statsContainer}>
-              <Skeleton height={80} count={3} />
-            </View>
-            <Skeleton height={150} count={2} />
-          </>
+          <Skeleton height={150} count={2} />
         ) : !selectedProperty ? (
           <EmptyState
             icon={Building2}
@@ -362,31 +314,17 @@ export default function PaymentsScreen() {
           />
         ) : (
           <View style={{ opacity: isRefreshing ? 0.5 : 1 }}>
-            <View style={styles.statsContainer}>
-              <Card style={styles.statCard}>
-                <Text style={[styles.statLabel, { color: colors.text.secondary }]}>Collected</Text>
-                <Text style={[styles.statAmount, { color: colors.success[500] }]}>
-                  {stats.collected}
+            {hasActiveFilters && (
+              <View style={[styles.filterSummary, { backgroundColor: colors.primary[50], borderColor: colors.primary[200] }]}>
+                <Text style={[styles.filterSummaryText, { color: colors.primary[700] }]}>
+                  {filteredPayments.length} of {payments.length} payments
                 </Text>
-              </Card>
-              <Card style={styles.statCard}>
-                <Text style={[styles.statLabel, { color: colors.text.secondary }]}>Pending</Text>
-                <Text style={[styles.statAmount, { color: colors.primary[500] }]}>
-                  {stats.pending}
-                </Text>
-              </Card>
-              <Card style={styles.statCard}>
-                <Text style={[styles.statLabel, { color: colors.text.secondary }]}>Overdue</Text>
-                <Text style={[styles.statAmount, { color: colors.danger[500] }]}>
-                  {stats.overdue}
-                </Text>
-              </Card>
-            </View>
-
-            <View style={styles.paymentsSection}>
-              <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>All Payments</Text>
-
-              {payments.map((payment, index) => (
+                <TouchableOpacity onPress={clearFilters} activeOpacity={0.7}>
+                  <Text style={[styles.clearFiltersText, { color: colors.primary[500] }]}>Clear Filters</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {filteredPayments.map((payment, index) => (
                 <TouchableOpacity key={index} activeOpacity={0.7} onPress={() => router.push(`/edit-payment?paymentId=${payment.id}`)}>
                   <Card style={styles.paymentCard}>
                     <View style={styles.paymentHeader}>
@@ -433,11 +371,113 @@ export default function PaymentsScreen() {
                   </Card>
                 </TouchableOpacity>
               ))}
-            </View>
           </View>
         )}
       </ScrollView>
       {selectedProperty && !isLoadingState && <FAB onPress={handleFabPress} />}
+      
+      <Modal
+        visible={showFilterModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFilterModal(false)}>
+        <View style={styles.filterModalOverlay}>
+          <View style={[styles.filterModalContent, { backgroundColor: colors.background.primary }]}>
+            <View style={[styles.filterModalHeader, { borderBottomColor: colors.border.light }]}>
+              <Text style={[styles.filterModalTitle, { color: colors.text.primary }]}>Filter Payments</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)} activeOpacity={0.7}>
+                <X size={24} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.filterModalBody}>
+              {/* Status Filter */}
+              <View style={styles.filterSection}>
+                <Text style={[styles.filterSectionTitle, { color: colors.text.primary }]}>Payment Status</Text>
+                <View style={styles.filterOptions}>
+                  {['all', 'paid', 'due', 'overdue'].map((status) => (
+                    <TouchableOpacity
+                      key={status}
+                      style={[
+                        styles.filterOption,
+                        {
+                          backgroundColor: statusFilter === status ? colors.primary[100] : colors.background.secondary,
+                          borderColor: statusFilter === status ? colors.primary[500] : colors.border.medium,
+                        },
+                      ]}
+                      onPress={() => setStatusFilter(status as any)}
+                      activeOpacity={0.7}>
+                      <Text
+                        style={[
+                          styles.filterOptionText,
+                          {
+                            color: statusFilter === status ? colors.primary[700] : colors.text.primary,
+                            fontWeight: statusFilter === status ? typography.fontWeight.semibold : typography.fontWeight.regular,
+                          },
+                        ]}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </Text>
+                      {statusFilter === status && (
+                        <CheckCircle size={18} color={colors.primary[500]} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Payment Method Filter */}
+              <View style={styles.filterSection}>
+                <Text style={[styles.filterSectionTitle, { color: colors.text.primary }]}>Payment Method</Text>
+                <View style={styles.filterOptions}>
+                  {['all', 'Cash', 'Online', 'Bank Transfer', 'UPI', 'Cheque'].map((method) => (
+                    <TouchableOpacity
+                      key={method}
+                      style={[
+                        styles.filterOption,
+                        {
+                          backgroundColor: methodFilter === method ? colors.primary[100] : colors.background.secondary,
+                          borderColor: methodFilter === method ? colors.primary[500] : colors.border.medium,
+                        },
+                      ]}
+                      onPress={() => setMethodFilter(method as any)}
+                      activeOpacity={0.7}>
+                      <Text
+                        style={[
+                          styles.filterOptionText,
+                          {
+                            color: methodFilter === method ? colors.primary[700] : colors.text.primary,
+                            fontWeight: methodFilter === method ? typography.fontWeight.semibold : typography.fontWeight.regular,
+                          },
+                        ]}>
+                        {method.charAt(0).toUpperCase() + method.slice(1)}
+                      </Text>
+                      {methodFilter === method && (
+                        <CheckCircle size={18} color={colors.primary[500]} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={[styles.filterModalFooter, { borderTopColor: colors.border.light }]}>
+              <TouchableOpacity
+                style={[styles.clearFiltersButton, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium }]}
+                onPress={clearFilters}
+                activeOpacity={0.7}>
+                <Text style={[styles.clearFiltersButtonText, { color: colors.text.primary }]}>Clear All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.applyFiltersButton, { backgroundColor: colors.primary[500] }]}
+                onPress={() => setShowFilterModal(false)}
+                activeOpacity={0.7}>
+                <Text style={[styles.applyFiltersButtonText, { color: colors.white }]}>Apply Filters</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <UpgradeModal
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
@@ -605,5 +645,102 @@ const styles = StyleSheet.create({
   },
   monthLoader: {
     marginLeft: spacing.sm,
+  },
+  filterSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.md,
+  },
+  filterSummaryText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  clearFiltersText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  filterModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  filterModalContent: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    maxHeight: '80%',
+    ...shadows.xl,
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
+  },
+  filterModalTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+  },
+  filterModalBody: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  filterSection: {
+    marginBottom: spacing.xl,
+  },
+  filterSectionTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.md,
+  },
+  filterOptions: {
+    gap: spacing.sm,
+  },
+  filterOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  filterOptionText: {
+    fontSize: typography.fontSize.md,
+  },
+  filterModalFooter: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderTopWidth: 1,
+  },
+  clearFiltersButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  clearFiltersButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  applyFiltersButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    ...shadows.md,
+  },
+  applyFiltersButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

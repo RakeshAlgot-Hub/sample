@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { WifiOff } from 'lucide-react-native';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -11,8 +12,9 @@ export function OfflineIndicator() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.warning[500] }]}>
-      <Text style={[styles.text, { color: colors.warning[900] }]}>📡 Offline Mode - Data cached from last sync</Text>
+    <View style={[styles.container, { borderBottomColor: colors.border.medium }]}> 
+      <WifiOff size={14} color={colors.text.secondary} />
+      <Text style={[styles.text, { color: colors.text.secondary }]}>You are offline</Text>
     </View>
   );
 }
@@ -21,10 +23,11 @@ const styles = StyleSheet.create({
   container: {
     paddingVertical: 8,
     paddingHorizontal: 12,
+    flexDirection: 'row',
+    gap: 6,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
   text: {
     fontSize: 13,

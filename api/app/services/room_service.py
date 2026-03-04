@@ -39,6 +39,15 @@ class RoomService:
         # Ensure active is set to True (default for new rooms)
         if "active" not in room_data:
             room_data["active"] = True
+        
+        # Check if room number already exists for this property
+        existing = await self.collection.find_one({
+            "propertyId": room_data["propertyId"],
+            "roomNumber": room_data["roomNumber"]
+        })
+        if existing:
+            raise ValueError(f"Room number '{room_data['roomNumber']}' already exists for this property")
+        
         result = await self.collection.insert_one(room_data)
         room_data["id"] = str(result.inserted_id)
         # Auto-create beds for this room
@@ -59,6 +68,17 @@ class RoomService:
     async def update_room(self, room_id: str, room_data: dict):
         from bson import ObjectId
         room_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        
+        # If roomNumber is being updated, check for duplicates
+        if "roomNumber" in room_data:
+            existing = await self.collection.find_one({
+                "propertyId": room_data["propertyId"],
+                "roomNumber": room_data["roomNumber"],
+                "_id": {"$ne": ObjectId(room_id)}
+            })
+            if existing:
+                raise ValueError(f"Room number '{room_data['roomNumber']}' already exists for this property")
+        
         await self.collection.update_one({"_id": ObjectId(room_id)}, {"$set": room_data})
         doc = await self.collection.find_one({"_id": ObjectId(room_id)})
         if doc:
