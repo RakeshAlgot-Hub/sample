@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -76,6 +76,7 @@ export default function TenantDetailScreen() {
   const [editTenantPhone, setEditTenantPhone] = useState('');
   const [editTenantRent, setEditTenantRent] = useState('');
   const [tenantActionLoading, setTenantActionLoading] = useState(false);
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchTenantData = async () => {
     if (!tenantId) {
@@ -98,8 +99,25 @@ export default function TenantDetailScreen() {
       setLoading(true);
       setError(null);
 
+      // Set a timeout to auto-dismiss skeleton after 8 seconds
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+      loadingTimeoutRef.current = setTimeout(() => {
+        setLoading(false);
+        if (!tenant) {
+          setError('Request is taking longer than expected. Please try again.');
+        }
+      }, 8000);
+
       // Only fetch what we need for this tenant
       const tenantRes = await tenantService.getTenantById(tenantId);
+
+      // Clear timeout if we got data back
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
 
       if (tenantRes.data) {
         setTenant(tenantRes.data);
@@ -127,6 +145,11 @@ export default function TenantDetailScreen() {
         }
       }
     } catch (err: any) {
+      // Clear timeout on error
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
       setError(err?.message || 'Failed to load tenant details');
     } finally {
       setLoading(false);
@@ -138,6 +161,15 @@ export default function TenantDetailScreen() {
       fetchTenantData();
     }, [tenantId])
   );
+
+  // Cleanup loading timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleRetry = () => {
     fetchTenantData();

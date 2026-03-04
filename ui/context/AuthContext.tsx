@@ -25,7 +25,7 @@ const MIN_REFRESH_INTERVAL = 10 * 1000;
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Owner | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start as true to prevent race condition during auth restore
   const appStateRef = useRef<AppStateStatus>('active');
   const tokenRefreshTimerRef = useRef<NodeJS.Timeout | number | null>(null);
 

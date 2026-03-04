@@ -59,6 +59,7 @@ export default function TenantsScreen() {
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFocusRefreshRef = useRef<number>(Date.now());
   const isFetchingRef = useRef(false);
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchTenants = useCallback(async (page: number = 1, search: string = '', status: string = 'all') => {
     if (!selectedPropertyId) {
@@ -85,6 +86,17 @@ export default function TenantsScreen() {
       // Only show loading if we don't already have data
       if (!tenants.length) {
         setLoading(true);
+        
+        // Set a timeout to auto-dismiss skeleton after 8 seconds
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+        }
+        loadingTimeoutRef.current = setTimeout(() => {
+          setLoading(false);
+          if (!tenants.length) {
+            setError('Request is taking longer than expected. Please try again.');
+          }
+        }, 8000);
       }
       setError(null);
       
@@ -93,12 +105,24 @@ export default function TenantsScreen() {
       // ONLY fetch tenants - rooms & beds data now included in response
       const tenantsRes = await tenantService.getTenants(selectedPropertyId, search || undefined, statusFilter, page, pageSize);
 
+      // Clear timeout if we got data back
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+
       if (tenantsRes.data) {
         setTenants(tenantsRes.data);
         setTotal(tenantsRes.meta?.total || 0);
         setScreenCache(cacheKey, tenantsRes);
       }
     } catch (err: any) {
+      // Clear timeout on error
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+      
       if (err?.code === 'SUBSCRIPTION_LIMIT_EXCEEDED' || err?.details?.status === 402) {
         setShowUpgradeModal(true);
       } else {
@@ -144,6 +168,15 @@ export default function TenantsScreen() {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
   }, [searchQuery, selectedStatus, fetchTenants]);
+
+  // Cleanup loading timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {

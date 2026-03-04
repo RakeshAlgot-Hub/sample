@@ -394,10 +394,6 @@ export const propertyService = {
     return await request<Property>('GET', '/properties', undefined, true) as PaginatedResponse<Property>;
   },
 
-  async getPropertyById(id: string): Promise<ApiResponse<Property>> {
-    return await request<Property>('GET', `/properties/${id}`, undefined, true) as ApiResponse<Property>;
-  },
-
   async createProperty(
     data: Partial<Property>
   ): Promise<ApiResponse<Property>> {

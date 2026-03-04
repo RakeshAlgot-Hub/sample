@@ -173,6 +173,10 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshProperties = async () => {
+    // Clear cache before fetching to ensure fresh data
+    const cacheKey = cacheKeys.properties();
+    clearScreenCache();
+    isFetchingPropertiesRef.current = false;
     await fetchProperties();
   };
 

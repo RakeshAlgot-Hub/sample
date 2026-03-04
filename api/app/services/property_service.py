@@ -92,6 +92,9 @@ class PropertyService:
         
         # 4. Delete all rooms for this property
         await self.db["rooms"].delete_many({"propertyId": property_id})
+        
+        # 5. Delete all staff for this property
+        await self.db["staff"].delete_many({"propertyId": property_id})
 
         # Delete the property itself
         await self.db["properties"].delete_one({"_id": ObjectId(property_id)})
