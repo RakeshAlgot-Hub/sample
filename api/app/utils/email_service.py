@@ -1,18 +1,16 @@
-"""Email service for sending OTP and other notifications via SendGrid"""
-import os
-from typing import Optional
+"""Email service for sending OTP and other notifications via Zoho Zepto Mail"""
 import asyncio
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
-from app.config.settings import SENDGRID_API_KEY, FROM_EMAIL
+import httpx
+from typing import Optional
+from app.config.settings import ZEPTO_MAIL_API_KEY, FROM_EMAIL
 
-# Initialize SendGrid client
-sg_client = SendGridAPIClient(SENDGRID_API_KEY) if SENDGRID_API_KEY else None
+# Zoho Zepto Mail API endpoint - using India region endpoint
+ZEPTO_API_ENDPOINT = "https://api.zeptomail.in/v1.1/email"
 
 
 async def send_otp_email(email: str, otp: str, app_name: str = "Hostel Manager") -> bool:
     """
-    Send OTP to user's email via SendGrid
+    Send OTP to user's email via Zoho Zepto Mail
     Args:
         email: User's email address
         otp: 6-digit OTP code
@@ -20,8 +18,8 @@ async def send_otp_email(email: str, otp: str, app_name: str = "Hostel Manager")
     Returns:
         True if email sent successfully, False otherwise
     """
-    if not sg_client or not FROM_EMAIL:
-        print(f"[WARNING] SendGrid not configured. OTP: {otp} for {email}")
+    if not ZEPTO_MAIL_API_KEY or not FROM_EMAIL:
+        print(f"[WARNING] Zepto Mail not configured. OTP: {otp} for {email}")
         return False
 
     try:
@@ -64,24 +62,42 @@ async def send_otp_email(email: str, otp: str, app_name: str = "Hostel Manager")
         </html>
         """
 
-        message = Mail(
-            from_email=Email(FROM_EMAIL, "Hostel Manager"),
-            to_emails=To(email),
-            subject=subject,
-            html_content=html_content
-        )
+        # Zepto Mail API payload
+        payload = {
+            "from": {
+                "address": FROM_EMAIL,
+                "name": "Hostel Manager"
+            },
+            "to": [
+                {
+                    "email_address": {
+                        "address": email
+                    }
+                }
+            ],
+            "subject": subject,
+            "htmlbody": html_content
+        }
 
-        # Run SendGrid API call in executor to avoid blocking
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, sg_client.send, message)
-        
-        if response.status_code in [200, 201, 202]:
-            print(f"[SUCCESS] OTP email sent to {email}")
-            return True
-        else:
-            print(f"[ERROR] Failed to send OTP email. Status: {response.status_code}")
+        headers = {
+            "Authorization": ZEPTO_MAIL_API_KEY,
+            "Content-Type": "application/json"
+        }
+
+        # Send email using httpx for async operation
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(ZEPTO_API_ENDPOINT, json=payload, headers=headers)
+                if response.status_code in [200, 201, 202]:
+                    print(f"[SUCCESS] OTP email sent to {email}")
+                    return True
+                else:
+                    error_text = response.text
+                    print(f"[ERROR] Failed to send OTP email. Status: {response.status_code}. Response: {error_text}")
+                    return False
+        except asyncio.TimeoutError:
+            print(f"[ERROR] Timeout sending OTP email to {email}")
             return False
-            
     except Exception as e:
         print(f"[ERROR] Exception sending OTP email to {email}: {str(e)}")
         return False
@@ -97,8 +113,8 @@ async def send_welcome_email(email: str, name: str, app_name: str = "Hostel Mana
     Returns:
         True if email sent successfully, False otherwise
     """
-    if not sg_client or not FROM_EMAIL:
-        print(f"[WARNING] SendGrid not configured. Welcome email not sent to {email}")
+    if not ZEPTO_MAIL_API_KEY or not FROM_EMAIL:
+        print(f"[WARNING] Zepto Mail not configured. Welcome email not sent to {email}")
         return False
 
     try:
@@ -136,24 +152,41 @@ async def send_welcome_email(email: str, name: str, app_name: str = "Hostel Mana
         </html>
         """
 
-        message = Mail(
-            from_email=Email(FROM_EMAIL, "Hostel Manager"),
-            to_emails=To(email),
-            subject=f"Welcome to {app_name}!",
-            html_content=html_content
-        )
+        payload = {
+            "from": {
+                "address": FROM_EMAIL,
+                "name": "Hostel Manager"
+            },
+            "to": [
+                {
+                    "email_address": {
+                        "address": email,
+                    }
+                }
+            ],
+            "subject": f"Welcome to {app_name}!",
+            "htmlbody": html_content
+        }
 
-        # Run SendGrid API call in executor to avoid blocking
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, sg_client.send, message)
-        
-        if response.status_code in [200, 201, 202]:
-            print(f"[SUCCESS] Welcome email sent to {email}")
-            return True
-        else:
-            print(f"[ERROR] Failed to send welcome email. Status: {response.status_code}")
+        headers = {
+            "Authorization": f"Zoho-enczapikey {ZEPTO_MAIL_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        # Send email using httpx for async operation
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(ZEPTO_API_ENDPOINT, json=payload, headers=headers)
+                if response.status_code in [200, 201, 202]:
+                    print(f"[SUCCESS] Welcome email sent to {email}")
+                    return True
+                else:
+                    error_text = response.text
+                    print(f"[ERROR] Failed to send welcome email. Status: {response.status_code}. Response: {error_text}")
+                    return False
+        except asyncio.TimeoutError:
+            print(f"[ERROR] Timeout sending welcome email to {email}")
             return False
-            
     except Exception as e:
         print(f"[ERROR] Exception sending welcome email to {email}: {str(e)}")
         return False

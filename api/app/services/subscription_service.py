@@ -3,6 +3,7 @@ from app.database.mongodb import db
 from datetime import datetime, timedelta
 from app.utils.ownership import build_owner_query
 import logging
+from app.config.default_plans import get_default_plan
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +41,15 @@ class SubscriptionService:
         # Fetch free plan from database
         free_plan = await db.plans.find_one({"name": "free"})
         if not free_plan:
-            # If no plans exist in DB, use fallback values
-            free_limits = {'properties': 1, 'tenants': 80, 'rooms': 30, 'staff': 3}
-        else:
-            free_limits = {
-                'properties': free_plan['properties'],
-                'tenants': free_plan['tenants'],
-                'rooms': free_plan['rooms'],
-                'staff': free_plan['staff']
-            }
+            free_plan = get_default_plan("free")
+            if not free_plan:
+                raise ValueError("Free plan not found in database or config")
+        free_limits = {
+            'properties': free_plan['properties'],
+            'tenants': free_plan['tenants'],
+            'rooms': free_plan['rooms'],
+            'staff': free_plan['staff']
+        }
         
         sub = Subscription(
             ownerId=owner_id,
@@ -88,7 +89,9 @@ class SubscriptionService:
             # Fetch plan from database
             plan_doc = await db.plans.find_one({"name": plan.lower()})
             if not plan_doc:
-                raise ValueError(f"Plan '{plan}' not found")
+                plan_doc = get_default_plan(plan)
+                if not plan_doc:
+                    raise ValueError(f"Plan '{plan}' not found")
             
             plan_data = {
                 'properties': plan_doc['properties'],
@@ -199,7 +202,9 @@ class SubscriptionService:
         """Get features/limits for a plan from database"""
         plan_doc = await db.plans.find_one({"name": plan.lower()})
         if not plan_doc:
-            return None
+            plan_doc = get_default_plan(plan)
+            if not plan_doc:
+                return None
         return {
             'properties': plan_doc['properties'],
             'tenants': plan_doc['tenants'],
@@ -248,14 +253,15 @@ class SubscriptionService:
             # Fetch free plan from database
             free_plan = await db.plans.find_one({"name": "free"})
             if not free_plan:
-                free_limits = {'properties': 1, 'tenants': 80, 'rooms': 30, 'staff': 3}
-            else:
-                free_limits = {
-                    'properties': free_plan['properties'],
-                    'tenants': free_plan['tenants'],
-                    'rooms': free_plan['rooms'],
-                    'staff': free_plan['staff']
-                }
+                free_plan = get_default_plan("free")
+                if not free_plan:
+                    raise ValueError("Free plan not found in database or config")
+            free_limits = {
+                'properties': free_plan['properties'],
+                'tenants': free_plan['tenants'],
+                'rooms': free_plan['rooms'],
+                'staff': free_plan['staff']
+            }
             
             period_end = (datetime.now() + timedelta(days=365)).isoformat()
             
@@ -275,7 +281,11 @@ class SubscriptionService:
                     "currentPeriodStart": now,
                     "currentPeriodEnd": period_end,
                     "updatedAt": now,
-                    "cancelledAt": now
+                    "cancelledAt": now,
+                    "propertyLimit": free_plan['properties'],
+                    "roomLimit": free_plan['rooms'],
+                    "tenantLimit": free_plan['tenants'],
+                    "staffLimit": free_plan['staff'],
                 }},
                 return_document=True
             )
@@ -311,9 +321,11 @@ class SubscriptionService:
         # Free tier limits from database
         free_plan = await db.plans.find_one({"name": "free"})
         if not free_plan:
-            free_limits = {'properties': 1, 'tenants': 80}
-        else:
-            free_limits = {'properties': free_plan['properties'], 'tenants': free_plan['tenants']}
+            free_plan = get_default_plan("free")
+            if not free_plan:
+                free_limits = {'properties': 1, 'tenants': 80}
+            else:
+                free_limits = {'properties': free_plan['properties'], 'tenants': free_plan['tenants']}
         
         # Calculate excess
         excess_properties = max(0, property_count - free_limits["properties"])
@@ -354,15 +366,15 @@ class SubscriptionService:
             
             # Fetch free plan from database
             free_plan = await db.plans.find_one({"name": "free", "is_active": True})
-            
             if not free_plan:
-                # If no plans in DB, return error - admin needs to initialize plans first
-                return {
-                    "success": False,
-                    "user_id": owner_id,
-                    "error": "Free plan not found in database",
-                    "message": "Admin must initialize subscription plans first"
-                }
+                free_plan = get_default_plan("free")
+                if not free_plan:
+                    return {
+                        "success": False,
+                        "user_id": owner_id,
+                        "error": "Free plan not found in database or config",
+                        "message": "Admin must initialize subscription plans first"
+                    }
             
             # Create single subscription document with free plan
             period_end = (datetime.now() + timedelta(days=365)).isoformat()

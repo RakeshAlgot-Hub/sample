@@ -2,62 +2,100 @@
 
 ## Backend Changes Required Before Production
 
-### 1. OTP Generation (CRITICAL)
-**File**: `api/app/services/auth_service.py` (Line 249)
+### 1. OTP Generation ✅ DONE
+**File**: `api/app/services/auth_service.py` (Line 267)
 
 **Current State**: 
 ```python
-otp = "130499"  # TODO: Replace with random OTP generation in production
+otp = str(random.randint(100000, 999999))  # Generate a random 6-digit OTP
 ```
 
-**What to do**:
-- Replace hardcoded OTP with random 6-digit generation
-- Restore: `otp = f"{random.randint(100000, 999999)}"`
-- This is currently hardcoded for testing purposes only
+**Status**: ✅ COMPLETED
+- Random 6-digit OTP generation is now implemented
+- Each OTP request generates a unique code
 
 ---
 
-### 2. OTP Attempt Limit (IMPORTANT)
+### 2. Email Service Integration ✅ DONE
+**File**: `api/app/utils/email_service.py`
+
+**Current State**: Using Zoho Zepto Mail API
+```python
+ZEPTO_API_ENDPOINT = "https://api.zeptomail.in/v1.1/email"
+```
+
+**Status**: ✅ COMPLETED
+- Integrated with Zoho Zepto Mail for real email sending
+- Using correct India region endpoint (.in)
+- Async email delivery using aiohttp
+- Professional HTML email templates
+- Error handling for email delivery failures
+
+**Configuration Required** (Add to `.env`):
+```
+ZEPTO_MAIL_API_KEY=Zoho-enczapikey PHtE6r1eQu+5j2Ev9UVRtqW+R8WjYYwor+02fQISsd0WC/8GS01RrooqwDbl/xsqUvIRRvSSz49rsrrItejXJm7sZz4aVWqyqK3sx/VYSPOZsbq6x00auFkSckPcXILndtJj0yPQv9rbNA==
+FROM_EMAIL=noreply@yourdomain.com
+```
+
+**Endpoints Using This**:
+- `/api/v1/auth/email/send-otp` - For registration email verification
+- `/api/v1/auth/forgot-password` - For password reset OTP
+- `/api/v1/auth/reset-password` - For password reset with OTP
+
+**See**: `SETUP.md` for detailed configuration guide
+
+---
+
+### 3. Forgot Password & Reset Password with OTP ✅ DONE
+**Files**: 
+- `api/app/services/auth_service.py` (forgot_password_service, reset_password_service)
+- `api/app/routes/auth.py` (POST /forgot-password, POST /reset-password)
+- `api/app/models/user_schema.py` (ForgotPasswordRequest, ResetPasswordRequest)
+
+**Status**: ✅ COMPLETED
+- Forgot password endpoint sends OTP via email
+- Reset password endpoint verifies OTP and updates password
+- Same security features as registration OTP:
+  - 6-digit random OTP
+  - 10-minute expiration
+  - 5 failed attempts lockout for 10 minutes
+  - Email sending via Zoho Zepto Mail
+  - Uses secure password hashing
+
+**Endpoints**:
+```
+POST /api/v1/auth/forgot-password
+Body: { "email": "user@example.com" }
+Response: Generic message for security
+
+POST /api/v1/auth/reset-password
+Body: { "email": "user@example.com", "otp": "123456", "newPassword": "new_secure_password" }
+Response: Success message with tokens
+```
+
+---
+
+### 4. OTP Attempt Limit (IMPORTANT)
 **File**: `api/app/utils/attempt_tracking.py` (Line 12)
 
 **Current State**:
 ```python
-MAX_OTP_ATTEMPTS = 20  # Temporarily increased for testing
+MAX_OTP_ATTEMPTS = 20  # Check actual value
 ```
 
 **What to do**:
-- Decide on final attempt limit for OTP verification
-- Currently set to 20 for testing
+- Review and decide on final attempt limit for OTP verification
 - Recommended production value: 5 attempts (matches login)
-- Change to: `MAX_OTP_ATTEMPTS = 5` (or desired value)
+- If needed, change to: `MAX_OTP_ATTEMPTS = 5`
 
 ---
 
-### 3. Email Service Integration (IMPORTANT)
-**File**: `api/app/services/auth_service.py` (Line 265)
-
-**Current State**:
-```python
-# TODO: In production, integrate with an email service (SendGrid, AWS SES, etc.)
-# For now, we'll just return success
-print(f"OTP for {normalized_email}: {otp}")  # For development only
-```
-
-**What to do**:
-- Integrate with email service (SendGrid, AWS SES, or similar)
-- Actually send OTP emails to users
-- Remove console logging
-- Add error handling for email delivery failures
-
----
-
-### 4. Database Cleanup - OTP Records
+### 5. Database Cleanup - OTP Records
 **File**: `api/app/utils/attempt_tracking.py`
 
 **What to do**:
 - Implement periodic cleanup of expired OTP records
-- Delete `email_otps` collection entries older than 10 minutes
-- Add a scheduled task/cron job for cleanup (recommend: every 5 minutes)
+- Delete `email_otps` collection entries older than 10 minutes- Delete `password_reset_otps` collection entries older than 10 minutes- Add a scheduled task/cron job for cleanup (recommend: every 5 minutes)
 - Prevents database bloat from old OTP attempts
 
 ---
@@ -73,7 +111,7 @@ print(f"OTP for {normalized_email}: {otp}")  # For development only
 
 ---
 
-### 6. Rate Limiting Configuration
+### 7. Rate Limiting Configuration
 **File**: `api/app/utils/rate_limit.py`
 
 **Current State**:
@@ -89,7 +127,7 @@ rate_limit_dep = limiter.limit("60/minute")
 
 ---
 
-### 7. Logging and Monitoring
+### 8. Logging and Monitoring
 **What to do**:
 - Replace `print()` statements with proper logging
 - Add security event logging for:

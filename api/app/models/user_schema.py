@@ -75,3 +75,22 @@ class LogoutRequest(BaseModel):
 
 class LogoutResponse(BaseModel):
     success: bool
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str
+    newPassword: str
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str
+    success: bool

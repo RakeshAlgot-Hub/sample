@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,9 @@ export default function RegisterScreen() {
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [emailAlreadyVerified, setEmailAlreadyVerified] = useState(false);
+  const [conflictEmail, setConflictEmail] = useState<{ email: string; isGoogleAccount: boolean } | null>(null);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -60,17 +63,58 @@ export default function RegisterScreen() {
       return;
     }
 
+    // Prevent resending if cooldown is active
+    if (resendCooldown > 0) {
+      setError(`Please wait ${resendCooldown} seconds before requesting another OTP`);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
+      setConflictEmail(null);
+      setEmailAlreadyVerified(false);
       await authService.sendEmailOTP({ email: email.trim() });
       setOtpSent(true);
+      setResendCooldown(45); // Start 45-second cooldown
     } catch (err: any) {
-      setError(err?.message || 'Failed to send OTP. Please try again.');
+      if (err?.code === 'TOO_MANY_REQUESTS') {
+        // Extract seconds from error message if available
+        const match = err?.message?.match(/(\d+)\s*seconds?/);
+        const seconds = match ? parseInt(match[1]) : 45;
+        setResendCooldown(seconds);
+        setError(`Please wait ${seconds} seconds before requesting another OTP`);
+      } else if (err?.code === 'CONFLICT' || err?.details?.status === 409) {
+        // Email already has an account
+        const isGoogleAccount = err?.message?.includes('Google Sign-in');
+        setConflictEmail({
+          email: email.trim(),
+          isGoogleAccount: isGoogleAccount,
+        });
+        setError(null); // Clear error, we'll show conflict card instead
+      } else if (err?.message?.includes('Email already verified')) {
+        // Email is already verified in this flow
+        setEmailAlreadyVerified(true);
+        setOtpSent(true);
+        setError(null);
+      } else {
+        setError(err?.message || 'Failed to send OTP. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleOtpChange = (value: string, index: number) => {
     if (value.length > 1) return;
@@ -81,6 +125,22 @@ export default function RegisterScreen() {
 
     if (value && index < 5) {
       otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyPress = (event: any, index: number) => {
+    if (event.nativeEvent.key === 'Backspace') {
+      if (otp[index] === '') {
+        // If current field is empty, move to previous field
+        if (index > 0) {
+          otpInputRefs.current[index - 1]?.focus();
+        }
+      } else {
+        // Clear current field
+        const newOtp = [...otp];
+        newOtp[index] = '';
+        setOtp(newOtp);
+      }
     }
   };
 
@@ -107,6 +167,12 @@ export default function RegisterScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProceedWithVerifiedEmail = () => {
+    // Email was already verified, mark it as verified and proceed
+    setEmailVerified(true);
+    setError(null);
   };
 
   const handleRegister = async () => {
@@ -203,6 +269,50 @@ export default function RegisterScreen() {
               </View>
             )}
 
+            {conflictEmail && (
+              <View
+                style={[
+                  styles.conflictCard,
+                  { backgroundColor: colors.warning[50], borderColor: colors.warning[200] },
+                ]}>
+                <Text style={[styles.conflictIcon]}>⚠️</Text>
+                <Text style={[styles.conflictTitle, { color: colors.warning[800] }]}>
+                  {conflictEmail.isGoogleAccount ? 'Account Already Exists' : 'Email Already Registered'}
+                </Text>
+                {conflictEmail.isGoogleAccount ? (
+                  <>
+                    <Text style={[styles.conflictMessage, { color: colors.warning[700] }]}>
+                      The email <Text style={{ fontWeight: '600' }}>{conflictEmail.email}</Text> is already registered with Google Sign-in.
+                    </Text>
+                    <View style={styles.conflictActionContainer}>
+                      <Text style={[styles.conflictSubtext, { color: colors.warning[600] }]}>
+                        Please use "Continue with Google" to sign in instead.
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.conflictButton, { backgroundColor: colors.warning[100] }]}
+                        onPress={() => setConflictEmail(null)}
+                        activeOpacity={0.7}>
+                        <Text style={[styles.conflictButtonText, { color: colors.warning[800] }]}>
+                          Go to Google Sign-in
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={[styles.conflictMessage, { color: colors.warning[700] }]}>
+                      The email <Text style={{ fontWeight: '600' }}>{conflictEmail.email}</Text> is already registered with email/password.
+                    </Text>
+                    <View style={styles.conflictActionContainer}>
+                      <Text style={[styles.conflictSubtext, { color: colors.warning[600] }]}>
+                        Please log in with your existing account or use a different email.
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            )}
+
             {emailVerified && (
               <View
                 style={[
@@ -251,7 +361,7 @@ export default function RegisterScreen() {
                 placeholderTextColor={colors.text.tertiary}
                 value={email}
                 onChangeText={setEmail}
-                editable={!loading && !emailVerified}
+                editable={!loading && !emailVerified && !emailAlreadyVerified}
               />
             </View>
 
@@ -274,7 +384,38 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             )}
 
-            {otpSent && !emailVerified && (
+            {otpSent && !emailVerified && emailAlreadyVerified && (
+              <>
+                <View style={[styles.successCard, { backgroundColor: colors.success[50], borderColor: colors.success[200] }]}>
+                  <Text style={[styles.successIcon]}>✓</Text>
+                  <Text style={[styles.successTitle, { color: colors.success[700] }]}>
+                    Email Already Verified
+                  </Text>
+                  <Text style={[styles.successMessage, { color: colors.success[600] }]}>
+                    Your email has already been verified. Please proceed to complete your registration by entering other details below.
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.primaryButton,
+                    { backgroundColor: colors.primary[500], opacity: loading ? 0.6 : 1 },
+                  ]}
+                  onPress={handleProceedWithVerifiedEmail}
+                  activeOpacity={0.8}
+                  disabled={loading}>
+                  {loading ? (
+                    <ActivityIndicator color={colors.white} size="small" />
+                  ) : (
+                    <Text style={[styles.primaryButtonText, { color: colors.white }]}>
+                      Proceed to Registration
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+
+            {otpSent && !emailVerified && !emailAlreadyVerified && (
               <>
                 <Text style={[styles.label, { color: colors.text.primary }]}>
                   Enter 6-digit OTP
@@ -296,6 +437,7 @@ export default function RegisterScreen() {
                       ]}
                       value={digit}
                       onChangeText={(value) => handleOtpChange(value, index)}
+                      onKeyPress={(event) => handleOtpKeyPress(event, index)}
                       keyboardType="number-pad"
                       maxLength={1}
                       textAlign="center"
@@ -322,12 +464,15 @@ export default function RegisterScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.linkButton}
+                  style={[
+                    styles.linkButton,
+                    resendCooldown > 0 && { opacity: 0.5 }
+                  ]}
                   onPress={handleSendOTP}
                   activeOpacity={0.7}
-                  disabled={loading}>
+                  disabled={loading || resendCooldown > 0}>
                   <Text style={[styles.linkText, { color: colors.primary[500] }]}>
-                    Resend OTP
+                    {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -584,6 +729,71 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
   },
   linkTextBold: {
+    fontWeight: typography.fontWeight.semibold,
+  },
+  successCard: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    marginBottom: spacing.lg,
+    alignItems: 'center',
+  },
+  successIcon: {
+    fontSize: 40,
+    marginBottom: spacing.sm,
+  },
+  successTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  conflictCard: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    marginBottom: spacing.lg,
+    alignItems: 'center',
+  },
+  conflictIcon: {
+    fontSize: 40,
+    marginBottom: spacing.sm,
+  },
+  conflictTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  conflictMessage: {
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  conflictActionContainer: {
+    width: '100%',
+  },
+  conflictSubtext: {
+    fontSize: typography.fontSize.xs,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  conflictButton: {
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+  },
+  conflictButtonText: {
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
 });

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Request
+from fastapi import APIRouter, status, Request, HTTPException
 from app.utils.rate_limit import rate_limit_dep
 from app.services.auth_service import (
     register_user_service,
@@ -9,6 +9,8 @@ from app.services.auth_service import (
     send_email_otp_service,
     verify_email_otp_service,
     get_current_user_service,
+    forgot_password_service,
+    reset_password_service,
 )
 from app.models.user_schema import (
     UserCreate,
@@ -18,7 +20,11 @@ from app.models.user_schema import (
     GoogleSignInRequest,
     EmailSendOTPRequest,
     EmailVerifyOTPRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
+from app.utils.otp_memory_store import get_resend_cooldown_remaining
+from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -44,6 +50,22 @@ async def send_email_otp(payload: EmailSendOTPRequest):
     return await send_email_otp_service(payload.email)
 
 
+@router.post("/email/resend-otp", status_code=status.HTTP_200_OK, summary="Check OTP resend cooldown status", tags=["auth"])
+async def check_resend_status(payload: EmailSendOTPRequest):
+    """Check if OTP can be resent or get cooldown remaining time"""
+    normalized_email = payload.email.strip().lower()
+    cooldown_remaining = await get_resend_cooldown_remaining(normalized_email)
+    
+    if cooldown_remaining > 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Please wait {cooldown_remaining} seconds before requesting another OTP"
+        )
+    
+    # If cooldown is 0, attempt to send new OTP
+    return await send_email_otp_service(payload.email)
+
+
 @router.post("/email/verify-otp", status_code=status.HTTP_200_OK, summary="Verify email OTP", tags=["auth"])
 async def verify_email_otp(payload: EmailVerifyOTPRequest):
     return await verify_email_otp_service(payload.email, payload.otp)
@@ -62,3 +84,13 @@ async def logout(payload: LogoutRequest):
 @router.get("/me", status_code=status.HTTP_200_OK, summary="Get current user", tags=["auth"])
 async def get_current_user(request: Request):
     return await get_current_user_service(request)
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK, summary="Send password reset OTP", tags=["auth"])
+async def forgot_password(payload: ForgotPasswordRequest):
+    return await forgot_password_service(payload.email)
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK, summary="Reset password with OTP", tags=["auth"])
+async def reset_password(payload: ResetPasswordRequest):
+    return await reset_password_service(payload.email, payload.otp, payload.newPassword)
