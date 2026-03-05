@@ -1,3 +1,5 @@
+from typing import Dict
+
 from app.models.subscription_schema import Subscription, Usage
 from app.database.mongodb import db
 from datetime import datetime, timedelta
