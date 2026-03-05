@@ -49,6 +49,16 @@ async def get_room(request: Request, room_id: str):
         return {"data": room.model_dump()}
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
+@router.get("/{room_id}/preview-bed-change")
+async def preview_bed_count_change(request: Request, room_id: str, new_bed_count: int):
+    """Preview what will happen if bed count is changed"""
+    room = await room_service.get_room(room_id)
+    property_ids = getattr(request.state, "property_ids", [])
+    if room and room.propertyId in property_ids:
+        result = await room_service.preview_bed_count_change(room_id, new_bed_count)
+        return {"data": result}
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
 @router.post("/")
 async def create_room(request: Request, room: Room):
     try:

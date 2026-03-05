@@ -83,10 +83,10 @@ export default function PropertyFormScreen() {
         
         await refreshProperties();
         
-        // Switch to the newly created property and go to My Properties screen
+        // Switch to the newly created property and go to My Property screen
         if (newPropertyId) {
           switchProperty(newPropertyId);
-          router.replace('/manage-properties');
+          router.replace('/my-property');
         } else {
           router.back();
         }

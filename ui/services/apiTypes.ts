@@ -41,6 +41,8 @@ export interface Tenant {
   documentId: string;
   phone: string;
   rent: string;
+  tenantStatus?: 'active' | 'vacated';
+  address?: string;
   joinDate: string;
   autoGeneratePayments?: boolean;
   billingConfig?: BillingConfig | null;
@@ -59,6 +61,7 @@ export interface Payment {
   propertyId: string;
   // property field removed
   tenantName?: string;
+  tenantStatus?: 'active' | 'vacated'; // Tenant status indicator
   roomNumber?: string;  // Enriched field
   bed: string;
   amount: string;
@@ -300,6 +303,8 @@ export interface Staff {
 
 export interface DashboardStats {
   totalTenants: number;
+  activeTenants?: number; // Count of active tenants
+  vacatedTenants?: number; // Count of vacated tenants
   totalBeds: number;
   occupiedBeds: number;
   availableBeds: number;

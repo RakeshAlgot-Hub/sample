@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { DoorOpen, ChevronLeft, ChevronDown } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -36,6 +36,7 @@ const FLOOR_OPTIONS = [
 export default function RoomFormScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { roomId } = useLocalSearchParams<{ roomId?: string }>();
   const { selectedPropertyId } = useProperty();
   const isOnline = useNetworkStatus();
   const [roomNumber, setRoomNumber] = useState('');
@@ -43,21 +44,94 @@ export default function RoomFormScreen() {
   const [customFloor, setCustomFloor] = useState('');
   const [price, setPrice] = useState('');
   const [numberOfBeds, setNumberOfBeds] = useState('');
+  const [originalBedCount, setOriginalBedCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(!!roomId);
   const [error, setError] = useState<string | null>(null);
   const [showFloorPicker, setShowFloorPicker] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showBedChangeWarning, setShowBedChangeWarning] = useState(false);
+  const [bedChangePreview, setBedChangePreview] = useState<any>(null);
+  const [checkingBedChange, setCheckingBedChange] = useState(false);
+
+  const isEdit = !!roomId;
+
+  // Load room data if editing
+  useEffect(() => {
+    if (isEdit && roomId) {
+      loadRoomData();
+    }
+  }, [roomId]);
+
+  const loadRoomData = async () => {
+    try {
+      setInitialLoading(true);
+      const response = await roomService.getRoomById(roomId!);
+      if (response.data) {
+        const room = response.data;
+        setRoomNumber(room.roomNumber);
+        setFloor(room.floor);
+        setPrice(room.price.toString());
+        setNumberOfBeds(room.numberOfBeds.toString());
+        setOriginalBedCount(room.numberOfBeds);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load room data');
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  const handleBedCountChange = (value: string) => {
+    setNumberOfBeds(value);
+    setError(null);
+  };
+
+  const checkBedCountChange = async () => {
+    const bedsNum = parseInt(numberOfBeds, 10);
+    
+    if (isNaN(bedsNum) || bedsNum <= 0) {
+      setError('Number of beds must be greater than 0');
+      return false;
+    }
+    
+    // If bed count is being reduced in edit mode, show warning
+    if (isEdit && bedsNum < originalBedCount) {
+      try {
+        setCheckingBedChange(true);
+        const preview = await roomService.previewBedCountChange(roomId!, bedsNum);
+        setBedChangePreview(preview.data);
+        
+        if (preview.data.affectedTenants && preview.data.affectedTenants.length > 0) {
+          setShowBedChangeWarning(true);
+          return false; // Wait for user confirmation
+        }
+      } catch (err: any) {
+        setError(err?.message || 'Failed to check bed count change');
+        return false;
+      } finally {
+        setCheckingBedChange(false);
+      }
+    }
+    
+    return true;
+  };
 
   const handleSubmit = async () => {
-    if (!roomNumber || !floor || !price || !numberOfBeds) {
+    if (!roomNumber || !floor) {
+      setError('Room number and floor are required');
+      return;
+    }
+
+    if (!isEdit && (!price || !numberOfBeds)) {
       setError('All fields are required');
       return;
     }
 
-    const priceNum = parseFloat(price);
-    const bedsNum = parseInt(numberOfBeds, 10);
+    const priceNum = price ? parseFloat(price) : 0;
+    const bedsNum = numberOfBeds ? parseInt(numberOfBeds, 10) : 0;
 
-    if (isNaN(priceNum) || priceNum < 0) {
+    if (!isEdit && (isNaN(priceNum) || priceNum < 0)) {
       setError('Price must be a valid number >= 0');
       return;
     }
@@ -77,19 +151,50 @@ export default function RoomFormScreen() {
       return;
     }
 
+    // Check for bed count changes before submitting
+    if (isEdit && bedsNum !== originalBedCount) {
+      const canProceed = await checkBedCountChange();
+      if (!canProceed) {
+        return; // Wait for user to confirm the bed change warning
+      }
+    }
+
+    await performSubmit();
+  };
+
+  const performSubmit = async () => {
+    const priceNum = price ? parseFloat(price) : 0;
+    const bedsNum = numberOfBeds ? parseInt(numberOfBeds, 10) : 0;
+    const finalFloor = floor === 'Other' ? customFloor.trim() : floor;
+
     try {
       setLoading(true);
       setError(null);
 
-      const finalFloor = floor === 'Other' ? customFloor.trim() : floor;
-
-      await roomService.createRoom({
-        propertyId: selectedPropertyId,
-        roomNumber: roomNumber.trim(),
-        floor: finalFloor,
-        price: priceNum,
-        numberOfBeds: bedsNum,
-      });
+      if (isEdit && roomId) {
+        // Update roomNumber, floor, and numberOfBeds if changed
+        const updateData: any = {
+          roomNumber: roomNumber.trim(),
+          floor: finalFloor,
+          propertyId: selectedPropertyId,
+        };
+        
+        // Include numberOfBeds if it has changed
+        if (bedsNum !== originalBedCount) {
+          updateData.numberOfBeds = bedsNum;
+        }
+        
+        await roomService.updateRoom(roomId, updateData);
+      } else {
+        // Create new room
+        await roomService.createRoom({
+          propertyId: selectedPropertyId,
+          roomNumber: roomNumber.trim(),
+          floor: finalFloor,
+          price: priceNum,
+          numberOfBeds: bedsNum,
+        });
+      }
 
       clearScreenCache('rooms:');
       clearScreenCache('dashboard:');
@@ -99,7 +204,7 @@ export default function RoomFormScreen() {
       if (err?.code === 'SUBSCRIPTION_LIMIT_EXCEEDED' || err?.details?.status === 402) {
         setShowUpgradeModal(true);
       } else {
-        setError(err?.message || 'Failed to create room');
+        setError(err?.message || `Failed to ${isEdit ? 'update' : 'create'} room`);
       }
     } finally {
       setLoading(false);
@@ -107,6 +212,30 @@ export default function RoomFormScreen() {
   };
 
   const displayFloor = floor === 'Other' && customFloor ? customFloor : floor || 'Select Floor';
+
+  if (initialLoading) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background.primary }]}
+        edges={['top', 'bottom']}>
+        <View style={[styles.header, { backgroundColor: colors.background.secondary, borderBottomColor: colors.border.light }]}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}>
+            <ChevronLeft size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+            {isEdit ? 'Edit Room' : 'Add Room'}
+          </Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={[styles.loadingContainer, { backgroundColor: colors.background.primary }]}>
+          <ActivityIndicator size="large" color={colors.primary[500]} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -119,7 +248,9 @@ export default function RoomFormScreen() {
           activeOpacity={0.7}>
           <ChevronLeft size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Add Room</Text>
+        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+          {isEdit ? 'Edit Room' : 'Add Room'}
+        </Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -133,7 +264,14 @@ export default function RoomFormScreen() {
             <View style={[styles.logoCircle, { backgroundColor: colors.primary[50] }]}>
               <DoorOpen size={32} color={colors.primary[500]} />
             </View>
-            <Text style={[styles.title, { color: colors.text.primary }]}>Create Room</Text>
+            <Text style={[styles.title, { color: colors.text.primary }]}>
+              {isEdit ? 'Edit Room Details' : 'Create Room'}
+            </Text>
+            {isEdit && (
+              <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+                Price cannot be changed. Reducing beds may affect tenants.
+              </Text>
+            )}
           </View>
 
           <View style={styles.formContainer}>
@@ -225,8 +363,8 @@ export default function RoomFormScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.background.secondary,
-                    color: colors.text.primary,
+                    backgroundColor: isEdit ? colors.background.tertiary : colors.background.secondary,
+                    color: isEdit ? colors.text.tertiary : colors.text.primary,
                     borderColor: colors.border.medium,
                   },
                 ]}
@@ -235,8 +373,13 @@ export default function RoomFormScreen() {
                 placeholderTextColor={colors.text.tertiary}
                 value={price}
                 onChangeText={setPrice}
-                editable={!loading}
+                editable={!loading && !isEdit}
               />
+              {isEdit && (
+                <Text style={[styles.fieldNote, { color: colors.text.tertiary }]}>
+                  Cannot be changed after creation
+                </Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -254,9 +397,14 @@ export default function RoomFormScreen() {
                 keyboardType="numeric"
                 placeholderTextColor={colors.text.tertiary}
                 value={numberOfBeds}
-                onChangeText={setNumberOfBeds}
+                onChangeText={handleBedCountChange}
                 editable={!loading}
               />
+              {isEdit && parseInt(numberOfBeds, 10) !== originalBedCount && (
+                <Text style={[styles.fieldNote, { color: colors.warning[600] }]}>
+                  ⚠️ Changing bed count may affect existing tenants
+                </Text>
+              )}
             </View>
 
             {!isOnline && (
@@ -282,7 +430,7 @@ export default function RoomFormScreen() {
                 <ActivityIndicator color={colors.white} size="small" />
               ) : (
                 <Text style={[styles.submitButtonText, { color: colors.white }]}>
-                  {isOnline ? 'Create Room' : 'Offline'}
+                  {isOnline ? (isEdit ? 'Update Room' : 'Create Room') : 'Offline'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -349,6 +497,114 @@ export default function RoomFormScreen() {
         </View>
       </Modal>
 
+      <Modal
+        visible={showBedChangeWarning}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBedChangeWarning(false)}>
+        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.bedChangeModalContent, { backgroundColor: colors.background.primary }]}>
+            <Text style={[styles.bedChangeModalTitle, { color: colors.text.primary }]}>
+              Bed Count Change Warning
+            </Text>
+            
+            <Text style={[styles.bedChangeModalMessage, { color: colors.text.secondary }]}>
+              You are reducing beds from {originalBedCount} to {numberOfBeds}. This will affect the following tenants:
+            </Text>
+
+            {bedChangePreview?.affectedTenants && (
+              <View style={[styles.tenantsList, { backgroundColor: colors.background.secondary }]}>
+                {bedChangePreview.affectedTenants.map((tenant: any, index: number) => (
+                  <View key={index} style={[styles.tenantItem, { borderBottomColor: colors.border.light }]}>
+                    <View style={styles.tenantInfo}>
+                      <Text style={[styles.tenantName, { color: colors.text.primary }]}>
+                        {tenant.name}
+                      </Text>
+                      <Text style={[styles.tenantBed, { color: colors.text.tertiary }]}>
+                        Bed #{tenant.bedNumber}
+                      </Text>
+                    </View>
+                    <View style={[
+                      styles.actionBadge,
+                      { 
+                        backgroundColor: tenant.action === 'relocate' 
+                          ? colors.success[50] 
+                          : colors.warning[50] 
+                      }
+                    ]}>
+                      <Text style={[
+                        styles.actionBadgeText,
+                        { 
+                          color: tenant.action === 'relocate' 
+                            ? colors.success[700] 
+                            : colors.warning[700] 
+                        }
+                      ]}>
+                        {tenant.action === 'relocate' 
+                          ? (tenant.location === 'same_room' 
+                            ? '🔄 Same Room' 
+                            : '🔄 Other Room')
+                          : '⚠️ Will Vacate'}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {(bedChangePreview?.availableBedsInSameRoom !== undefined || 
+              bedChangePreview?.availableBedsInProperty !== undefined) && (
+              <View style={[styles.infoBox, { backgroundColor: colors.background.secondary }]}>
+                {bedChangePreview?.availableBedsInSameRoom !== undefined && (
+                  <Text style={[styles.infoText, { color: colors.text.secondary }]}>
+                    📍 Available beds in same room: <Text style={{ fontWeight: typography.fontWeight.bold }}>
+                      {bedChangePreview.availableBedsInSameRoom}
+                    </Text>
+                  </Text>
+                )}
+                {bedChangePreview?.availableBedsInProperty !== undefined && (
+                  <Text style={[styles.infoText, { color: colors.text.secondary, marginTop: spacing.xs }]}>
+                    🏠 Available beds in other rooms: <Text style={{ fontWeight: typography.fontWeight.bold }}>
+                      {bedChangePreview.availableBedsInProperty}
+                    </Text>
+                  </Text>
+                )}
+              </View>
+            )}
+
+            <View style={styles.bedChangeModalActions}>
+              <TouchableOpacity
+                style={[styles.bedChangeModalButton, { backgroundColor: colors.background.secondary }]}
+                onPress={() => {
+                  setShowBedChangeWarning(false);
+                  setNumberOfBeds(originalBedCount.toString()); // Reset to original
+                }}
+                disabled={loading}>
+                <Text style={[styles.bedChangeModalButtonText, { color: colors.text.primary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.bedChangeModalButton, { backgroundColor: colors.primary[500] }]}
+                onPress={() => {
+                  setShowBedChangeWarning(false);
+                  performSubmit(); // Proceed with the update
+                }}
+                disabled={loading}>
+                {loading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={[styles.bedChangeModalButtonText, { color: '#fff' }]}>
+                    Confirm & Update
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <UpgradeModal
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
@@ -407,6 +663,16 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     marginBottom: 0,
   },
+  subtitle: {
+    fontSize: typography.fontSize.sm,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   formContainer: {
     width: '100%',
   },
@@ -428,6 +694,11 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing.sm,
+  },
+  fieldNote: {
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
+    fontStyle: 'italic',
   },
   input: {
     borderRadius: radius.md,
@@ -507,6 +778,81 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCloseButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  bedChangeModalContent: {
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    margin: spacing.lg,
+    maxHeight: '80%',
+  },
+  bedChangeModalTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  bedChangeModalMessage: {
+    fontSize: typography.fontSize.md,
+    marginBottom: spacing.lg,
+    lineHeight: 22,
+  },
+  tenantsList: {
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.lg,
+    maxHeight: 300,
+  },
+  tenantItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: 1,
+  },
+  tenantInfo: {
+    flex: 1,
+  },
+  tenantName: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs,
+  },
+  tenantBed: {
+    fontSize: typography.fontSize.sm,
+  },
+  actionBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm,
+  },
+  actionBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  infoBox: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.lg,
+  },
+  infoText: {
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+  },
+  bedChangeModalActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  bedChangeModalButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bedChangeModalButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },

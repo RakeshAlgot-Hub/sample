@@ -38,6 +38,7 @@ export default function AddTenantScreen() {
   const [name, setName] = useState('John Doe');
   const [documentId, setDocumentId] = useState('1234567890');
   const [phone, setPhone] = useState('9876543210');
+  const [address, setAddress] = useState('');
   const [rent, setRent] = useState('5000');
   const [joinDate, setJoinDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -63,6 +64,17 @@ export default function AddTenantScreen() {
       const response = await bedService.getAvailableBedsByProperty(selectedPropertyId);
       if (response.data) {
         setRoomsWithBeds(response.data);
+        
+        // Auto-select if only one room available
+        if (response.data.length === 1) {
+          const roomData = response.data[0];
+          setSelectedRoom(roomData.room);
+          
+          // Auto-select if only one bed available in that room
+          if (roomData.availableBeds.length === 1) {
+            setSelectedBed(roomData.availableBeds[0]);
+          }
+        }
       } else {
         setRoomsWithBeds([]);
       }
@@ -95,10 +107,18 @@ export default function AddTenantScreen() {
       if (roomData) {
         setAvailableBedsForRoom(roomData.availableBeds);
         setRent(roomData.room.price.toString());
+        
+        // Auto-select if only one bed available
+        if (roomData.availableBeds.length === 1) {
+          setSelectedBed(roomData.availableBeds[0]);
+        } else {
+          // Only clear selection if there are 0 or multiple beds
+          setSelectedBed(null);
+        }
       } else {
         setAvailableBedsForRoom([]);
+        setSelectedBed(null);
       }
-      setSelectedBed(null);
     } else {
       setAvailableBedsForRoom([]);
       setSelectedBed(null);
@@ -119,13 +139,14 @@ export default function AddTenantScreen() {
       setError('No property selected');
       return;
     }
-    // Pass tenant details to billing setup screen
+    // Pass tenant details to billing setup screen (status will default to 'active' in backend)
     router.push({
       pathname: '/add-payment',
       params: {
         name: name.trim(),
         documentId: documentId.trim(),
         phone: phone.trim(),
+        address: address.trim(),
         rent: rentNum.toString(),
         joinDate,
         propertyId: selectedPropertyId,
@@ -326,6 +347,27 @@ export default function AddTenantScreen() {
                 value={phone}
                 onChangeText={setPhone}
                 editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.text.primary }]}>Address</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.background.secondary,
+                    color: colors.text.primary,
+                    borderColor: colors.border.medium,
+                  },
+                ]}
+                placeholder="e.g., 123 Main St, City"
+                placeholderTextColor={colors.text.tertiary}
+                value={address}
+                onChangeText={setAddress}
+                editable={!loading}
+                multiline
+                numberOfLines={2}
               />
             </View>
 

@@ -20,8 +20,22 @@ async def get_dashboard_stats(request: Request, property_id: str):
     payments_col = getCollection("payments")
     staff_col = getCollection("staff")
     
-    # Count tenants for this property
-    tenants_count = await tenants_col.count_documents({"propertyId": property_id, "archived": {"$ne": True}})
+    # Count tenants for this property - separate active and vacated
+    # Handle tenants with missing tenantStatus field (treat as 'active' by default)
+    active_tenants_count = await tenants_col.count_documents({
+        "propertyId": property_id,
+        "archived": {"$ne": True},
+        "$or": [
+            {"tenantStatus": "active"},
+            {"tenantStatus": {"$exists": False}}  # Existing tenants without the field default to active
+        ]
+    })
+    vacated_tenants_count = await tenants_col.count_documents({
+        "propertyId": property_id,
+        "archived": {"$ne": True},
+        "tenantStatus": "vacated"
+    })
+    tenants_count = active_tenants_count + vacated_tenants_count  # Total count
     
     # Count beds and occupancy
     total_beds = await beds_col.count_documents({"propertyId": property_id})
@@ -171,6 +185,8 @@ async def get_dashboard_stats(request: Request, property_id: str):
     return {
         "data": {
             "totalTenants": tenants_count,
+            "activeTenants": active_tenants_count,
+            "vacatedTenants": vacated_tenants_count,
             "totalBeds": total_beds,
             "occupiedBeds": occupied_beds,
             "availableBeds": available_beds,

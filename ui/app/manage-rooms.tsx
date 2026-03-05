@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -40,6 +41,8 @@ export default function ManageRoomsScreen() {
   const [showArchiveWarning, setShowArchiveWarning] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [warningAction, setWarningAction] = useState<'edit' | 'delete' | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchRooms = async () => {
     if (!selectedPropertyId) {
@@ -106,7 +109,7 @@ export default function ManageRoomsScreen() {
       setWarningAction('edit');
       setShowArchiveWarning(true);
     } else {
-      console.log('Edit room:', room);
+      router.push(`/room-form?roomId=${room.id}`);
     }
   };
 
@@ -116,7 +119,29 @@ export default function ManageRoomsScreen() {
       setWarningAction('delete');
       setShowArchiveWarning(true);
     } else {
-      console.log('Delete room:', room);
+      setSelectedRoom(room);
+      setShowDeleteConfirm(true);
+    }
+  };
+
+  const confirmDeleteRoom = async () => {
+    if (!selectedRoom) return;
+
+    try {
+      setDeleting(true);
+      await roomService.deleteRoom(selectedRoom.id);
+      
+      // Clear cache and refresh
+      const cacheKey = cacheKeys.rooms(selectedPropertyId!);
+      setScreenCache(cacheKey, null);
+      await fetchRooms();
+      
+      setShowDeleteConfirm(false);
+      setSelectedRoom(null);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to delete room');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -143,6 +168,8 @@ export default function ManageRoomsScreen() {
       </SafeAreaView>
     );
   }
+
+const showEmptyState = !!selectedProperty && !loading && rooms.length === 0 && !error;
 
   if (!selectedProperty) {
     return (
@@ -200,6 +227,14 @@ export default function ManageRoomsScreen() {
         }>
         {error ? (
           <ApiErrorCard error={error} onRetry={handleRetry} />
+        ) : showEmptyState ? (
+          <EmptyState
+            icon={DoorOpen}
+            title="No Rooms Yet"
+            subtitle="Add rooms to start organizing tenants and beds in your property"
+            actionLabel="Add Room"
+            onActionPress={handleAddRoom}
+          />
         ) : (
           <>
             {rooms.map((room, index) => (
@@ -292,7 +327,7 @@ export default function ManageRoomsScreen() {
         )}
       </ScrollView>
 
-      <FAB onPress={handleAddRoom} disabled={!isOnline} />
+      {!showEmptyState && <FAB onPress={handleAddRoom} disabled={!isOnline} />}
 
       <ArchiveWarningModal
         visible={showArchiveWarning}
@@ -305,6 +340,58 @@ export default function ManageRoomsScreen() {
           setSelectedRoom(null);
         }}
       />
+
+      <Modal
+        visible={showDeleteConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteConfirm(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background.primary }]}>
+            <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Delete Room?</Text>
+            
+            <Text style={[styles.modalMessage, { color: colors.text.secondary }]}>
+              This room will be permanently deleted. This action cannot be undone.
+            </Text>
+
+            <View style={[styles.warningBox, { 
+              backgroundColor: colors.background.secondary, 
+              borderColor: colors.danger[500] 
+            } as any]}>
+              <Text style={[styles.warningTitle, { color: colors.danger[500] } as any]}>⚠️ Warning</Text>
+              <Text style={[styles.warningText, { color: colors.text.secondary }]}>
+                • All tenants in this room will be marked as vacated{'\n'}
+                • All beds in this room will become available
+              </Text>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.background.secondary }]}
+                onPress={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text.primary }]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteButton, { 
+                  backgroundColor: colors.danger[500] 
+                } as any]}
+                onPress={confirmDeleteRoom}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={[styles.modalButtonText, { color: '#fff' }]}>Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -486,5 +573,60 @@ const styles = StyleSheet.create({
   roomNumber: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.md,
+  },
+  modalMessage: {
+    fontSize: typography.fontSize.md,
+    marginBottom: spacing.lg,
+    lineHeight: 22,
+  },
+  warningBox: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+  },
+  warningTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
+  },
+  warningText: {
+    fontSize: typography.fontSize.sm,
+    lineHeight: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButton: {
+    // backgroundColor set inline
+  },
+  modalButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

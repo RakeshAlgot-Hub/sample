@@ -46,6 +46,7 @@ export default function AddPaymentScreen() {
   const [name, setName] = useState(typeof params.name === 'string' ? params.name : '');
   const [documentId, setDocumentId] = useState(typeof params.documentId === 'string' ? params.documentId : '');
   const [phone, setPhone] = useState(typeof params.phone === 'string' ? params.phone : '');
+  const [address] = useState(typeof params.address === 'string' ? params.address : '');
   const [rent, setRent] = useState(typeof params.rent === 'string' ? params.rent : ''); // Rent remains unchanged
   const [joinDate, setJoinDate] = useState(typeof params.joinDate === 'string' ? params.joinDate : '');
   const [roomId] = useState(typeof params.roomId === 'string' ? params.roomId : '');
@@ -110,13 +111,14 @@ export default function AddPaymentScreen() {
           name: typeof name === 'string' ? name.trim() : '',
           documentId: typeof documentId === 'string' ? documentId.trim() : '',
           phone: typeof phone === 'string' ? phone.trim() : '',
+          address: typeof address === 'string' ? address.trim() : '',
           rent: rent,
           joinDate,
         },
         status,
         anchorDay,
       };
-      // Call backend to create tenant
+      // Call backend to create tenant (tenantStatus will default to 'active' in backend)
       const tenantPayload: any = {
         ...payload.tenant,
         autoGeneratePayments,
@@ -305,17 +307,17 @@ export default function AddPaymentScreen() {
                     activeOpacity={0.7}
                     disabled={loading}>
                     <Text style={[styles.pickerButtonText, { color: colors.text.primary }]}>
-                      📅 Day ${anchorDay} • Every Month
+                      📅 Day {anchorDay} • Every Month
                     </Text>
                     <ChevronDown size={20} color={colors.text.tertiary} />
                   </TouchableOpacity>
                 )}
+                {status !== 'due' && (
+                  <Text style={[styles.helperText, { color: colors.text.secondary, marginTop: spacing.sm }]}>
+                    Same day each month
+                  </Text>
+                )}
               </View>
-              {status !== 'due' && (
-                <Text style={[styles.helperText, { color: colors.text.secondary, marginTop: 2 }]}>
-                  Rent is due on the same day every month. Example: Day 2 = Jan 2, Feb 2, Mar 2, Apr 2, etc.
-                </Text>
-              )}
               </>
             )}
 
@@ -458,7 +460,7 @@ export default function AddPaymentScreen() {
                               : typography.fontWeight.regular,
                         },
                       ]}>
-                      Day ${day} • Every Month
+                      Day {day} • Every Month
                     </Text>
                   </TouchableOpacity>
                 ))}

@@ -96,6 +96,8 @@ class TenantService:
                         "phone": 1,
                         "rent": 1,
                         "status": 1,
+                        "tenantStatus": 1,
+                        "address": 1,
                         "joinDate": 1,
                         "checkoutDate": 1,
                         "createdAt": 1,
@@ -192,13 +194,29 @@ class TenantService:
         # Check if bedId is being changed
         orig_doc = await self.collection.find_one({"_id": ObjectId(tenant_id)})
         orig_bed_id = orig_doc.get("bedId") if orig_doc else None
+        orig_status = orig_doc.get("tenantStatus") if orig_doc else None
         new_bed_id = tenant_data.get("bedId")
-        if orig_bed_id and orig_bed_id != new_bed_id:
+        new_status = tenant_data.get("tenantStatus")
+        
+        # Handle tenant vacating - free up the bed and set checkout date
+        if new_status == "vacated" and orig_status != "vacated":
+            if orig_bed_id:
+                # Set bed to available and clear tenantId
+                await bed_service.update_bed(orig_bed_id, BedUpdate(status=BedStatus.AVAILABLE.value, tenantId=None))
+            # Set checkout date if not already set
+            if not tenant_data.get("checkoutDate"):
+                tenant_data["checkoutDate"] = datetime.now(timezone.utc).isoformat()
+            # Clear billingConfig for vacated tenant
+            tenant_data["billingConfig"] = None
+        
+        # Handle regular bedId changes
+        if orig_bed_id and orig_bed_id != new_bed_id and new_status != "vacated":
             # Set previous bed to available and clear tenantId
             await bed_service.update_bed(orig_bed_id, BedUpdate(status=BedStatus.AVAILABLE.value, tenantId=None))
-        if new_bed_id and orig_bed_id != new_bed_id:
+        if new_bed_id and orig_bed_id != new_bed_id and new_status != "vacated":
             # Set new bed to occupied with tenantId
             await bed_service.update_bed(new_bed_id, BedUpdate(status=BedStatus.OCCUPIED.value, tenantId=tenant_id))
+        
         # Ensure billingConfig is present and stored
         if "billingConfig" in tenant_data:
             tenant_data["billingConfig"] = tenant_data["billingConfig"] or None

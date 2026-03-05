@@ -54,6 +54,11 @@ class SubscriptionEnforcement:
 
             # Get plan limits
             limits = await SubscriptionService.get_plan_limits(sub.plan)
+            
+            # If plan not found in database, use fallback limits
+            if not limits:
+                logger.warning(f"Plan {sub.plan} not found in database, using fallback limits")
+                limits = {"properties": 1, "tenants": 80, "rooms": 30, "staff": 3}
 
             # Count existing properties using string owner_id
             current = await db["properties"].count_documents(build_owner_query(owner_id))
@@ -117,6 +122,11 @@ class SubscriptionEnforcement:
 
             # Get plan limits
             limits = await SubscriptionService.get_plan_limits(sub.plan)
+            
+            # If plan not found in database, use fallback limits
+            if not limits:
+                logger.warning(f"Plan {sub.plan} not found in database, using fallback limits")
+                limits = {"properties": 1, "tenants": 80, "rooms": 30, "staff": 3}
 
             # Count existing tenants in THIS property only (not across all properties)
             current = await db["tenants"].count_documents(
@@ -182,6 +192,11 @@ class SubscriptionEnforcement:
 
             # Get plan limits
             limits = await SubscriptionService.get_plan_limits(sub.plan)
+            
+            # If plan not found in database, use fallback limits
+            if not limits:
+                logger.warning(f"Plan {sub.plan} not found in database, using fallback limits")
+                limits = {"properties": 1, "tenants": 80, "rooms": 30, "staff": 3}
 
             # Count existing rooms in THIS property
             current = await db["rooms"].count_documents(
@@ -248,6 +263,11 @@ class SubscriptionEnforcement:
 
             # Get plan limits
             limits = await SubscriptionService.get_plan_limits(sub.plan)
+            
+            # If plan not found in database, use fallback limits
+            if not limits:
+                logger.warning(f"Plan {sub.plan} not found in database, using fallback limits")
+                limits = {"properties": 1, "tenants": 80, "rooms": 30, "staff": 3}
 
             # Count existing staff in THIS property (not archived)
             current = await db["staff"].count_documents(
@@ -286,6 +306,11 @@ class SubscriptionEnforcement:
         try:
             sub = await SubscriptionService.get_subscription(owner_id)
             limits = await SubscriptionService.get_plan_limits(sub.plan)
+            
+            # If plan not found in database, use fallback limits
+            if not limits:
+                logger.warning(f"Plan {sub.plan} not found in database, using fallback limits")
+                limits = {"properties": 1, "tenants": 80, "rooms": 30, "staff": 3}
 
             # Get actual usage
             owned_properties = await db["properties"].find(

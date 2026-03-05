@@ -9,6 +9,10 @@ class BillingStatus(str, Enum):
 class BillingCycle(str, Enum):
     MONTHLY = 'monthly'
 
+class TenantStatus(str, Enum):
+    ACTIVE = 'active'
+    VACATED = 'vacated'
+
 class BillingConfig(BaseModel):
     status: Literal['paid', 'due']
     billingCycle: Literal['monthly']
@@ -25,6 +29,8 @@ class Tenant(BaseModel):
     phone: Optional[str] = None
     rent: Optional[str] = None
     status: Optional[str] = None
+    tenantStatus: Optional[Literal['active', 'vacated']] = 'active'
+    address: Optional[str] = None
     joinDate: Optional[str] = None
     checkoutDate: Optional[str] = None
     createdAt: Optional[str] = None
@@ -46,6 +52,8 @@ class TenantOut(BaseModel):
     phone: Optional[str] = None
     rent: Optional[str] = None
     status: Optional[str] = None
+    tenantStatus: Optional[Literal['active', 'vacated']] = 'active'
+    address: Optional[str] = None
     joinDate: Optional[str] = None
     checkoutDate: Optional[str] = None
     createdAt: Optional[str] = None
@@ -68,6 +76,8 @@ class TenantCreate(BaseModel):
     phone: Optional[str] = None
     rent: Optional[str] = None
     status: Optional[str] = None
+    tenantStatus: Optional[Literal['active', 'vacated']] = 'active'
+    address: Optional[str] = None
     joinDate: Optional[str] = None
     checkoutDate: Optional[str] = None
     billingConfig: Optional[BillingConfig] = None
@@ -82,6 +92,8 @@ class TenantUpdate(BaseModel):
     phone: Optional[str] = None
     rent: Optional[str] = None
     status: Optional[str] = None
+    tenantStatus: Optional[Literal['active', 'vacated']] = None
+    address: Optional[str] = None
     joinDate: Optional[str] = None
     checkoutDate: Optional[str] = None
     billingConfig: Optional[BillingConfig] = None

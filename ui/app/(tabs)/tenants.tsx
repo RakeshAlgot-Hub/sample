@@ -18,7 +18,7 @@ import Skeleton from '@/components/Skeleton';
 import ApiErrorCard from '@/components/ApiErrorCard';
 import FAB from '@/components/FAB';
 import UpgradeModal from '@/components/UpgradeModal';
-import { Search, Filter, Phone, Users, Archive } from 'lucide-react-native';
+import { Search, Filter, Phone, Users, Archive, LogOut } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useProperty } from '@/context/PropertyContext';
@@ -336,6 +336,12 @@ export default function TenantsScreen() {
                       <View style={styles.tenantInfo}>
                         <View style={styles.tenantNameRow}>
                           <Text style={[styles.tenantName, { color: colors.text.primary }]}>{tenant.name}</Text>
+                          {tenant.tenantStatus === 'vacated' && (
+                            <View style={[styles.archivedBadge, { backgroundColor: colors.danger[100] }]}>
+                              <LogOut size={12} color={colors.danger[600]} />
+                              <Text style={[styles.archivedBadgeText, { color: colors.danger[600] }]}>Vacated</Text>
+                            </View>
+                          )}
                           {tenant.archived === true && (
                             <View style={[styles.archivedBadge, { backgroundColor: colors.warning[100] }]}>
                               <Archive size={12} color={colors.warning[600]} />

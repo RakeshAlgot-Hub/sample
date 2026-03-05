@@ -162,7 +162,7 @@ async def list_payments(
                             }
                         }
                     },
-                    {"$project": {"_id": 1, "name": 1, "roomId": 1}}
+                    {"$project": {"_id": 1, "name": 1, "roomId": 1, "tenantStatus": 1}}
                 ]
             }
         },
@@ -248,6 +248,7 @@ async def list_payments(
                 "createdAt": 1,
                 "updatedAt": 1,
                 "tenantName": {"$arrayElemAt": ["$tenant.name", 0]},
+                "tenantStatus": {"$arrayElemAt": ["$tenant.tenantStatus", 0]},
                 "roomNumber": {
                     "$ifNull": [
                         {"$arrayElemAt": ["$bed_info.roomNumber", 0]},
@@ -296,10 +297,11 @@ async def get_payment(request: Request, payment_id: str):
         try:
             tenant_doc = await getCollection("tenants").find_one(
                 {"_id": ObjectId(payment.tenantId)},
-                {"name": 1, "roomId": 1}
+                {"name": 1, "roomId": 1, "tenantStatus": 1}
             )
             if tenant_doc:
                 payment_dict["tenantName"] = tenant_doc.get("name", "Unknown")
+                payment_dict["tenantStatus"] = tenant_doc.get("tenantStatus")
                 tenant_room_id = tenant_doc.get("roomId")
         except Exception:
             # Skip if tenant ID is invalid

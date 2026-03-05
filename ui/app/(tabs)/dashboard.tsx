@@ -94,6 +94,8 @@ export default function DashboardScreen() {
 
       const stats = statsRes.data || {
         totalTenants: 0,
+        activeTenants: 0,
+        vacatedTenants: 0,
         totalBeds: 0,
         occupiedBeds: 0,
         availableBeds: 0,
@@ -340,6 +342,24 @@ export default function DashboardScreen() {
                         </Text>
                       </View>
                     </Card>
+                  )}
+
+                  {dashboardData?.stats.activeTenants !== undefined && (
+                    <TouchableOpacity 
+                      onPress={() => router.push('/tenants')}
+                      activeOpacity={0.7}>
+                      <Card style={styles.quickStatCard}>
+                        <View style={[styles.quickStatIcon, { backgroundColor: colors.success[50] }]}>
+                          <Users size={18} color={colors.success[500]} />
+                        </View>
+                        <View>
+                          <Text style={[styles.quickStatLabel, { color: colors.text.secondary }]}>Tenant Status</Text>
+                          <Text style={[styles.quickStatValue, { color: colors.text.primary }]}>
+                            {dashboardData.stats.activeTenants} Active{dashboardData.stats.vacatedTenants ? `, ${dashboardData.stats.vacatedTenants} Vacated` : ''}
+                          </Text>
+                        </View>
+                      </Card>
+                    </TouchableOpacity>
                   )}
                 </View>
 

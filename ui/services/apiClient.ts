@@ -679,6 +679,15 @@ export const roomService = {
   async deleteRoom(id: string): Promise<ApiResponse<{ success: boolean }>> {
     return await request<{ success: boolean }>('DELETE', `/rooms/${id}`, undefined, true) as ApiResponse<{ success: boolean }>;
   },
+
+  async previewBedCountChange(id: string, newBedCount: number): Promise<ApiResponse<any>> {
+    return await request<any>(
+      'GET', 
+      `/rooms/${id}/preview-bed-change?new_bed_count=${newBedCount}`, 
+      undefined, 
+      true
+    ) as ApiResponse<any>;
+  },
 };
 
 export const bedService = {

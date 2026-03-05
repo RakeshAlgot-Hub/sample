@@ -356,6 +356,10 @@ export default function ManagePropertiesScreen() {
                   colors={colors}
                 />
                 <WarningItem
+                  text="All staff"
+                  colors={colors}
+                />
+                <WarningItem
                   text="All payments"
                   colors={colors}
                 />

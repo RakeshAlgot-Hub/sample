@@ -75,6 +75,9 @@ export default function TenantDetailScreen() {
   const [editTenantName, setEditTenantName] = useState('');
   const [editTenantPhone, setEditTenantPhone] = useState('');
   const [editTenantRent, setEditTenantRent] = useState('');
+  const [editTenantAddress, setEditTenantAddress] = useState('');
+  const [editTenantStatus, setEditTenantStatus] = useState<'active' | 'vacated'>('active');
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [tenantActionLoading, setTenantActionLoading] = useState(false);
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -322,6 +325,8 @@ export default function TenantDetailScreen() {
     setEditTenantName(tenant.name || '');
     setEditTenantPhone(tenant.phone || '');
     setEditTenantRent(tenant.rent || '');
+    setEditTenantAddress(tenant.address || '');
+    setEditTenantStatus(tenant.tenantStatus || 'active');
     setShowEditTenantModal(true);
   };
 
@@ -331,6 +336,7 @@ export default function TenantDetailScreen() {
     const name = editTenantName.trim();
     const phone = editTenantPhone.trim();
     const rent = editTenantRent.trim();
+    const address = editTenantAddress.trim();
 
     if (!name || !phone || !rent) {
       Alert.alert('Validation', 'Name, phone, and rent are required.');
@@ -348,6 +354,8 @@ export default function TenantDetailScreen() {
         name,
         phone,
         rent,
+        address,
+        tenantStatus: editTenantStatus,
       });
       if (response.data) {
         setTenant((prev) => prev ? { ...prev, ...response.data } : prev);
@@ -355,6 +363,26 @@ export default function TenantDetailScreen() {
       setShowEditTenantModal(false);
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to update tenant');
+    } finally {
+      setTenantActionLoading(false);
+    }
+  };
+
+  const handleQuickStatusToggle = async () => {
+    if (!tenant) return;
+
+    const newStatus: 'active' | 'vacated' = tenant.tenantStatus === 'active' ? 'vacated' : 'active';
+    
+    try {
+      setTenantActionLoading(true);
+      const response = await tenantService.updateTenant(tenant.id, {
+        tenantStatus: newStatus,
+      });
+      if (response.data) {
+        setTenant((prev) => prev ? { ...prev, ...response.data } : prev);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to update tenant status');
     } finally {
       setTenantActionLoading(false);
     }
@@ -517,6 +545,44 @@ export default function TenantDetailScreen() {
                   <Text style={[styles.contactText, { color: colors.text.primary }]}>
                     {tenant.phone}
                   </Text>
+                </View>
+                {tenant.address && (
+                  <View style={styles.contactItem}>
+                    <MapPin size={16} color={colors.text.secondary} />
+                    <Text style={[styles.contactText, { color: colors.text.primary }]}>
+                      {tenant.address}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.contactItem}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.contactText, { color: colors.text.primary }]}>
+                      Status: <Text style={{ color: tenant.tenantStatus === 'active' ? colors.success[600] : colors.danger[600], fontWeight: typography.fontWeight.semibold as any }}>{tenant.tenantStatus === 'active' ? 'Active' : 'Vacated'}</Text>
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.statusToggleButton,
+                      {
+                        backgroundColor: tenant.tenantStatus === 'active' ? colors.danger[50] : colors.success[50],
+                        borderColor: tenant.tenantStatus === 'active' ? colors.danger[200] : colors.success[200],
+                      },
+                    ]}
+                    onPress={handleQuickStatusToggle}
+                    disabled={tenantActionLoading || !isOnline}
+                    activeOpacity={0.7}>
+                    <Text
+                      style={[
+                        styles.statusToggleButtonText,
+                        {
+                          color: tenant.tenantStatus === 'active' ? colors.danger[600] : colors.success[600],
+                          fontSize: typography.fontSize.xs,
+                          fontWeight: typography.fontWeight.semibold as any,
+                        },
+                      ]}>
+                      {tenant.tenantStatus === 'active' ? 'Vacate' : 'Activate'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
                 <View style={styles.contactItem}>
                   <Calendar size={16} color={colors.text.secondary} />
@@ -784,6 +850,46 @@ export default function TenantDetailScreen() {
                 />
               </View>
 
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Address</Text>
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: colors.background.secondary, borderColor: colors.border.medium, color: colors.text.primary }]}
+                  value={editTenantAddress}
+                  onChangeText={setEditTenantAddress}
+                  placeholder="Enter address"
+                  placeholderTextColor={colors.text.tertiary}
+                  editable={!tenantActionLoading}
+                  multiline
+                  numberOfLines={2}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Status</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.pickerButton,
+                    {
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.medium,
+                    },
+                  ]}
+                  onPress={() => setShowStatusPicker(true)}
+                  activeOpacity={0.7}
+                  disabled={tenantActionLoading}>
+                  <Text
+                    style={[
+                      styles.pickerButtonText,
+                      {
+                        color: colors.text.primary,
+                      },
+                    ]}>
+                    {editTenantStatus === 'active' ? 'Active' : 'Vacated'}
+                  </Text>
+                  <ChevronDown size={20} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity
                 style={[
                   styles.submitButton,
@@ -850,10 +956,10 @@ export default function TenantDetailScreen() {
                       onPress={() => setShowAnchorDayPicker(true)}
                       activeOpacity={0.7}
                       disabled={editLoading}>
-                      <Text style={[styles.pickerButtonText, { color: colors.text.primary }]}>📅 Day ${editAnchorDay} • Every Month</Text>
+                      <Text style={[styles.pickerButtonText, { color: colors.text.primary }]}>📅 Day {editAnchorDay} • Every Month</Text>
                       <ChevronDown size={20} color={colors.text.tertiary} />
                     </TouchableOpacity>
-                    <Text style={[styles.summaryLabel, { color: colors.text.secondary, marginTop: spacing.xs }]}>Rent is due on the same day every month. Example: Day 2 = Jan 2, Feb 2, Mar 2, Apr 2, etc.</Text>
+                    <Text style={[styles.summaryLabel, { color: colors.text.secondary, marginTop: spacing.xs }]}>Same day each month</Text>
                   </View>
                 </>
               )}
@@ -915,7 +1021,7 @@ export default function TenantDetailScreen() {
                             : typography.fontWeight.regular,
                       },
                     ]}>
-                    Day ${day} • Every Month
+                    Day {day} • Every Month
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -923,6 +1029,75 @@ export default function TenantDetailScreen() {
             <TouchableOpacity
               style={[styles.pickerCloseButton, { borderTopColor: colors.border.light }]}
               onPress={() => setShowAnchorDayPicker(false)}
+              activeOpacity={0.7}>
+              <Text style={[styles.pickerCloseButtonText, { color: colors.text.secondary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Status Picker Modal */}
+      <Modal
+        visible={showStatusPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowStatusPicker(false)}>
+        <View style={[styles.pickerOverlay, { backgroundColor: colors.modal.overlay }]}>
+          <View style={[styles.pickerContainer, { backgroundColor: colors.background.secondary }]}>
+            <View style={[styles.pickerHeader, { borderBottomColor: colors.border.light }]}>
+              <Text style={[styles.pickerTitle, { color: colors.text.primary }]}>Select Status</Text>
+            </View>
+            <ScrollView style={styles.pickerScrollView}>
+              <TouchableOpacity
+                style={[styles.pickerOption, { borderBottomColor: colors.border.light }]}
+                onPress={() => {
+                  setEditTenantStatus('active');
+                  setShowStatusPicker(false);
+                }}
+                activeOpacity={0.7}>
+                <Text
+                  style={[
+                    styles.pickerOptionText,
+                    {
+                      color:
+                        editTenantStatus === 'active' ? colors.primary[500] : colors.text.primary,
+                      fontWeight:
+                        editTenantStatus === 'active'
+                          ? typography.fontWeight.semibold
+                          : typography.fontWeight.regular,
+                    },
+                  ]}>
+                  Active
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.pickerOption, { borderBottomColor: colors.border.light }]}
+                onPress={() => {
+                  setEditTenantStatus('vacated');
+                  setShowStatusPicker(false);
+                }}
+                activeOpacity={0.7}>
+                <Text
+                  style={[
+                    styles.pickerOptionText,
+                    {
+                      color:
+                        editTenantStatus === 'vacated' ? colors.primary[500] : colors.text.primary,
+                      fontWeight:
+                        editTenantStatus === 'vacated'
+                          ? typography.fontWeight.semibold
+                          : typography.fontWeight.regular,
+                    },
+                  ]}>
+                  Vacated
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.pickerCloseButton, { borderTopColor: colors.border.light }]}
+              onPress={() => setShowStatusPicker(false)}
               activeOpacity={0.7}>
               <Text style={[styles.pickerCloseButtonText, { color: colors.text.secondary }]}>
                 Cancel
@@ -1014,9 +1189,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   contactText: {
     fontSize: typography.fontSize.md,
+  },
+  statusToggleButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  statusToggleButtonText: {
+    textAlign: 'center',
   },
   section: {
     marginBottom: spacing.lg,

@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  LogOut,
 } from 'lucide-react-native';
 import { spacing, typography, radius, shadows } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -330,9 +331,17 @@ export default function PaymentsScreen() {
                         {getStatusIcon(payment.status)}
                       </View>
                       <View style={styles.paymentInfo}>
-                        <Text style={[styles.tenantName, { color: colors.text.primary }]}>
-                          {payment.tenantName || 'Unknown Tenant'}
-                        </Text>
+                        <View style={styles.tenantNameRow}>
+                          <Text style={[styles.tenantName, { color: colors.text.primary }]}>
+                            {payment.tenantName || 'Unknown Tenant'}
+                          </Text>
+                          {payment.tenantStatus === 'vacated' && (
+                            <View style={[styles.vacatedBadge, { backgroundColor: colors.danger[100] }]}>
+                              <LogOut size={12} color={colors.danger[600]} />
+                              <Text style={[styles.vacatedBadgeText, { color: colors.danger[600] }]}>Vacated</Text>
+                            </View>
+                          )}
+                        </View>
                         <Text style={[styles.bedNumber, { color: colors.text.tertiary }]}>Room: {payment.roomNumber || 'N/A'}</Text>
                       </View>
                       <View style={styles.amountContainer}>
@@ -555,10 +564,27 @@ const styles = StyleSheet.create({
   paymentInfo: {
     flex: 1,
   },
+  tenantNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   tenantName: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.bold,
     marginBottom: 2,
+  },
+  vacatedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  vacatedBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
   },
   propertyName: {
     fontSize: typography.fontSize.sm,
