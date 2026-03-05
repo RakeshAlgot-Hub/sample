@@ -2,7 +2,6 @@ from fastapi import APIRouter, status, Request, HTTPException
 from app.models.property_schema import PropertyCreate, PropertyOut, PropertyUpdate
 from app.services.property_service import PropertyService
 from app.services.subscription_enforcement import SubscriptionEnforcement
-from typing import List
 
 
 router = APIRouter(prefix="/properties", tags=["properties"])
@@ -22,11 +21,31 @@ async def create_property(request: Request, property: PropertyCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error creating property. Please try again.")
 
-@router.get("", response_model=List[PropertyOut])
-async def get_properties(request: Request):
+@router.get("")
+async def get_properties(
+    request: Request,
+    page: int = 1,
+    page_size: int = 50
+):
+    """Get properties with pagination support"""
     try:
+        # Validate and normalize pagination params
+        page = max(1, page)
+        page_size = min(100, max(1, page_size))  # Cap at 100 per page
+        skip = (page - 1) * page_size
+        
         user_id = getattr(request.state, "user_id", None)
-        return await property_service.list_properties(user_id)
+        properties, total = await property_service._list_properties_paginated(user_id, skip=skip, limit=page_size)
+        
+        return {
+            "data": [prop.model_dump() for prop in properties],
+            "meta": {
+                "total": total,
+                "page": page,
+                "pageSize": page_size,
+                "hasMore": skip + page_size < total
+            }
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error retrieving properties. Please try again.")
 

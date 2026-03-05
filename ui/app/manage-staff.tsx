@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -49,6 +49,8 @@ const STAFF_STATUS = [
   { label: 'Terminated', value: 'terminated' },
 ];
 
+const STAFF_FOCUS_THROTTLE_MS = 60 * 1000;
+
 export default function ManageStaffScreen() {
   const { colors } = useTheme();
   const router = useRouter();
@@ -83,6 +85,7 @@ export default function ManageStaffScreen() {
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const lastStaffFocusRefreshRef = useRef<number>(0);
 
   // Load all staff data (without filters)
   const loadAllStaff = useCallback(async () => {
@@ -131,10 +134,14 @@ export default function ManageStaffScreen() {
     return filtered;
   }, [staffList, search, selectedRole]);
 
-  // Load staff on component focus (not on filter changes)
+  // Load staff on component focus with throttle (not on filter changes)
   useFocusEffect(
     useCallback(() => {
-      loadAllStaff();
+      const now = Date.now();
+      if (lastStaffFocusRefreshRef.current === 0 || (now - lastStaffFocusRefreshRef.current) > STAFF_FOCUS_THROTTLE_MS) {
+        lastStaffFocusRefreshRef.current = now;
+        loadAllStaff();
+      }
     }, [loadAllStaff])
   );
 

@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { spacing, typography, radius } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -193,7 +193,6 @@ export default function DatePicker({
         onPress={() => !disabled && setShowModal(true)}
         activeOpacity={0.7}
         disabled={disabled}>
-        <Calendar size={20} color={colors.text.tertiary} />
         <Text
           style={[
             styles.inputText,

@@ -217,21 +217,29 @@ export default function PaymentsScreen() {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     setError(null);
-    
-    // Clear cache immediately
+
+    // Clear only payments cache
     clearScreenCache('payments:');
-    
-    // Reset to current month
-    setSelectedDate(new Date());
+
+    // Reset to current month / first page
+    const now = new Date();
+    const isAlreadyCurrentMonth =
+      selectedDate.getFullYear() === now.getFullYear() &&
+      selectedDate.getMonth() === now.getMonth();
+    const isAlreadyFirstPage = currentPage === 1;
+
+    setSelectedDate(now);
     setCurrentPage(1);
-    
+
     try {
-      // Fetch with fresh data (cache is cleared)
-      await fetchPayments();
+      // Avoid duplicate network calls when month/page state changes will trigger fetch via effect
+      if (isAlreadyCurrentMonth && isAlreadyFirstPage) {
+        await fetchPayments();
+      }
     } finally {
       setIsRefreshing(false);
     }
-  }, [selectedPropertyId]);
+  }, [selectedDate, currentPage]);
 
   const handleFabPress = () => {
     router.push('/manual-payment');

@@ -6,6 +6,7 @@ from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -19,6 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from app.utils.exception_handlers import add_global_exception_handlers
 from app.middleware.user_context import UserContextMiddleware
+from app.middleware.timing_middleware import TimingMiddleware
 
 # Configure logging for APScheduler
 logging.basicConfig()
@@ -92,6 +94,13 @@ async def ensure_indexes():
     await create_index_safe("payments", "dueDate")
     await create_index_safe("payments", [("propertyId", 1), ("status", 1)])
     # Unique index to prevent duplicate payments (non-sparse to enforce uniqueness)
+        # Additional compound index for common tenant queries
+    await create_index_safe("tenants", [("propertyId", 1), ("billingConfig.status", 1)])
+    # Text search index for tenant search functionality
+    try:
+        await create_index_safe("tenants", [("name", "text"), ("phone", "text"), ("documentId", "text")])
+    except Exception:
+        pass  # Text indexes can conflict, skip if already exists
     await create_index_safe("payments", [("tenantId", 1), ("dueDate", 1)], unique=True)
     logger.info("✓ Payments indexes created (including unique tenantId+dueDate)")
     
@@ -100,6 +109,8 @@ async def ensure_indexes():
     await create_index_safe("staff", "role")
     await create_index_safe("staff", "status")
     await create_index_safe("staff", [("propertyId", 1), ("archived", 1)])
+        # Compound index for efficient payment queries by property and due date
+    await create_index_safe("payments", [("propertyId", 1), ("dueDate", 1)])
     logger.info("✓ Staff indexes created")
     
     # ============ SUBSCRIPTIONS COLLECTION ============
@@ -109,12 +120,16 @@ async def ensure_indexes():
     await create_index_safe("subscriptions", [("ownerId", 1), ("status", 1)])
     logger.info("✓ Subscriptions indexes created")
     
+        # Compound index for room-specific bed queries
+    await create_index_safe("beds", [("roomId", 1), ("status", 1)])
     # ============ EMAIL OTP COLLECTION ============
     await create_index_safe("email_otps", "email")
     await create_index_safe("email_otps", "createdAt", expireAfterSeconds=60*10)  # Auto-delete after 10 minutes
     logger.info("✓ Email OTP indexes created (TTL: 10 minutes)")
     
     # ============ OTP ATTEMPTS COLLECTION ============
+        # Compound index for room number uniqueness checks
+    await create_index_safe("rooms", [("propertyId", 1), ("roomNumber", 1)])
     await create_index_safe("otp_attempts", "email")
     await create_index_safe("otp_attempts", "createdAt", expireAfterSeconds=60*60)  # Auto-delete after 1 hour
     logger.info("✓ OTP Attempts indexes created (TTL: 1 hour)")
@@ -122,6 +137,11 @@ async def ensure_indexes():
     # ============ RAZORPAY ORDERS COLLECTION ============
     await create_index_safe("razorpay_orders", "order_id", unique=True)
     await create_index_safe("razorpay_orders", "propertyId")
+        # Text search index for property search
+    try:
+        await create_index_safe("properties", [("name", "text"), ("address", "text")])
+    except Exception:
+        pass  # Text indexes can conflict, skip if already exists
     await create_index_safe("razorpay_orders", "createdAt")
     logger.info("✓ Razorpay Orders indexes created")
     
@@ -214,6 +234,12 @@ async def lifespan(app):
 
 
 app = FastAPI(lifespan=lifespan)
+# Enable response compression for better performance (reduces bandwidth by 60-80%)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Add timing middleware to track slow requests
+app.add_middleware(TimingMiddleware)
+
 app.add_middleware(UserContextMiddleware)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 enforce_https = os.getenv("ENFORCE_HTTPS", "False").lower() == "true"

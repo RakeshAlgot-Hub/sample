@@ -55,6 +55,167 @@ interface RequestOptions {
 // Request deduplication cache to prevent duplicate in-flight requests
 const inFlightRequests = new Map<string, Promise<any>>();
 
+type CachedResponse = ApiResponse<any> | PaginatedResponse<any>;
+
+interface CachePolicy {
+  freshMs: number;
+  maxStaleMs: number;
+}
+
+interface MemoryCacheEntry {
+  data: CachedResponse;
+  timestamp: number;
+  expiresAt: number;
+}
+
+const NETWORK_TIMEOUT_MS = 12000;
+const MAX_GET_RETRIES = 2;
+const MEMORY_CACHE_MAX_ENTRIES = 200;
+const BACKOFF_BASE_MS = 250;
+
+const memoryCache = new Map<string, MemoryCacheEntry>();
+
+function getEndpointPath(endpoint: string): string {
+  const path = endpoint.split('?')[0] || '/';
+  if (path.length > 1 && path.endsWith('/')) {
+    return path.slice(0, -1);
+  }
+  return path;
+}
+
+function getCachePolicy(endpoint: string): CachePolicy {
+  const path = getEndpointPath(endpoint);
+
+  if (path.startsWith('/dashboard')) {
+    return { freshMs: 20 * 1000, maxStaleMs: 2 * 60 * 1000 };
+  }
+  if (path.startsWith('/subscription')) {
+    return { freshMs: 60 * 1000, maxStaleMs: 10 * 60 * 1000 };
+  }
+  if (path.startsWith('/properties')) {
+    return { freshMs: 60 * 1000, maxStaleMs: 10 * 60 * 1000 };
+  }
+  if (path.startsWith('/tenants') || path.startsWith('/rooms') || path.startsWith('/beds') || path.startsWith('/staff')) {
+    return { freshMs: 30 * 1000, maxStaleMs: 5 * 60 * 1000 };
+  }
+  if (path.startsWith('/payments')) {
+    return { freshMs: 20 * 1000, maxStaleMs: 2 * 60 * 1000 };
+  }
+  if (path.startsWith('/auth/me')) {
+    return { freshMs: 15 * 1000, maxStaleMs: 60 * 1000 };
+  }
+
+  return { freshMs: 30 * 1000, maxStaleMs: 5 * 60 * 1000 };
+}
+
+function setMemoryCacheEntry(key: string, data: CachedResponse, maxStaleMs: number, timestamp: number = Date.now()): void {
+  if (memoryCache.size >= MEMORY_CACHE_MAX_ENTRIES) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (oldestKey) {
+      memoryCache.delete(oldestKey);
+    }
+  }
+
+  memoryCache.set(key, {
+    data,
+    timestamp,
+    expiresAt: timestamp + maxStaleMs,
+  });
+}
+
+function getMemoryCacheEntry<T extends CachedResponse>(key: string, maxAgeMs: number): T | null {
+  const entry = memoryCache.get(key);
+  if (!entry) return null;
+
+  const age = Date.now() - entry.timestamp;
+  if (age > maxAgeMs || Date.now() > entry.expiresAt) {
+    memoryCache.delete(key);
+    return null;
+  }
+
+  return entry.data as T;
+}
+
+function clearMemoryCacheByPrefix(prefix: string): void {
+  for (const key of memoryCache.keys()) {
+    if (key.startsWith(prefix)) {
+      memoryCache.delete(key);
+    }
+  }
+}
+
+async function fetchWithTimeout(url: string, config: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...config,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function getRetryDelayMs(retryIndex: number): number {
+  return BACKOFF_BASE_MS * Math.pow(2, retryIndex);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function invalidateRelatedCaches(endpoint: string): Promise<void> {
+  const path = getEndpointPath(endpoint);
+  const root = `/${path.split('/').filter(Boolean)[0] || ''}`;
+
+  if (root === '/auth' && /\/(login|logout|google|register)$/.test(path)) {
+    memoryCache.clear();
+    await dataCache.clear();
+    return;
+  }
+
+  const prefixes = new Set<string>();
+  prefixes.add(`api:${root}`);
+
+  if (root === '/properties') {
+    prefixes.add('api:/rooms');
+    prefixes.add('api:/beds');
+    prefixes.add('api:/tenants');
+    prefixes.add('api:/payments');
+    prefixes.add('api:/staff');
+    prefixes.add('api:/dashboard');
+  } else if (root === '/rooms') {
+    prefixes.add('api:/beds');
+    prefixes.add('api:/dashboard');
+  } else if (root === '/beds') {
+    prefixes.add('api:/rooms');
+    prefixes.add('api:/tenants');
+    prefixes.add('api:/dashboard');
+  } else if (root === '/tenants') {
+    prefixes.add('api:/beds');
+    prefixes.add('api:/payments');
+    prefixes.add('api:/dashboard');
+  } else if (root === '/payments') {
+    prefixes.add('api:/tenants');
+    prefixes.add('api:/dashboard');
+  } else if (root === '/subscription') {
+    prefixes.add('api:/dashboard');
+  }
+
+  await Promise.all(
+    Array.from(prefixes).map(async (prefix) => {
+      clearMemoryCacheByPrefix(prefix);
+      await dataCache.removeByPrefix(prefix);
+    })
+  );
+}
+
 function getRequestKey(method: HttpMethod, endpoint: string, body?: any): string {
   // Only deduplicate GET/read requests, not mutations
   if (method !== 'GET') {
@@ -146,7 +307,26 @@ async function _performRequest<T>(
   requiresAuth: boolean = false
 ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
   let triedRefresh = false;
+  let retryCount = 0;
   const cacheKey = getCacheKey(method, endpoint);
+  const cachePolicy = getCachePolicy(endpoint);
+
+  // Cache-first for GET requests to keep UI instant and reduce backend load
+  if (method === 'GET' && cacheKey) {
+    const memoryFresh = getMemoryCacheEntry<ApiResponse<T> | PaginatedResponse<T>>(cacheKey, cachePolicy.freshMs);
+    if (memoryFresh) {
+      return memoryFresh;
+    }
+
+    const persistentFreshEntry = await dataCache.getEntry<ApiResponse<T> | PaginatedResponse<T>>(cacheKey);
+    if (persistentFreshEntry) {
+      const ageMs = Date.now() - persistentFreshEntry.timestamp;
+      if (ageMs <= cachePolicy.freshMs) {
+        setMemoryCacheEntry(cacheKey, persistentFreshEntry.data, cachePolicy.maxStaleMs, persistentFreshEntry.timestamp);
+        return persistentFreshEntry.data;
+      }
+    }
+  }
 
   while (true) {
     try {
@@ -168,7 +348,7 @@ async function _performRequest<T>(
       if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
         config.body = JSON.stringify(body);
       }
-      const response = await fetch(url, config);
+      const response = await fetchWithTimeout(url, config, NETWORK_TIMEOUT_MS);
       let responseData: any;
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
@@ -184,6 +364,14 @@ async function _performRequest<T>(
             continue; // retry with new token
           }
         }
+
+        if (method === 'GET' && isRetryableStatus(response.status) && retryCount < MAX_GET_RETRIES) {
+          const delayMs = getRetryDelayMs(retryCount);
+          retryCount += 1;
+          await sleep(delayMs);
+          continue;
+        }
+
         if (response.status === 401) {
           const error: ApiError = {
             code: 'UNAUTHORIZED',
@@ -257,25 +445,47 @@ async function _performRequest<T>(
         } as ApiResponse<T>;
       }
 
-      // Cache successful GET responses
-      if (cacheKey) {
-        await dataCache.set(cacheKey, result);
+      // Cache successful GET responses (memory + persistent)
+      if (method === 'GET' && cacheKey) {
+        setMemoryCacheEntry(cacheKey, result, cachePolicy.maxStaleMs);
+        await dataCache.set(cacheKey, result, cachePolicy.maxStaleMs);
+      }
+
+      // Invalidate related caches after successful mutations
+      if (method !== 'GET') {
+        await invalidateRelatedCaches(endpoint);
       }
 
       return result;
     } catch (error: any) {
-      // If it's a known API error (not network), rethrow it
-      if (error.code && error.message) {
-        throw error;
+      const isKnownApiError = Boolean(error?.code && error?.message);
+      const statusCode = Number(error?.details?.status || 0);
+
+      if (method === 'GET' && retryCount < MAX_GET_RETRIES && (!isKnownApiError || isRetryableStatus(statusCode))) {
+        const delayMs = getRetryDelayMs(retryCount);
+        retryCount += 1;
+        await sleep(delayMs);
+        continue;
       }
 
-      // Network error - try to return cached data
-      if (cacheKey) {
-        const cachedData = await dataCache.get<ApiResponse<T> | PaginatedResponse<T>>(cacheKey);
-        if (cachedData) {
-          console.warn(`Using cached data for ${endpoint} due to network error`);
-          return cachedData;
+      // Fallback to stale cache on failure for GET requests
+      if (method === 'GET' && cacheKey) {
+        const memoryStale = getMemoryCacheEntry<ApiResponse<T> | PaginatedResponse<T>>(cacheKey, cachePolicy.maxStaleMs);
+        if (memoryStale) {
+          console.warn(`Using stale memory cache for ${endpoint} due to request error`);
+          return memoryStale;
         }
+
+        const persistentStaleEntry = await dataCache.getEntry<ApiResponse<T> | PaginatedResponse<T>>(cacheKey);
+        if (persistentStaleEntry) {
+          setMemoryCacheEntry(cacheKey, persistentStaleEntry.data, cachePolicy.maxStaleMs, persistentStaleEntry.timestamp);
+          console.warn(`Using stale persistent cache for ${endpoint} due to request error`);
+          return persistentStaleEntry.data;
+        }
+      }
+
+      if (isKnownApiError) {
+        throw error;
       }
 
       // No cache available - throw network error
@@ -390,8 +600,10 @@ export const authService = {
 };
 
 export const propertyService = {
-  async getProperties(): Promise<PaginatedResponse<Property>> {
-    return await request<Property>('GET', '/properties', undefined, true) as PaginatedResponse<Property>;
+  async getProperties(page: number = 1, pageSize: number = 50): Promise<PaginatedResponse<Property>> {
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.min(100, Math.max(1, pageSize));
+    return await request<Property>('GET', `/properties?page=${safePage}&page_size=${safePageSize}`, undefined, true) as PaginatedResponse<Property>;
   },
 
   async createProperty(

@@ -29,8 +29,21 @@ class PropertyService:
         return PropertyOut(**doc)
 
     async def list_properties(self, user_id: str) -> List[PropertyOut]:
+        """List all properties for a user - kept for backward compatibility"""
+        properties, _ = await self._list_properties_paginated(user_id, skip=0, limit=1000)
+        return properties
+    
+    async def _list_properties_paginated(self, user_id: str, skip: int = 0, limit: int = 50):
+        """Internal method with pagination support"""
+        query = build_owner_query(user_id)
+        
+        # Get total count
+        total = await self.db["properties"].count_documents(query)
+        
+        # Fetch paginated results
         properties = []
-        async for doc in self.db["properties"].find(build_owner_query(user_id)):
+        cursor = self.db["properties"].find(query).skip(skip).limit(limit)
+        async for doc in cursor:
             doc["id"] = str(doc["_id"])
 
             original_owner_id = doc.get("ownerId")
@@ -52,7 +65,8 @@ class PropertyService:
                 )
 
             properties.append(PropertyOut(**doc))
-        return properties
+        
+            return properties, total
 
     async def update_property(self, property_id: str, owner_id: str, property_update: dict) -> PropertyOut | None:
         now = datetime.now(timezone.utc).isoformat()

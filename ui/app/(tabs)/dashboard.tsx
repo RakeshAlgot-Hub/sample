@@ -58,8 +58,13 @@ export default function DashboardScreen() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(initialDashboardData);
   const lastFocusRefreshRef = useRef<number>(Date.now());
   const isFetchingRef = useRef(false);
+  const hasDashboardDataRef = useRef(Boolean(initialDashboardData));
 
-  const fetchDashboardData = async () => {
+  useEffect(() => {
+    hasDashboardDataRef.current = Boolean(dashboardData);
+  }, [dashboardData]);
+
+  const fetchDashboardData = useCallback(async () => {
     if (!selectedPropertyId) {
       setLoading(false);
       return;
@@ -81,7 +86,7 @@ export default function DashboardScreen() {
     try {
       isFetchingRef.current = true;
       // Only show loading if we don't already have data
-      if (!dashboardData) {
+      if (!hasDashboardDataRef.current) {
         setLoading(true);
       }
       setError(null);
@@ -130,7 +135,7 @@ export default function DashboardScreen() {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  };
+  }, [selectedPropertyId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -148,12 +153,12 @@ export default function DashboardScreen() {
         // If property loading is done but there are no properties, set loading to false
         setLoading(false);
       }
-    }, [selectedPropertyId, propertyLoading, dashboardData])
+    }, [selectedPropertyId, propertyLoading, fetchDashboardData])
   );
 
   // Fetch data on initial mount or when property changes
   useEffect(() => {
-    if (!propertyLoading && selectedPropertyId && !dashboardData) {
+    if (!propertyLoading && selectedPropertyId && !hasDashboardDataRef.current) {
       // Only fetch if we don't have any data yet
       const cacheKey = cacheKeys.dashboard(selectedPropertyId);
       const cachedData = getScreenCache<DashboardData>(cacheKey, DASHBOARD_CACHE_STALE_MS);
@@ -161,7 +166,7 @@ export default function DashboardScreen() {
         fetchDashboardData();
       }
     }
-  }, [selectedPropertyId, propertyLoading, dashboardData]);
+  }, [selectedPropertyId, propertyLoading, fetchDashboardData]);
 
   const handleRetry = () => {
     fetchDashboardData();
@@ -172,12 +177,17 @@ export default function DashboardScreen() {
     setError(null);
     
     try {
-      clearScreenCache();
+      if (selectedPropertyId) {
+        clearScreenCache(cacheKeys.dashboard(selectedPropertyId));
+        clearScreenCache(`payments:${selectedPropertyId}:`);
+      } else {
+        clearScreenCache('dashboard:');
+      }
       await fetchDashboardData();
     } finally {
       setRefreshing(false);
     }
-  }, [selectedPropertyId]);
+  }, [selectedPropertyId, fetchDashboardData]);
 
   const totalBeds = dashboardData?.stats.totalBeds || 0;
   const occupiedBeds = dashboardData?.stats.occupiedBeds || 0;

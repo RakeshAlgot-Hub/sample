@@ -60,6 +60,12 @@ export default function TenantsScreen() {
   const lastFocusRefreshRef = useRef<number>(Date.now());
   const isFetchingRef = useRef(false);
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tenantsCountRef = useRef(initialTenants.length);
+  const hasMountedSearchEffectRef = useRef(false);
+
+  useEffect(() => {
+    tenantsCountRef.current = tenants.length;
+  }, [tenants.length]);
 
   const fetchTenants = useCallback(async (page: number = 1, search: string = '', status: string = 'all') => {
     if (!selectedPropertyId) {
@@ -84,7 +90,7 @@ export default function TenantsScreen() {
     try {
       isFetchingRef.current = true;
       // Only show loading if we don't already have data
-      if (!tenants.length) {
+      if (!tenantsCountRef.current) {
         setLoading(true);
         
         // Set a timeout to auto-dismiss skeleton after 8 seconds
@@ -93,7 +99,7 @@ export default function TenantsScreen() {
         }
         loadingTimeoutRef.current = setTimeout(() => {
           setLoading(false);
-          if (!tenants.length) {
+          if (!tenantsCountRef.current) {
             setError('Request is taking longer than expected. Please try again.');
           }
         }, 8000);
@@ -132,7 +138,7 @@ export default function TenantsScreen() {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [selectedPropertyId, tenants.length]);
+  }, [selectedPropertyId]);
 
   // Fetch data on property change or initial mount
   useEffect(() => {
@@ -144,17 +150,22 @@ export default function TenantsScreen() {
     const cacheKey = cacheKeys.tenants(selectedPropertyId, 1, '', 'all');
     const cachedResponse = getScreenCache<PaginatedResponse<Tenant>>(cacheKey, TENANTS_CACHE_STALE_MS);
     
-    if (!cachedResponse && !tenants.length) {
+    if (!cachedResponse && tenantsCountRef.current === 0) {
       // Only show skeleton if we have no cached data and no current data
       setLoading(true);
       setTenants([]);
       setTotal(0);
       fetchTenants(1, '', 'all');
     }
-  }, [selectedPropertyId, propertyLoading, tenants.length, fetchTenants]);
+  }, [selectedPropertyId, propertyLoading, fetchTenants]);
 
   // Debounced search handler
   useEffect(() => {
+    if (!hasMountedSearchEffectRef.current) {
+      hasMountedSearchEffectRef.current = true;
+      return;
+    }
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
@@ -199,8 +210,13 @@ export default function TenantsScreen() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Clear all cached data to force fresh data fetch
-    clearScreenCache();
+
+    // Clear only tenants cache to avoid forcing unrelated screens to refetch
+    if (selectedPropertyId) {
+      clearScreenCache(`tenants:${selectedPropertyId}:`);
+    } else {
+      clearScreenCache('tenants:');
+    }
     
     // Reset pagination and filters
     setCurrentPage(1);

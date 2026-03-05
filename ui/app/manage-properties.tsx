@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -41,9 +41,6 @@ export default function ManagePropertiesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    refreshProperties();
-  }, []);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);

@@ -51,6 +51,7 @@ interface TenantDetailCachePayload {
 }
 
 const TENANT_DETAIL_CACHE_STALE_MS = 30 * 1000;
+const TENANT_DETAIL_FOCUS_THROTTLE_MS = 30 * 1000;
 
 export default function TenantDetailScreen() {
   const { colors } = useTheme();
@@ -80,6 +81,7 @@ export default function TenantDetailScreen() {
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [tenantActionLoading, setTenantActionLoading] = useState(false);
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTenantFocusRefreshRef = useRef<number>(0);
 
   const fetchTenantData = async () => {
     if (!tenantId) {
@@ -161,7 +163,11 @@ export default function TenantDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchTenantData();
+      const now = Date.now();
+      if (lastTenantFocusRefreshRef.current === 0 || (now - lastTenantFocusRefreshRef.current) > TENANT_DETAIL_FOCUS_THROTTLE_MS) {
+        lastTenantFocusRefreshRef.current = now;
+        fetchTenantData();
+      }
     }, [tenantId])
   );
 
@@ -392,18 +398,20 @@ export default function TenantDetailScreen() {
     if (!tenant) return;
 
     Alert.alert(
-      'Delete Tenant',
-      `Are you sure you want to delete ${tenant.name}? This action cannot be undone.`,
+      'Delete Tenant?',
+      `⚠️ Deleting ${tenant.name} will permanently remove:\n• Tenant profile and all details\n• All payment records and history\n\nThis action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Delete Tenant & Payments',
           style: 'destructive',
           onPress: async () => {
             try {
               setTenantActionLoading(true);
               await tenantService.deleteTenant(tenant.id);
-              router.back();
+              Alert.alert('Success', `${tenant.name} and all associated payments have been deleted.`, [
+                { text: 'OK', onPress: () => router.back() }
+              ]);
             } catch (err: any) {
               Alert.alert('Error', err?.message || 'Failed to delete tenant');
             } finally {

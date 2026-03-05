@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -67,6 +67,8 @@ export default function SubscriptionScreen() {
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
   const [selectedPeriods, setSelectedPeriods] = useState<{ [key: string]: number }>({});
   const [upgradingPlan, setUpgradingPlan] = useState<string | null>(null);
+  const isFetchingRef = useRef(false);
+  const lastFocusRefreshRef = useRef<number>(0);
 
   const formatPrice = (paise: number) => {
     if (paise === 0) return 'Free';
@@ -88,6 +90,10 @@ export default function SubscriptionScreen() {
   };
 
   const fetchSubscriptionData = async () => {
+    if (isFetchingRef.current) {
+      return;
+    }
+
     const cacheKey = cacheKeys.subscription();
     const cachedData = getScreenCache<SubscriptionCachePayload>(cacheKey, SUBSCRIPTION_CACHE_STALE_MS);
     if (cachedData) {
@@ -101,6 +107,7 @@ export default function SubscriptionScreen() {
     }
 
     try {
+      isFetchingRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -152,12 +159,20 @@ export default function SubscriptionScreen() {
       }
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   };
 
   useFocusEffect(
     useCallback(() => {
-      fetchSubscriptionData();
+      const now = Date.now();
+      const timeSinceLastRefresh = now - lastFocusRefreshRef.current;
+      const shouldRefresh = timeSinceLastRefresh > SUBSCRIPTION_CACHE_STALE_MS;
+
+      if (lastFocusRefreshRef.current === 0 || shouldRefresh) {
+        lastFocusRefreshRef.current = now;
+        fetchSubscriptionData();
+      }
     }, [])
   );
 

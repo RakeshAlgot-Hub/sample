@@ -60,6 +60,29 @@ export const dataCache = {
   },
 
   /**
+   * Get full cache entry metadata (used for stale/fresh strategies)
+   */
+  async getEntry<T>(key: string): Promise<CacheEntry<T> | null> {
+    try {
+      const cached = await AsyncStorage.getItem(CACHE_PREFIX + key);
+      if (!cached) return null;
+
+      const cacheEntry: CacheEntry<T> = JSON.parse(cached);
+
+      // Check if cache has expired
+      if (Date.now() > cacheEntry.expiresAt) {
+        await AsyncStorage.removeItem(CACHE_PREFIX + key);
+        return null;
+      }
+
+      return cacheEntry;
+    } catch (error) {
+      console.warn(`Failed to retrieve cache entry for key "${key}":`, error);
+      return null;
+    }
+  },
+
+  /**
    * Remove specific cache entry
    */
   async remove(key: string): Promise<void> {
@@ -80,6 +103,21 @@ export const dataCache = {
       await AsyncStorage.multiRemove(cacheKeys);
     } catch (error) {
       console.warn('Failed to clear cache:', error);
+    }
+  },
+
+  /**
+   * Remove all cache entries matching a key prefix
+   */
+  async removeByPrefix(prefix: string): Promise<void> {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const matchedKeys = keys.filter((key) => key.startsWith(CACHE_PREFIX + prefix));
+      if (matchedKeys.length > 0) {
+        await AsyncStorage.multiRemove(matchedKeys);
+      }
+    } catch (error) {
+      console.warn(`Failed to remove cache by prefix "${prefix}":`, error);
     }
   },
 

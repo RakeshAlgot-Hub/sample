@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,7 @@ import type { Room, PaginatedResponse } from '@/services/apiTypes';
 import { cacheKeys, getScreenCache, setScreenCache } from '@/services/screenCache';
 
 const ROOMS_CACHE_STALE_MS = 60 * 1000;
+const ROOMS_FOCUS_THROTTLE_MS = 60 * 1000;
 
 export default function ManageRoomsScreen() {
   const { colors } = useTheme();
@@ -43,6 +44,7 @@ export default function ManageRoomsScreen() {
   const [warningAction, setWarningAction] = useState<'edit' | 'delete' | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const lastRoomsFocusRefreshRef = useRef<number>(0);
 
   const fetchRooms = async () => {
     if (!selectedPropertyId) {
@@ -77,10 +79,14 @@ export default function ManageRoomsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!propertyLoading) {
+      if (propertyLoading) return;
+      
+      const now = Date.now();
+      if (lastRoomsFocusRefreshRef.current === 0 || (now - lastRoomsFocusRefreshRef.current) > ROOMS_FOCUS_THROTTLE_MS) {
+        lastRoomsFocusRefreshRef.current = now;
         fetchRooms();
       }
-    }, [selectedPropertyId, propertyLoading])
+    }, [propertyLoading])
   );
 
   const handleRetry = () => {
