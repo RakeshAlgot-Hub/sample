@@ -47,6 +47,9 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       }
+        ,"blockedPermissions": [
+          "android.permission.READ_PHONE_STATE"
+        ]
     }
   }
 }
