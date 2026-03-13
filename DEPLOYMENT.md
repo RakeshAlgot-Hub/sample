@@ -1,80 +1,97 @@
-# Deployment Guide for AWS EC2 (Free Tier)
+# Deployment Guide for AWS EC2
 
-This guide helps you deploy the backend to an AWS EC2 `t2.micro` or `t3.micro` instance using Docker and Docker Compose.
+This project can be deployed with plain Docker Compose. No deployment script is required.
 
-## 1. Prerequisites
-- An AWS Account.
-- EC2 Instance (Ubuntu 22.04 LTS recommended).
-- Security Group configured to allow:
-    - SSH (Port 22)
-    - HTTP (Port 80)
-    - HTTPS (Port 443)
+## Prerequisites
+- Ubuntu server with Docker installed
+- Docker Compose available as either `docker compose` or `docker-compose`
+- Security group allowing at least:
+  - Port 22 for SSH
+  - Port 80 for HTTP
 
-## 2. Server Setup
-Once you've SSHed into your EC2 instance:
+## Deploy
 
+### 1. Clone the repository
 ```bash
-# Update system
-sudo apt-get update && sudo apt-get upgrade -y
-
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# Install Docker Compose
-sudo apt-get install -y docker-compose-plugin
-
-# Add your user to the docker group
-sudo usermod -aG docker $USER
-# (Log out and log back in for this to take effect)
+cd /home/ubuntu
+git clone git@github.com:shoverhub-glitch/HostelManager.git
+cd HostelManager
 ```
 
-## 3. Clone and Configure
-Clone your repository to the server:
-
-```bash
-git clone <your-repo-url>
-cd <repo-folder>
-```
-
-Create and configure your `.env` file:
+### 2. Create the backend env file
 ```bash
 cp api/.env.example api/.env
 nano api/.env
 ```
-*Tip: For `MONGO_URL`, use a free cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) to save memory on your EC2 instance.*
 
-## 4. Deployment
-Start the services:
+At minimum, update these values in `api/.env`:
+- `JWT_SECRET`: generate with `openssl rand -hex 32`
+- `ALLOWED_ORIGINS`: replace `YOUR_SERVER_PUBLIC_IP` with your EC2 public IP or domain
+- `ZEPTO_MAIL_API_KEY`, `FROM_EMAIL`, `GOOGLE_CLIENT_IDS`, `RAZORPAY_*`: set real values only if you use those features
 
+Defaults already work for Docker Compose:
+- `MONGO_URL=mongodb://mongodb:27017/hostelmanager`
+
+### 3. Start the stack
 ```bash
-docker compose up -d --build
+sudo docker compose up -d --build
 ```
 
-Check the status:
+### 4. Check the stack
 ```bash
-docker compose ps
-docker compose logs -f backend
+sudo docker compose ps
+sudo docker compose logs -f
+curl http://localhost/api/v1/health
 ```
 
-## 5. SSL (Optional but Recommended)
-To enable HTTPS, use Certbot with Nginx:
-
-```bash
-sudo apt-get install certbot python3-certbot-nginx -y
-# Note: You need a domain name pointing to your EC2 IP
-sudo certbot --nginx -d yourdomain.com
+If Nginx is running correctly, the public endpoint is:
+```text
+http://YOUR_SERVER_PUBLIC_IP/api/v1/health
 ```
 
-## 6. Performance Optimization for Free Tier
-- **SWAP Space:** t2.micro has only 1GB RAM. It's highly recommended to add 2GB of swap space to prevent the server from crashing.
+## Daily Commands
+
+Start:
 ```bash
-sudo fallocate -l 2G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+sudo docker compose up -d
 ```
 
-- **Database:** Avoid running MongoDB locally on the same instance if possible; use MongoDB Atlas.
-- **Workers:** Keep the number of Gunicorn workers low (set to 2 in the Dockerfile).
+Stop:
+```bash
+sudo docker compose down
+```
+
+Rebuild after code changes:
+```bash
+sudo docker compose up -d --build
+```
+
+Logs:
+```bash
+sudo docker compose logs -f backend
+sudo docker compose logs -f nginx
+sudo docker compose logs -f mongodb
+```
+
+## Troubleshooting
+
+### API not reachable from browser
+- Confirm EC2 security group allows inbound traffic on port 80
+- Run `sudo docker compose ps`
+- Run `curl http://localhost/api/v1/health` on the server
+
+### Nginx returns 502
+- Backend is still starting or has crashed
+- Check `sudo docker compose logs -f backend`
+
+### MongoDB uses too much memory
+- On a small EC2 instance, local MongoDB may be heavy
+- If needed, switch `MONGO_URL` in `api/.env` to MongoDB Atlas and restart Compose
+
+## Services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| MongoDB | 27017 | Database |
+| Backend | 8000 | FastAPI app |
+| Nginx | 80 | Reverse proxy |

@@ -41,7 +41,7 @@ import {
 import { encryptedTokenStorage } from './encryptedTokenStorage';
 import { dataCache } from './dataCache';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://hostel.shoverhub.com/api/v1';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -718,8 +718,8 @@ export const paymentService = {
     }>;
   },
 
-  async getPaymentMethods(): Promise<ApiResponse<{ data: string[] }>> {
-    return await request<{ data: string[] }>('GET', '/payments/methods', undefined, true) as ApiResponse<{ data: string[] }>;
+  async getPaymentMethods(): Promise<PaginatedResponse<string>> {
+    return await request<string>('GET', '/payments/methods', undefined, true) as PaginatedResponse<string>;
   },
 };
 

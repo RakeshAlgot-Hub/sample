@@ -37,6 +37,3 @@ if not PUBLIC_PATHS:
 RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET")
 RAZORPAY_WEBHOOK_SECRET = os.environ.get("RAZORPAY_WEBHOOK_SECRET")
-
-# Redis
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
