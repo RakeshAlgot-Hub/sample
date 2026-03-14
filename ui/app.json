@@ -3,6 +3,7 @@
     "name": "Hostel Manager",
     "slug": "hostel-manager",
     "version": "1.0.0",
+    "jsEngine": "hermes",
     "orientation": "portrait",
     "icon": "./assets/images/hm-logo-v2.jpg",
     "splash": {
@@ -13,17 +14,7 @@
     "scheme": "hostelmanager",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.lohilit101.hostelmanager"
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "single",
-      "favicon": "./assets/images/hm-logo-v2.jpg"
-    },
     "platforms": [
-      "ios",
       "android"
     ],
     "plugins": [
