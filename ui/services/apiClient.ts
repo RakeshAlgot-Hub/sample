@@ -24,11 +24,12 @@ import {
   VerifyOTPRequest,
   VerifyOTPResponse,
   ResendOTPRequest,
-  ResendOTPResponse,
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   ResetPasswordRequest,
   ResetPasswordResponse,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
   ApiError,
   RazorpayCheckoutSession,
   VerifyPaymentRequest,
@@ -546,8 +547,8 @@ export const authService = {
 
   async resendOTP(
     data: ResendOTPRequest
-  ): Promise<ApiResponse<ResendOTPResponse>> {
-    return await request<ResendOTPResponse>('POST', '/auth/resend-otp', data, false) as ApiResponse<ResendOTPResponse>;
+  ): Promise<ApiResponse<EmailSendOTPResponse>> {
+    return await request<EmailSendOTPResponse>('POST', '/auth/resend-otp', data, false) as ApiResponse<EmailSendOTPResponse>;
   },
 
   async forgotPassword(
@@ -566,6 +567,12 @@ export const authService = {
     data: ResetPasswordRequest
   ): Promise<ApiResponse<ResetPasswordResponse>> {
     return await request<ResetPasswordResponse>('POST', '/auth/reset-password', data, false) as ApiResponse<ResetPasswordResponse>;
+  },
+
+  async changePassword(
+    data: ChangePasswordRequest
+  ): Promise<ApiResponse<ChangePasswordResponse>> {
+    return await request<ChangePasswordResponse>('POST', '/auth/change-password', data, true) as ApiResponse<ChangePasswordResponse>;
   },
 
   async logout(): Promise<ApiResponse<{ success: boolean }>> {
@@ -868,7 +875,7 @@ export const roomService = {
   },
 
   async createRoom(data: Partial<Room>): Promise<ApiResponse<Room>> {
-    const response = await request<Room>('POST', '/rooms', data, true) as ApiResponse<Room>;
+    const response = await request<Room>('POST', '/rooms/', data, true) as ApiResponse<Room>;
     if (data.propertyId) {
       const propertyId = encodeURIComponent(data.propertyId);
       await dataCache.remove(`api:/beds/available-by-property?property_id=${propertyId}`);
